@@ -1,0 +1,14 @@
+version: "3.6"
+
+services:
+  mysql:
+    image: mysql:8
+    command: --local-infile
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql_passwd
+      MYSQL_DATABASE: kestra
+    ports:
+      - "63306:3306"
+    volumes:
+      - ${PWD}/docker/mysql/:/etc/mysql/conf.d
+      - ${PWD}/data:/tmp/docker
