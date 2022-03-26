@@ -46,7 +46,7 @@ public class Message {
         @Nullable
         Instant timestamp;
 
-        Boolean snapshot;
+        String snapshot;
 
         String db;
 
