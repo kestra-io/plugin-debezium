@@ -33,3 +33,14 @@ services:
       - ./certs/server/server.crt:/var/lib/postgresql/server.crt
       - ./certs/server/server.key:/var/lib/postgresql/server.key
       - ./certs/client/:/client
+
+  oracle:
+    image: gvenzl/oracle-xe:21
+    ports:
+      - "41521:1521"
+    environment:
+      ORACLE_PASSWORD: "oraclepasswd"
+      APP_USER: myuser
+      APP_USER_PASSWORD: mypassword
+    volumes:
+      - ${PWD}/data:/tmp/docker

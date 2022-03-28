@@ -1,0 +1,7 @@
+dependencies {
+    implementation project(':plugin-debezium')
+    testImplementation project(':plugin-debezium').sourceSets.test.output
+
+    implementation "com.oracle.database.jdbc:ojdbc11:21.5.0.0"
+    implementation group: 'io.debezium', name: 'debezium-connector-oracle', version: '1.9.0.Beta1'
+}
