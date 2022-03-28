@@ -1,0 +1,17 @@
+id: trigger
+namespace: io.kestra.tests
+
+triggers:
+  - id: watch
+    type: io.kestra.plugin.debezium.mysql.Trigger
+    snapshotMode: NEVER
+    hostname: 127.0.0.1
+    port: 63306
+    username: root
+    password: mysql_passwd
+    maxRecords: 19
+
+tasks:
+  - id: end
+    type: io.kestra.core.tasks.debugs.Return
+    format: "{{task.id}} > {{taskrun.startDate}}"

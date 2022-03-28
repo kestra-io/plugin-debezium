@@ -156,6 +156,9 @@ subprojects { Project subproject ->
     shadowJar {
         archiveClassifier.set(null)
         mergeServiceFiles()
+        if (subproject.name != "plugin-debezium") {
+            dependsOn(project(":plugin-debezium").tasks.named("shadowJar"))
+        }
     }
 }
 

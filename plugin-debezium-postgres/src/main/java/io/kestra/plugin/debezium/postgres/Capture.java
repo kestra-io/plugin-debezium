@@ -1,9 +1,12 @@
 package io.kestra.plugin.debezium.postgres;
 
 import io.debezium.connector.postgresql.PostgresConnector;
+import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.micronaut.core.annotation.Introspected;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -15,6 +18,25 @@ import java.util.Properties;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
+@Schema(
+    title = "Wait for change data capture event on PostgresSQL server"
+)
+@Plugin(
+    examples = {
+        @Example(
+            code = {
+                "hostname: 127.0.0.1",
+                "port: 5432",
+                "username: posgres",
+                "password: psql_passwd",
+                "maxRecords: 100",
+                "database: my_database",
+                "pluginName: PGOUTPUT",
+                "snapshotMode: ALWAYS"
+            }
+        )
+    }
+)
 public class Capture extends AbstractDebeziumTask implements PostgresInterface {
     protected String database;
 
@@ -55,13 +77,5 @@ public class Capture extends AbstractDebeziumTask implements PostgresInterface {
         PostgresService.handleProperties(props, runContext, this);
 
         return props;
-    }
-
-    @Introspected
-    public enum SnapshotMode {
-        INITIAL,
-        ALWAYS,
-        NEVER,
-        INITIAL_ONLY,
     }
 }

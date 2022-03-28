@@ -4,7 +4,6 @@ import ch.qos.logback.classic.LoggerContext;
 import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -33,9 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-import javax.validation.constraints.NotNull;
 
-import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static io.kestra.core.utils.Rethrow.throwFunction;
 
 @SuperBuilder
@@ -44,192 +41,59 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractDebeziumTask extends Task implements RunnableTask<AbstractDebeziumTask.Output> {
-    @Schema(
-        title = "The format of output",
-        description = " Possible settings are:\n" +
-            "- `RAW`: Send raw data from debezium.\n" +
-            "- `INLINE`: Send a row like in the source with only data (remove after & before), all the cols will be present on each rows.\n" +
-            "- `WRAP`: Send a row like INLINE but wrapped on a `record` field.\n"
-    )
-    @PluginProperty(dynamic = false)
-    @NotNull
     @Builder.Default
     protected Format format = Format.INLINE;
 
-    @Schema(
-        title = "How to handle deleted rows",
-        description = " Possible settings are:\n" +
-            "- `ADD_FIELD`: add a deleted fields as boolean.\n" +
-            "- `NULL`: send a row will all values as null.\n" +
-            "- `DROP`: don't send row deleted."
-    )
-    @PluginProperty(dynamic = false)
-    @NotNull
     @Builder.Default
     protected Deleted deleted = Deleted.ADD_FIELD;
 
-    @Schema(
-        title = "The name of deleted fields if deleted is `ADD_FIELD`"
-    )
-    @PluginProperty(dynamic = false)
-    @NotNull
     @Builder.Default
     protected String deletedFieldName = "deleted";
 
-    @Schema(
-        title = "How to handle key",
-        description = " Possible settings are:\n" +
-            "- `ADD_FIELD`: add key(s) merged with cols.\n" +
-            "- `DROP`: drop keys."
-    )
-    @PluginProperty(dynamic = false)
-    @NotNull
     @Builder.Default
     protected Key key = Key.ADD_FIELD;
 
-    @Schema(
-        title = "How to handle metadata",
-        description = " Possible settings are:\n" +
-            "- `ADD_FIELD`: add metadata in a col named `metadata`.\n" +
-            "- `DROP`: drop keys."
-    )
-    @PluginProperty(dynamic = false)
-    @NotNull
     @Builder.Default
     protected Metadata metadata = Metadata.ADD_FIELD;
 
-    @Schema(
-        title = "The name of metadata fields if metadata is `ADD_FIELD`"
-    )
-    @PluginProperty(dynamic = false)
-    @NotNull
     @Builder.Default
     protected String metadataFieldName = "metadata";
 
-    @Schema(
-        title = "Split table on separate output `uris`",
-        description = " Possible settings are:\n" +
-            "- `TABLE`: will split all rows by tables on output with name `database.table`\n" +
-            "- `DATABASE`: will split all rows by database on output with name `database`.\n" +
-            "- `OFF`: will **NOT** split all rows resulting a single `data` output."
-    )
-    @PluginProperty(dynamic = false)
-    @NotNull
     @Builder.Default
     protected SplitTable splitTable = SplitTable.TABLE;
 
-    @Schema(
-        title = "Ignore ddl statement",
-        description = "Ignore create table and others administration operations"
-    )
-    @PluginProperty(dynamic = false)
-    @NotNull
     @Builder.Default
     protected Boolean ignoreDdl = true;
 
-    @Schema(
-        title = "Hostname of the remote server"
-    )
-    @PluginProperty(dynamic = true)
-    @NotNull
     protected String hostname;
 
-    @Schema(
-        title = "Port of the remote server"
-    )
-    @PluginProperty(dynamic = true)
-    @NotNull
     protected String port;
 
-    @Schema(
-        title = "Username on the remote server"
-    )
-    @PluginProperty(dynamic = true)
     protected String username;
 
-    @Schema(
-        title = "Password on the remote server"
-    )
-    @PluginProperty(dynamic = true)
     protected String password;
 
-    @Schema(
-        title = "An optional, comma-separated list of regular expressions that match the names of the databases for which to capture changes.",
-        description = "The connector does not capture changes in any database whose name is not in `includedDatabases``. By default, the connector captures changes in all databases. Do not also set the `excludedDatabases` connector configuration property."
-    )
-    @PluginProperty(dynamic = true)
     private Object includedDatabases;
 
-    @Schema(
-        title = "An optional, comma-separated list of regular expressions that match the names of databases for which you do not want to capture changes. ",
-        description = "The connector captures changes in any database whose name is not in the `excludedDatabases``. Do not also set the `includedDatabases` connector configuration property."
-    )
-    @PluginProperty(dynamic = true)
     private Object excludedDatabases;
 
-    @Schema(
-        title = "An optional, comma-separated list of regular expressions that match fully-qualified table identifiers of tables whose changes you want to capture.",
-        description = "The connector does not capture changes in any table not included in `includedTables``. Each identifier is of the form databaseName.tableName. By default, the connector captures changes in every non-system table in each database whose changes are being captured. Do not also specify the `excludedTables` connector configuration property."
-    )
-    @PluginProperty(dynamic = true)
     private Object includedTables;
 
-    @Schema(
-        title = "An optional, comma-separated list of regular expressions that match fully-qualified table identifiers for tables whose changes you do not want to capture.",
-        description = "The connector captures changes in any table not included in `excludedTables`. Each identifier is of the form databaseName.tableName. Do not also specify the `includedTables` connector configuration property."
-    )
-    @PluginProperty(dynamic = true)
     private Object excludedTables;
 
-
-    @Schema(
-        title = "An optional, comma-separated list of regular expressions that match the fully-qualified names of columns to exclude from change event record values.",
-        description = "Fully-qualified names for columns are of the form databaseName.tableName.columnName."
-    )
-    @PluginProperty(dynamic = true)
     private Object includedColumns;
 
-    @Schema(
-        title = "An optional, comma-separated list of regular expressions that match the fully-qualified names of columns to include in change event record values.",
-        description = "Fully-qualified names for columns are of the form databaseName.tableName.columnName."
-    )
-    @PluginProperty(dynamic = true)
     private Object excludedColumns;
 
-    @Schema(
-        title = "Additional configuration properties",
-        description = "Any additional configuration properties that is valid for the current driver"
-    )
-    @PluginProperty(dynamic = true)
     private Map<String, String> properties;
 
-    @Schema(
-        title = "The name of Debezium state file"
-    )
-    @PluginProperty(dynamic = false)
-    @NotNull
     @Builder.Default
     protected String stateName = "debezium-state";
 
-    @Schema(
-        title = "The max number of rows to fetch before stopping",
-        description = "It's not an hard limit and is evaluated every second"
-    )
-    @PluginProperty(dynamic = false)
     private Integer maxRecords;
 
-    @Schema(
-        title = "The max total processing duration",
-        description = "It's not an hard limit and is evaluated every second"
-    )
-    @PluginProperty(dynamic = false)
     private Duration maxDuration;
 
-    @Schema(
-        title = "The max duration waiting for new rows",
-        description = "It's not an hard limit and is evaluated every second"
-    )
-    @PluginProperty(dynamic = false)
     @Builder.Default
     private Duration maxWait = Duration.ofSeconds(10);
 
