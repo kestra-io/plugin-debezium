@@ -41,7 +41,7 @@ class CaptureTest {
             .type(Capture.class.getName())
             .hostname("127.0.0.1")
             .port("41521")
-            .username("dbzuser")
+            .username("c##dbzuser")
             .password("dbz")
             .database("XE")
             .maxRecords(19)
