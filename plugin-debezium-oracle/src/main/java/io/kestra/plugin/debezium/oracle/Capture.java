@@ -53,6 +53,8 @@ public class Capture extends AbstractDebeziumTask {
 
         props.put("database.dbname", runContext.render(database));
 
+        props.put("database.pdb.name", "XEPDB1");
+
         if (this.snapshotMode != null) {
             props.setProperty("snapshot.mode", this.snapshotMode.name().toLowerCase(Locale.ROOT));
         }

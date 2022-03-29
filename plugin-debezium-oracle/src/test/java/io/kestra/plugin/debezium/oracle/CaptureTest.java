@@ -44,7 +44,8 @@ class CaptureTest {
             .username("c##dbzuser")
             .password("dbz")
             .database("XE")
-            .maxRecords(19)
+            .maxDuration(Duration.ofSeconds(240))
+            .maxWait(Duration.ofSeconds(240))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());

@@ -70,7 +70,7 @@ jobs:
           sleep 10
           docker exec plugin-debezium_mysql_1 sh -c "mysql -u root -pmysql_passwd < /tmp/docker/mysql.sql"
           docker exec plugin-debezium_postgres_1  sh -c "export PGPASSWORD=pg_passwd && psql -d postgres -U postgres -f /tmp/docker/postgres.sql > /dev/null"
-          docker exec -it plugin-debezium_oracle_1 bash  /tmp/docker/oracle-logminer.sh
+          docker exec -it plugin-debezium_oracle_1 bash  /tmp/docker/oracle.sh
 
       # Gradle check
       - name: Build with Gradle

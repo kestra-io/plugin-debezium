@@ -59,6 +59,11 @@ sqlplus sys/oraclepasswd@//localhost:1521/XE as sysdba <<- EOF
   GRANT SELECT ON V_\$LOGFILE TO c##dbzuser;
   GRANT SELECT ON V_\$ARCHIVED_LOG TO c##dbzuser;
   GRANT SELECT ON V_\$ARCHIVE_DEST_STATUS TO c##dbzuser;
+  GRANT SELECT ON V_\$DATABASE TO c##dbzuser;
+  GRANT SET CONTAINER TO c##dbzuser container=all;
+  GRANT SELECT ON SYS.V_$DATABASE to c##dbzuser container = all;
+  GRANT SELECT ON SYS.V_$TRANSACTION to c##dbzuser container = all;
+
   exit;
 EOF
 
@@ -69,5 +74,66 @@ sqlplus sys/oraclepasswd@//localhost:1521/XEPDB1 as sysdba <<- EOF
   GRANT CREATE TABLE TO debezium;
   GRANT CREATE SEQUENCE to debezium;
   ALTER USER debezium QUOTA 100M on users;
+  exit;
+EOF
+
+sqlplus sys/oraclepasswd@//localhost:1521/XE as sysdba <<- EOF
+  ALTER SESSION SET container=XEPDB1;
+
+  CREATE SEQUENCE oracle_types_seq START WITH 1;
+
+  INSERT INTO oracle_types
+  (
+      ID,
+      t_NULL,
+      t_CHAR,
+      t_VARCHAR,
+      t_VARCHAR2,
+      t_NVARCHAR,
+      t_NVARCHAR2,
+      t_BLOB,
+      t_CLOB,
+      t_NCLOB,
+      --     t_BFILE,
+      t_NUMBER,
+      t_NUMBER_1,
+      t_NUMBER_2,
+      t_NUMBER_3,
+      t_NUMBER_4,
+      t_NUMBER_5,
+      t_BINARY_FLOAT,
+      t_BINARY_DOUBLE,
+      t_DATE,
+      t_TIMESTAMP,
+      t_TIMESTAMP_TIME_ZONE,
+      t_TIMESTAMP_LOCAL
+  )
+  VALUES
+  (
+      oracle_types_seq.NEXTVAL,
+      NULL,
+      'aa',
+      'bb',
+      'cc',
+      'dd',
+      'ee',
+      UTL_RAW.CAST_TO_RAW('ff'),
+      'gg',
+      'hh',
+      --     BFILENAME('STUFF', 'WD.pdf'),
+      7456123.89,
+      7456123.89,
+      7456123.89,
+      7456123.89,
+      7456123.89,
+      7456123.89,
+      7456123.89,
+      7456123.89,
+      TO_DATE('November 13, 1992', 'MONTH DD, YYYY'),
+      TIMESTAMP'1998-1-23 6:00:00-5:00',
+      TIMESTAMP'1998-1-23 6:00:00-5:00',
+      TIMESTAMP'1998-1-23 6:00:00-5:00'
+  );
+
   exit;
 EOF
