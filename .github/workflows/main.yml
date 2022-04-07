@@ -32,14 +32,14 @@ jobs:
 
       # Caches
       - name: Gradle cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle*.properties') }}
+          key: ${{ runner.os }}-gradlew-${{ hashFiles('**/*.gradle*', '**/gradle*.properties') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-
+            ${{ runner.os }}-gradlew-
 
       # Services
       - name: Build the docker-compose stack

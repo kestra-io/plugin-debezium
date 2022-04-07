@@ -113,10 +113,10 @@ subprojects { Project subproject ->
     apply plugin: 'ru.vyarus.github-info'
     apply plugin: 'ru.vyarus.java-lib'
 
-    def group;
+    def group
 
     if (subproject.name == "plugin-debezium") {
-        subproject.description = 'Abstract debezium plugin for Kestra';
+        subproject.description = 'Abstract debezium plugin for Kestra'
         group = project.group + ".debezium"
     } else {
         subproject.description = subproject.name.substring(16, 17).toUpperCase() + subproject.name.substring(17)  + ' debezium plugin for Kestra'
@@ -161,7 +161,6 @@ subprojects { Project subproject ->
         }
     }
 }
-
 
 /**********************************************************************************************************************\
  * Version
