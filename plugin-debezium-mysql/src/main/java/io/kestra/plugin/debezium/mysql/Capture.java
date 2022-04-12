@@ -38,7 +38,7 @@ import javax.validation.constraints.NotNull;
         )
     }
 )
-public class Capture extends AbstractDebeziumTask {
+public class Capture extends AbstractDebeziumTask implements MysqlInterface {
     @Builder.Default
     private MysqlInterface.SnapshotMode snapshotMode = MysqlInterface.SnapshotMode.INITIAL;
 

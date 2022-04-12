@@ -1,0 +1,18 @@
+id: trigger
+namespace: io.kestra.tests
+
+triggers:
+  - id: watch
+    type: io.kestra.plugin.debezium.sqlserver.Trigger
+    hostname: 127.0.0.1
+    port: 61433
+    username: sa
+    password: Sqls3rv3r_Pa55word!
+    database: deb
+    maxRecords: 2
+    stateName: trigger-state
+
+tasks:
+  - id: end
+    type: io.kestra.core.tasks.debugs.Return
+    format: "{{task.id}} > {{taskrun.startDate}}"

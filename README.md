@@ -12,8 +12,9 @@
 ## Documentation
 * The official Kestra documentation can be found under: [kestra.io](https://kestra.io)
 * This plugin documentation is available here :
-    * [for MySQL](https://kestra.io/plugins/plugin-debezium-mysql/)
-    * [for Postgres](https://kestra.io/plugins/plugin-debezium-postgres/)
+  * [for MySQL](https://kestra.io/plugins/plugin-debezium-mysql/)
+  * [for Postgres](https://kestra.io/plugins/plugin-debezium-postgres/)
+  * [for Microsoft SQL Server](https://kestra.io/plugins/plugin-debezium-sqlserver/)
 
 ## License
 Apache 2.0 © [Kestra Technologies](https://kestra.io)
