@@ -118,6 +118,9 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     @Override
     public AbstractDebeziumTask.Output run(RunContext runContext) throws Exception {
+        // ugly hack to force use of Kestra plugins classLoader
+        Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
+
         ExecutorService executorService = runContext.getApplicationContext()
             .getBean(ExecutorsUtils.class)
             .singleThreadExecutor(this.getClass().getSimpleName());
@@ -145,6 +148,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         // start
         try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
+            .using(this.getClass().getClassLoader())
             .using(props)
             .notifying(changeConsumer)
             .using(completionCallback)
