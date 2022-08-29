@@ -1,5 +1,5 @@
 dependencies {
-    implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.11'
+    implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.4.0'
     implementation group: 'io.debezium', name: 'debezium-api', version: debeziumVersion
     implementation group: 'io.debezium', name: 'debezium-embedded', version: debeziumVersion
 }
