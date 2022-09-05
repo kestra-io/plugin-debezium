@@ -129,6 +129,12 @@ subprojects { Project subproject ->
         license 'Apache'
     }
 
+    if (subproject.name != "plugin-debezium") {
+        shadowJar {
+            dependsOn(":plugin-debezium:shadowJar")
+        }
+    }
+
     jar {
         manifest {
             attributes(
