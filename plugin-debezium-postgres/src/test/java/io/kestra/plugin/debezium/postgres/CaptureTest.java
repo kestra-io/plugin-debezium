@@ -45,7 +45,7 @@ class CaptureTest {
             .sslCert(TestUtils.cert())
             .sslKey(TestUtils.key())
             .sslKeyPassword(TestUtils.keyPass())
-            .snapshotMode(Capture.SnapshotMode.ALWAYS)
+            .snapshotMode(Capture.SnapshotMode.INITIAL)
             .maxRecords(2)
             .build();
 
@@ -60,5 +60,9 @@ class CaptureTest {
         assertThat(types.size(), is(2));
         assertThat(types.stream().filter(o -> o.get("concert_id").equals(3)).count(), is(1L));
         assertThat(types.stream().filter(o -> o.get("concert_id").equals(2)).count(), is(1L));
+
+        // rerun state will prevent new records
+        runOutput = task.run(runContext);
+        assertThat(runOutput.getSize(), is(0));
     }
 }
