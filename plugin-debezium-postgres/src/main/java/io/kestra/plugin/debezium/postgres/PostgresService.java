@@ -9,7 +9,12 @@ import org.bouncycastle.openssl.PEMEncryptedKeyPair;
 import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
+import org.bouncycastle.openssl.jcajce.JceOpenSSLPKCS8DecryptorProviderBuilder;
 import org.bouncycastle.openssl.jcajce.JcePEMDecryptorProviderBuilder;
+import org.bouncycastle.operator.InputDecryptorProvider;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo;
+import org.bouncycastle.pkcs.PKCSException;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -21,7 +26,7 @@ import java.util.Locale;
 import java.util.Properties;
 
 public abstract class PostgresService {
-    public static void handleProperties(Properties properties, RunContext runContext, PostgresInterface postgres) throws IllegalVariableEvaluationException, IOException {
+    public static void handleProperties(Properties properties, RunContext runContext, PostgresInterface postgres) throws IllegalVariableEvaluationException, IOException, OperatorCreationException, PKCSException {
         properties.put("database.dbname", runContext.render(postgres.getDatabase()));
         properties.put("plugin.name", postgres.getPluginName().name().toLowerCase(Locale.ROOT));
         properties.put("snapshot.mode", postgres.getSnapshotMode().name().toLowerCase(Locale.ROOT));
@@ -68,7 +73,7 @@ public abstract class PostgresService {
         }
     }
 
-    private static String convertPrivateKey(RunContext runContext, String vars, String password) throws IOException, IllegalVariableEvaluationException {
+    private static String convertPrivateKey(RunContext runContext, String vars, String password) throws IOException, IllegalVariableEvaluationException, OperatorCreationException, PKCSException {
         PostgresService.addProvider();
 
         Object pemObject = readPem(runContext, vars);
@@ -85,6 +90,16 @@ public abstract class PostgresService {
 
             PEMKeyPair decryptedKeyPair = ((PEMEncryptedKeyPair) pemObject).decryptKeyPair(decrypter);
             keyInfo = decryptedKeyPair.getPrivateKeyInfo();
+        } else if (pemObject instanceof PKCS8EncryptedPrivateKeyInfo) {
+            if (password == null) {
+                throw new IOException("Unable to import private key. Key is encrypted, but no password was provided.");
+            }
+
+            InputDecryptorProvider inputDecryptorProvider = new JceOpenSSLPKCS8DecryptorProviderBuilder()
+                .setProvider("BC")
+                .build(password.toCharArray());
+
+            keyInfo = ((PKCS8EncryptedPrivateKeyInfo) pemObject).decryptPrivateKeyInfo(inputDecryptorProvider);
         } else {
             keyInfo = ((PEMKeyPair) pemObject).getPrivateKeyInfo();
         }
