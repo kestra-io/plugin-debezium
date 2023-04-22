@@ -1,3 +1,15 @@
+jar {
+    manifest {
+        attributes(
+                "X-Kestra-Name": project.name,
+                "X-Kestra-Title": "Debezium Microsoft SQL Server",
+                "X-Kestra-Group": project.group + ".debezium.sqlserver",
+                "X-Kestra-Description": 'Debezium Microsoft SQL Server plugin for Kestra',
+                "X-Kestra-Version": project.version
+        )
+    }
+}
+
 dependencies {
     implementation project(':plugin-debezium')
     testImplementation project(':plugin-debezium').sourceSets.test.output

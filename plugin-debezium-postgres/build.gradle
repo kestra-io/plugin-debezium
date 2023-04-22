@@ -1,3 +1,15 @@
+jar {
+    manifest {
+        attributes(
+                "X-Kestra-Name": project.name,
+                "X-Kestra-Title": "Debezium PostgreSQL",
+                "X-Kestra-Group": project.group + ".debezium.postgres",
+                "X-Kestra-Description": 'Debezium PostgreSQL plugin for Kestra',
+                "X-Kestra-Version": project.version
+        )
+    }
+}
+
 dependencies {
     implementation project(':plugin-debezium')
     testImplementation project(':plugin-debezium').sourceSets.test.output
