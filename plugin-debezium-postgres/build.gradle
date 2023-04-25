@@ -4,7 +4,7 @@ jar {
                 "X-Kestra-Name": project.name,
                 "X-Kestra-Title": "Debezium PostgreSQL",
                 "X-Kestra-Group": project.group + ".debezium.postgres",
-                "X-Kestra-Description": 'Debezium PostgreSQL plugin for Kestra',
+                "X-Kestra-Description": 'Capture PostgreSQL changes using Debezium and Kestra integration.',
                 "X-Kestra-Version": project.version
         )
     }

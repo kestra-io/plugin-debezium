@@ -4,7 +4,7 @@ jar {
                 "X-Kestra-Name": project.name,
                 "X-Kestra-Title": "Debezium Microsoft SQL Server",
                 "X-Kestra-Group": project.group + ".debezium.sqlserver",
-                "X-Kestra-Description": 'Debezium Microsoft SQL Server plugin for Kestra',
+                "X-Kestra-Description": 'Leverage Debezium for SQL Server change streaming in Kestra workflows.',
                 "X-Kestra-Version": project.version
         )
     }

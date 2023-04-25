@@ -4,7 +4,7 @@ jar {
                 "X-Kestra-Name": project.name,
                 "X-Kestra-Title": "Debezium MySQL",
                 "X-Kestra-Group": project.group + ".debezium.mysql",
-                "X-Kestra-Description": 'Debezium MySQL plugin for Kestra',
+                "X-Kestra-Description": 'Stream MySQL database changes with Debezium in Kestra workflows.',
                 "X-Kestra-Version": project.version
         )
     }
