@@ -1,10 +1,12 @@
+project.description = 'Capture PostgreSQL changes using Debezium and Kestra integration.'
+
 jar {
     manifest {
         attributes(
                 "X-Kestra-Name": project.name,
                 "X-Kestra-Title": "Debezium PostgreSQL",
                 "X-Kestra-Group": project.group + ".debezium.postgres",
-                "X-Kestra-Description": 'Capture PostgreSQL changes using Debezium and Kestra integration.',
+                "X-Kestra-Description": project.description,
                 "X-Kestra-Version": project.version
         )
     }

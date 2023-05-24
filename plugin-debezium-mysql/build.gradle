@@ -1,10 +1,12 @@
+project.description = 'Stream MySQL database changes with Debezium in Kestra workflows.'
+
 jar {
     manifest {
         attributes(
                 "X-Kestra-Name": project.name,
                 "X-Kestra-Title": "Debezium MySQL",
                 "X-Kestra-Group": project.group + ".debezium.mysql",
-                "X-Kestra-Description": 'Stream MySQL database changes with Debezium in Kestra workflows.',
+                "X-Kestra-Description": project.description,
                 "X-Kestra-Version": project.version
         )
     }

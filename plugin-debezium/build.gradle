@@ -1,10 +1,12 @@
+project.description = 'Abstract Debezium plugin for Kestra'
+
 jar {
     manifest {
         attributes(
                 "X-Kestra-Name": project.name,
                 "X-Kestra-Title": "Abstract Debezium",
                 "X-Kestra-Group": project.group + ".debezium",
-                "X-Kestra-Description": 'Abstract Debezium plugin for Kestra',
+                "X-Kestra-Description": project.description,
                 "X-Kestra-Version": project.version
         )
     }
