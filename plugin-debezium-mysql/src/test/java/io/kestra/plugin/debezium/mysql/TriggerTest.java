@@ -5,9 +5,9 @@ import io.kestra.core.queues.QueueFactoryInterface;
 import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.LocalFlowRepositoryLoader;
 import io.kestra.core.runners.FlowListeners;
+import io.kestra.core.runners.Worker;
 import io.kestra.core.schedulers.AbstractScheduler;
 import io.kestra.core.schedulers.DefaultScheduler;
-import io.kestra.core.schedulers.SchedulerExecutionStateInterface;
 import io.kestra.core.schedulers.SchedulerTriggerStateInterface;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
@@ -33,9 +33,6 @@ class TriggerTest {
     private SchedulerTriggerStateInterface triggerState;
 
     @Inject
-    private SchedulerExecutionStateInterface executionState;
-
-    @Inject
     private FlowListeners flowListenersService;
 
     @Inject
@@ -51,12 +48,14 @@ class TriggerTest {
         CountDownLatch queueCount = new CountDownLatch(1);
 
         // scheduler
-        try (AbstractScheduler scheduler = new DefaultScheduler(
-            this.applicationContext,
-            this.flowListenersService,
-            this.executionState,
-            this.triggerState
-        )) {
+        try (
+            AbstractScheduler scheduler = new DefaultScheduler(
+                this.applicationContext,
+                this.flowListenersService,
+                this.triggerState
+            );
+            Worker worker = new Worker(applicationContext, 8, null);
+        ) {
             AtomicReference<Execution> last = new AtomicReference<>();
 
             // wait for execution
@@ -67,6 +66,7 @@ class TriggerTest {
                 assertThat(execution.getFlowId(), is("trigger"));
             });
 
+            worker.run();
             scheduler.run();
 
             repositoryLoader.load(Objects.requireNonNull(TriggerTest.class.getClassLoader().getResource("flows")));
