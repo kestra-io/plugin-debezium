@@ -113,21 +113,21 @@ public interface AbstractDebeziumInterface {
 
     @Schema(
         title = "An optional, comma-separated list of regular expressions that match the names of the databases for which to capture changes.",
-        description = "The connector does not capture changes in any database whose name is not in `includedDatabases``. By default, the connector captures changes in all databases. Do not also set the `excludedDatabases` connector configuration property."
+        description = "The connector does not capture changes in any database whose name is not in `includedDatabases`. By default, the connector captures changes in all databases. Do not also set the `excludedDatabases` connector configuration property."
     )
     @PluginProperty(dynamic = true)
     Object getIncludedDatabases();
 
     @Schema(
         title = "An optional, comma-separated list of regular expressions that match the names of databases for which you do not want to capture changes. ",
-        description = "The connector captures changes in any database whose name is not in the `excludedDatabases``. Do not also set the `includedDatabases` connector configuration property."
+        description = "The connector captures changes in any database whose name is not in the `excludedDatabases`. Do not also set the `includedDatabases` connector configuration property."
     )
     @PluginProperty(dynamic = true)
     Object getExcludedDatabases();
 
     @Schema(
         title = "An optional, comma-separated list of regular expressions that match fully-qualified table identifiers of tables whose changes you want to capture.",
-        description = "The connector does not capture changes in any table not included in `includedTables``. Each identifier is of the form databaseName.tableName. By default, the connector captures changes in every non-system table in each database whose changes are being captured. Do not also specify the `excludedTables` connector configuration property."
+        description = "The connector does not capture changes in any table not included in `includedTables`. Each identifier is of the form databaseName.tableName. By default, the connector captures changes in every non-system table in each database whose changes are being captured. Do not also specify the `excludedTables` connector configuration property."
     )
     @PluginProperty(dynamic = true)
     Object getIncludedTables();
