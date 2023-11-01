@@ -53,16 +53,16 @@ class CaptureTest {
         assertThat(runOutput.getSize(), is(19));
 
         List<Map<String, Object>> employee = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(runOutput.getUris().get("second.EmployeeTerritory")))), r -> employee.add((Map<String, Object>) r));
+        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, runOutput.getUris().get("second.EmployeeTerritory")))), r -> employee.add((Map<String, Object>) r));
 
         List<Map<String, Object>> types = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(runOutput.getUris().get("kestra.mysql_types")))), r -> types.add((Map<String, Object>) r));
+        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, runOutput.getUris().get("kestra.mysql_types")))), r -> types.add((Map<String, Object>) r));
 
-        IOUtils.toString(storageInterface.get(runOutput.getUris().get("kestra.mysql_types")), Charsets.UTF_8);
+        IOUtils.toString(storageInterface.get(null, runOutput.getUris().get("kestra.mysql_types")), Charsets.UTF_8);
         assertThat(employee.size(), is(14));
         assertThat(employee.stream().filter(o -> !((Boolean) o.get("deleted"))).count(), is(7L));
 
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(runOutput.getUris().get("second.EmployeeTerritory")))), r -> employee.add((Map<String, Object>) r));
+        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, runOutput.getUris().get("second.EmployeeTerritory")))), r -> employee.add((Map<String, Object>) r));
         assertThat(types.size(), is(5));
         assertThat(types.stream().filter(o -> !((Boolean) o.get("deleted"))).count(), is(4L));
 

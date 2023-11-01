@@ -51,7 +51,7 @@ class CaptureTest {
         assertThat(runOutput.getSize(), is(2));
 
         List<Map<String, Object>> data = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(runOutput.getUris().get("deb.sqlserver_types")))), r -> data.add((Map<String, Object>) r));
+        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, runOutput.getUris().get("deb.sqlserver_types")))), r -> data.add((Map<String, Object>) r));
 
         assertThat(data.size(), is(2));
         assertThat(data.stream().filter(o -> !((Boolean) o.get("deleted"))).count(), is(2L));

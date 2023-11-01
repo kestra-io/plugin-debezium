@@ -55,7 +55,7 @@ class CaptureTest {
         assertThat(runOutput.getSize(), is(2));
 
         List<Map<String, Object>> types = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(runOutput.getUris().get("postgres.pgsql_types")))), r -> types.add((Map<String, Object>) r));
+        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, runOutput.getUris().get("postgres.pgsql_types")))), r -> types.add((Map<String, Object>) r));
 
         assertThat(types.size(), is(2));
         assertThat(types.stream().filter(o -> o.get("concert_id").equals(3)).count(), is(1L));
