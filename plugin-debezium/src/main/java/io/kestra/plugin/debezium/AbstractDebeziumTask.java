@@ -130,11 +130,11 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         ZonedDateTime lastRecord = ZonedDateTime.now();
 
         // restore state
-        Path offsetFile = runContext.tempDir().resolve("offsets.dat");
+        Path offsetFile = runContext.resolve(Path.of("offsets.dat"));
         this.restoreState(runContext, offsetFile);
 
         // database history
-        Path historyFile = runContext.tempDir().resolve("dbhistory.dat");
+        Path historyFile = runContext.resolve(Path.of("dbhistory.dat"));
         if (this.needDatabaseHistory()) {
             this.restoreState(runContext, historyFile);
         }
