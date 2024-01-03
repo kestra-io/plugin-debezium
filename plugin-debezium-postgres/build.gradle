@@ -12,12 +12,20 @@ jar {
     }
 }
 
+configurations.all {
+    resolutionStrategy {
+        // ugly bug on crypto plugin
+        force('org.bouncycastle:bcprov-jdk18on:1.77')
+        force('org.bouncycastle:bcpkix-jdk18on:1.77')
+    }
+}
+
 dependencies {
     implementation project(':plugin-debezium')
     testImplementation project(':plugin-debezium').sourceSets.test.output
 
     api group: 'io.debezium', name: 'debezium-connector-postgres', version: debeziumVersion
-    api 'org.bouncycastle:bcprov-jdk18on:1.77'
-    api 'org.bouncycastle:bcpkix-jdk18on:1.77'
+    api 'org.bouncycastle:bcprov-jdk18on'
+    api 'org.bouncycastle:bcpkix-jdk18on'
     api 'name.neuhalfen.projects.crypto.bouncycastle.openpgp:bouncy-gpg:2.3.0'
 }
