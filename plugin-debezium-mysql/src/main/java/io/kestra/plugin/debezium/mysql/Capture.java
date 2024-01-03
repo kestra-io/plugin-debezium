@@ -3,10 +3,8 @@ package io.kestra.plugin.debezium.mysql;
 import io.debezium.connector.mysql.MySqlConnector;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
-import io.micronaut.core.annotation.Introspected;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -14,7 +12,6 @@ import lombok.experimental.SuperBuilder;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Properties;
-import javax.validation.constraints.NotNull;
 
 @SuperBuilder
 @ToString
