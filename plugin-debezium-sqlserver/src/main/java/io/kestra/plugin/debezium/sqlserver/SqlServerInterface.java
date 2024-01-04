@@ -14,7 +14,7 @@ import javax.validation.constraints.NotNull;
 
 public interface SqlServerInterface {
     @Schema(
-        title = "The name of the PostgreSQL database from which to stream the changes."
+        title = "The name of the Microsoft SQL Server database from which to stream the changes."
     )
     @PluginProperty(dynamic = true)
     @NotNull

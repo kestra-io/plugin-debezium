@@ -29,15 +29,16 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for change data capture event on Microsoft SQL server and create new execution"
+    title = "Wait for change data capture event on Microsoft SQL Server and create new execution."
 )
 @Plugin(
     examples = {
         @Example(
             code = {
+                "snapshotMode: INITIAL",
                 "hostname: 127.0.0.1",
-                "port: 1433",
-                "username: sa",
+                "port: \"1433\"",
+                "username: sqlserver_user",
                 "password: sqlserver_passwd",
                 "database: deb",
                 "maxRecords: 100",

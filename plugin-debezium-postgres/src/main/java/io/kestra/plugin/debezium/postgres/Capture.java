@@ -19,15 +19,15 @@ import java.util.Properties;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for change data capture event on PostgresSQL server"
+    title = "Wait for change data capture event on PostgreSQL server."
 )
 @Plugin(
     examples = {
         @Example(
             code = {
                 "hostname: 127.0.0.1",
-                "port: 5432",
-                "username: posgres",
+                "port: \"5432\"",
+                "username: psql_user",
                 "password: psql_passwd",
                 "maxRecords: 100",
                 "database: my_database",

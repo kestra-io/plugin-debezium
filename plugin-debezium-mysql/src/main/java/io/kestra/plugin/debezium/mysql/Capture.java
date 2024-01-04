@@ -22,7 +22,7 @@ import javax.validation.constraints.NotNull;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for change data capture event on MySQL server"
+    title = "Wait for change data capture event on MySQL server."
 )
 @Plugin(
     examples = {
@@ -30,8 +30,8 @@ import javax.validation.constraints.NotNull;
             code = {
                 "snapshotMode: NEVER",
                 "hostname: 127.0.0.1",
-                "port: 63306",
-                "username: root",
+                "port: \"3306\"",
+                "username: mysql_user",
                 "password: mysql_passwd",
                 "maxRecords: 100",
             }
