@@ -29,14 +29,14 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for change data capture event on PostgresSQL server and create new execution"
+    title = "Wait for change data capture event on PostgreSQL server and create new execution."
 )
 @Plugin(
     examples = {
         @Example(
             code = {
                 "hostname: 127.0.0.1",
-                "port: 5432",
+                "port: \"5432\"",
                 "username: posgres",
                 "password: psql_passwd",
                 "maxRecords: 100",

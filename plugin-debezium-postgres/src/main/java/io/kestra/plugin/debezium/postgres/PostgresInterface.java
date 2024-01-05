@@ -27,7 +27,7 @@ public interface PostgresInterface {
     PluginName getPluginName();
 
     @Schema(
-        title = "The name of the PostgreSQL publication created for streaming changes when using `pgoutput`.",
+        title = "The name of the PostgreSQL publication created for streaming changes when using `PGOUTPUT`.",
         description = "This publication is created at start-up if it does not already exist and it includes all tables. " +
             "Debezium then applies its own include/exclude list filtering, if configured, to limit the publication to " +
             "change events for the specific tables of interest. The connector user must have superuser permissions to " +
@@ -55,7 +55,7 @@ public interface PostgresInterface {
             "- `DISABLE` uses an unencrypted connection.\n" +
             "- `REQUIRE` uses a secure (encrypted) connection, and fails if one cannot be established.\n" +
             "- `VERIFY_CA` behaves like require but also verifies the server TLS certificate against the configured Certificate Authority (CA) certificates, or fails if no valid matching CA certificates are found.\n" +
-            "- `VERIFY_FULL` behaves like verify-ca but also verifies that the server certificate matches the host to which the connector is trying to connect. \n\n" +
+            "- `VERIFY_FULL` behaves like verify-ca but also verifies that the server certificate matches the host to which the connector is trying to connect.\n\n" +
             "See the [PostgreSQL documentation](https://www.postgresql.org/docs/current/static/libpq-connect.html) for more information."
     )
     @PluginProperty(dynamic = false)
@@ -63,21 +63,21 @@ public interface PostgresInterface {
 
     @Schema(
         title = "The root certificate(s) against which the server is validated.",
-        description = "Must be a PEM encoded certificate"
+        description = "Must be a PEM encoded certificate."
     )
     @PluginProperty(dynamic = true)
     String getSslRootCert();
 
     @Schema(
         title = "The SSL certificate for the client.",
-        description = "Must be a PEM encoded certificate"
+        description = "Must be a PEM encoded certificate."
     )
     @PluginProperty(dynamic = true)
     String getSslCert();
 
     @Schema(
         title = "The SSL private key of the client.",
-        description = "Must be a PEM encoded key"
+        description = "Must be a PEM encoded key."
     )
     @PluginProperty(dynamic = true)
     String getSslKey();

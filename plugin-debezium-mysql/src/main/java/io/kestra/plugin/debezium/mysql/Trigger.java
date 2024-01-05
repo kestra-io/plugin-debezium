@@ -29,7 +29,7 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for change data capture event on MySQL server and create new execution"
+    title = "Wait for change data capture event on MySQL server and create new execution."
 )
 @Plugin(
     examples = {
@@ -37,8 +37,8 @@ import java.util.Optional;
             code = {
                 "snapshotMode: NEVER",
                 "hostname: 127.0.0.1",
-                "port: 63306",
-                "username: root",
+                "port: \"3306\"",
+                "username: mysql_user",
                 "password: mysql_passwd",
                 "maxRecords: 100",
             }
