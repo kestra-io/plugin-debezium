@@ -11,6 +11,8 @@ triggers:
     database: deb
     maxRecords: 2
     stateName: trigger-state
+    properties:
+      database.encrypt: false
 
 tasks:
   - id: end

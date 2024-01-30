@@ -43,6 +43,7 @@ class CaptureTest {
             .password("Sqls3rv3r_Pa55word!")
             .database("deb")
             .maxRecords(2)
+            .properties(Map.of("database.encrypt", "false"))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
