@@ -1,4 +1,4 @@
-project.description = 'Capture PostgreSQL changes using Debezium and Kestra integration.'
+project.description = 'Capture PostgreSQL database changes using Debezium integration. Note that this plugin is intended for advanced use cases and requires a proper Debezium setup as explained e.g. in [the following blueprint](https://kestra.io/blueprints/194-use-debezium-to-trigger-a-flow-whenever-new-entries-hit-a-postgres-database-then-send-notification-to-slack-and-process-data-in-python). For simple use cases, consider using the [JDBC-based PostgreSQL plugin](https://kestra.io/plugins/plugin-jdbc-postgres) instead.'
 
 jar {
     manifest {
