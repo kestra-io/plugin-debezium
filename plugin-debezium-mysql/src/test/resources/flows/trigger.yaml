@@ -10,6 +10,9 @@ triggers:
     username: root
     password: mysql_passwd
     maxRecords: 19
+    properties:
+      database.server.id: 1
+      topic.prefix: test
 
 tasks:
   - id: end
