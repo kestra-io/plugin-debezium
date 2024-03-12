@@ -1,23 +1,20 @@
 package io.kestra.plugin.debezium.mysql;
 
 import com.google.common.base.Charsets;
-import io.debezium.data.Envelope;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import jakarta.inject.Inject;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.runners.RunContextFactory;
-
-import jakarta.inject.Inject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +42,7 @@ class CaptureTest {
             .username("root")
             .password("mysql_passwd")
             .maxRecords(19)
+            .properties(Map.of("topic.prefix", "test", "database.server.id", "1"))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
