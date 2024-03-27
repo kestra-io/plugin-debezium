@@ -9,6 +9,7 @@ import io.kestra.core.runners.Worker;
 import io.kestra.core.schedulers.AbstractScheduler;
 import io.kestra.core.schedulers.DefaultScheduler;
 import io.kestra.core.schedulers.SchedulerTriggerStateInterface;
+import io.kestra.core.utils.IdUtils;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
@@ -54,7 +55,7 @@ class TriggerTest {
                 this.flowListenersService,
                 this.triggerState
             );
-            Worker worker = new Worker(applicationContext, 8, null);
+            Worker worker = applicationContext.createBean(Worker.class, IdUtils.create(), 8, null);
         ) {
             AtomicReference<Execution> last = new AtomicReference<>();
 
