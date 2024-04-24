@@ -22,10 +22,11 @@ group "io.kestra.plugin"
 
 subprojects {
     group "io.kestra.plugin"
-    sourceCompatibility = 17
-    targetCompatibility = 17
+    sourceCompatibility = 21
+    targetCompatibility = 21
 
     repositories {
+        mavenLocal()
         mavenCentral()
         if (isBuildSnapshot) {
             maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" }
@@ -36,23 +37,21 @@ subprojects {
     apply plugin: "idea"
 
     dependencies {
-        // lombok
+        // Lombok
         annotationProcessor "org.projectlombok:lombok:$lombokVersion"
         compileOnly "org.projectlombok:lombok:$lombokVersion"
 
-        // micronaut
-        annotationProcessor platform("io.micronaut.platform:micronaut-platform:$micronautVersion")
-        annotationProcessor "io.micronaut:micronaut-inject-java"
-        annotationProcessor "io.micronaut.validation:micronaut-validation-processor"
-
+        // Micronaut
         compileOnly platform("io.micronaut.platform:micronaut-platform:$micronautVersion")
-        compileOnly "io.micronaut:micronaut-inject"
-        compileOnly "io.micronaut.validation:micronaut-validation"
+        compileOnly "io.micronaut:micronaut-context"
 
-        compileOnly "ch.qos.logback:logback-classic"
-
-        // kestra
+        // Kestra
+        annotationProcessor group: "io.kestra", name: "processor", version: kestraVersion
         compileOnly group: "io.kestra", name: "core", version: kestraVersion
+
+        // Logs
+        compileOnly'org.slf4j:slf4j-api:2.0.13'
+        compileOnly 'ch.qos.logback:logback-classic:1.5.5'
     }
 }
 
@@ -90,6 +89,7 @@ subprojects {
         testImplementation "io.micronaut.reactor:micronaut-reactor"
 
         // test deps needed only for to have a runner
+        testAnnotationProcessor group: "io.kestra", name: "processor", version: kestraVersion
         testImplementation group: "io.kestra", name: "core", version: kestraVersion
         testImplementation group: "io.kestra", name: "repository-memory", version: kestraVersion
         testImplementation group: "io.kestra", name: "runner-memory", version: kestraVersion

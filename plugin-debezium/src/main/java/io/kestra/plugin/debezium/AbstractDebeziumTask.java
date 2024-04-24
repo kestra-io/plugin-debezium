@@ -11,7 +11,6 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.utils.Await;
 import io.kestra.core.utils.ExecutorsUtils;
-import io.micronaut.core.annotation.Introspected;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -360,33 +359,28 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         private final Map<String, URI> uris;
     }
 
-    @Introspected
     public enum Key {
         ADD_FIELD,
         DROP,
     }
 
-    @Introspected
     public enum Metadata {
         ADD_FIELD,
         DROP,
     }
 
-    @Introspected
     public enum Format {
         RAW,
         INLINE,
         WRAP,
     }
 
-    @Introspected
     public enum Deleted {
         ADD_FIELD,
         NULL,
         DROP
     }
 
-    @Introspected
     public enum SplitTable {
         OFF,
         DATABASE,
