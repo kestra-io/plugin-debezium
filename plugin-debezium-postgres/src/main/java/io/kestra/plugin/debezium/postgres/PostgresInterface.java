@@ -1,7 +1,6 @@
 package io.kestra.plugin.debezium.postgres;
 
 import io.kestra.core.models.annotations.PluginProperty;
-import io.micronaut.core.annotation.Introspected;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import jakarta.validation.constraints.NotNull;
@@ -100,7 +99,6 @@ public interface PostgresInterface {
     @NotNull
     SnapshotMode getSnapshotMode();
 
-    @Introspected
     enum SnapshotMode {
         INITIAL,
         ALWAYS,
@@ -108,7 +106,6 @@ public interface PostgresInterface {
         INITIAL_ONLY,
     }
 
-    @Introspected
     enum SslMode {
         DISABLE,
         REQUIRE,
@@ -116,7 +113,6 @@ public interface PostgresInterface {
         VERIFY_FULL
     }
 
-    @Introspected
     enum PluginName {
         DECODERBUFS,
         WAL2JSON,

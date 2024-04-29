@@ -3,7 +3,6 @@ package io.kestra.plugin.debezium.sqlserver;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.runners.RunContext;
-import io.micronaut.core.annotation.Introspected;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.io.IOException;
@@ -38,7 +37,6 @@ public interface SqlServerInterface {
         }
     }
 
-    @Introspected
     public enum SnapshotMode {
         INITIAL,
         INITIAL_ONLY,

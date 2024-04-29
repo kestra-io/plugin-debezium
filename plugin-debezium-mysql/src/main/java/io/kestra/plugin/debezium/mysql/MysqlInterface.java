@@ -1,7 +1,6 @@
 package io.kestra.plugin.debezium.mysql;
 
 import io.kestra.core.models.annotations.PluginProperty;
-import io.micronaut.core.annotation.Introspected;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import jakarta.validation.constraints.NotNull;
@@ -31,7 +30,6 @@ public interface MysqlInterface {
     @PluginProperty(dynamic = true)
     String getServerId();
 
-    @Introspected
     public enum SnapshotMode {
         INITIAL,
         INITIAL_ONLY,
