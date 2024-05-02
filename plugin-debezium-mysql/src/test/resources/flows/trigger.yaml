@@ -4,6 +4,7 @@ namespace: io.kestra.tests
 triggers:
   - id: watch
     type: io.kestra.plugin.debezium.mysql.Trigger
+    serverId: 123456789
     snapshotMode: NEVER
     hostname: 127.0.0.1
     port: 63306

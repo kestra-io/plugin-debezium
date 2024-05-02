@@ -39,6 +39,7 @@ class CaptureTest {
         Capture task = Capture.builder()
             .id(IdUtils.create())
             .type(Capture.class.getName())
+            .serverId("123456789")
             .snapshotMode(MysqlInterface.SnapshotMode.NEVER)
             .hostname("127.0.0.1")
             .port("63306")

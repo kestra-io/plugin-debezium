@@ -226,8 +226,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         props.setProperty("database.server.name", "kestra");
 
         if (this.needDatabaseHistory()) {
-            props.setProperty("database.history", "io.debezium.relational.history.FileDatabaseHistory");
-            props.setProperty("database.history.file.filename", historyFile.toAbsolutePath().toString());
+            props.setProperty("schema.history.internal", "io.debezium.storage.file.history.FileSchemaHistory");
+            props.setProperty("schema.history.internal.file.filename", historyFile.toAbsolutePath().toString());
         }
 
         // connection
@@ -248,6 +248,9 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         // delete are send with a full rows, we don't want to emulate kafka behaviour
         props.setProperty("tombstones.on.delete", "false");
+
+        // required
+        props.setProperty("topic.prefix", "kestra_");
 
         if (this.includedDatabases != null) {
             props.setProperty("database.include.list", joinProperties(runContext, this.includedDatabases));

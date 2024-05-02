@@ -11,6 +11,7 @@ triggers:
     database: deb
     maxRecords: 2
     stateName: trigger-state
+    snapshotMode: INITIAL_ONLY
     properties:
       database.encrypt: false
 
