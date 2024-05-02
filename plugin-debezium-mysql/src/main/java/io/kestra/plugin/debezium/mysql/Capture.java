@@ -6,6 +6,7 @@ import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -39,6 +40,7 @@ public class Capture extends AbstractDebeziumTask implements MysqlInterface {
     @Builder.Default
     private MysqlInterface.SnapshotMode snapshotMode = MysqlInterface.SnapshotMode.INITIAL;
 
+    @NotNull
     private String serverId;
 
     @Override
@@ -51,10 +53,8 @@ public class Capture extends AbstractDebeziumTask implements MysqlInterface {
         Properties props = super.properties(runContext, offsetFile, historyFile);
 
         props.setProperty("connector.class", MySqlConnector.class.getName());
-
-        if (this.serverId != null) {
-            props.setProperty("database.server.id", runContext.render(this.serverId));
-        }
+        props.setProperty("database.server.id", runContext.render(this.serverId));
+        props.setProperty("include.schema.changes", "false");
 
         if (this.snapshotMode != null) {
             props.setProperty("snapshot.mode", this.snapshotMode.name().toLowerCase(Locale.ROOT));

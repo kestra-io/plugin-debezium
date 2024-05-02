@@ -30,7 +30,7 @@ public interface SqlServerInterface {
     SnapshotMode getSnapshotMode();
 
     static void handleProperties(Properties properties, RunContext runContext, SqlServerInterface sqlServer) throws IllegalVariableEvaluationException, IOException {
-        properties.put("database.dbname", runContext.render(sqlServer.getDatabase()));
+        properties.put("database.names", runContext.render(sqlServer.getDatabase()));
 
         if (sqlServer.getSnapshotMode() != null) {
             properties.setProperty("snapshot.mode", sqlServer.getSnapshotMode().name().toLowerCase(Locale.ROOT));
