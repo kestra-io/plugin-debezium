@@ -244,13 +244,15 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                     final Properties props = this.properties(runContext, offsetFile, historyFile);
 
                     // callback
-                    FluxConsumer changeConsumer = new FluxConsumer(this, sink);
+                    ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, new AtomicInteger(), ZonedDateTime.now());
 
                     // start
                     try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
                         .using(this.getClass().getClassLoader())
                         .using(props)
-                        .notifying(changeConsumer)
+                        .notifying(
+                            (list, recordCommitter) -> changeConsumer.handleBatch(list, recordCommitter, sink)
+                        )
                         .using((success, message, error) -> {
                             if (error != null) {
                                 sink.error(error);
