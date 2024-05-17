@@ -155,7 +155,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
             .using(this.getClass().getClassLoader())
             .using(props)
-            .notifying(changeConsumer::handleBatch)
+            .notifying(changeConsumer)
             .using(completionCallback)
             .build()
         ) {
