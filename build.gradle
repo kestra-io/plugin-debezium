@@ -44,6 +44,7 @@ subprojects {
         // Micronaut
         compileOnly platform("io.micronaut.platform:micronaut-platform:$micronautVersion")
         compileOnly "io.micronaut:micronaut-context"
+        compileOnly "io.micronaut.reactor:micronaut-reactor"
 
         // Kestra
         annotationProcessor group: "io.kestra", name: "processor", version: kestraVersion

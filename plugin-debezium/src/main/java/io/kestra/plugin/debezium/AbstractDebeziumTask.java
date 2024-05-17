@@ -16,12 +16,14 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.scheduler.Schedulers;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -153,7 +155,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
             .using(this.getClass().getClassLoader())
             .using(props)
-            .notifying(changeConsumer)
+            .notifying(changeConsumer::handleBatch)
             .using(completionCallback)
             .build()
         ) {
@@ -221,6 +223,52 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         return outputBuilder
             .size(count.get())
             .build();
+    }
+
+    public Publisher<StreamOutput> stream(RunContext runContext) throws Exception {
+        // ugly hack to force use of Kestra plugins classLoader
+        Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
+        return Flux.<StreamOutput>create(sink -> {
+                try {
+                    // restore state
+                    Path offsetFile = runContext.tempDir().resolve("offsets.dat");
+                    this.restoreState(runContext, offsetFile);
+
+                    // database history
+                    Path historyFile = runContext.tempDir().resolve("dbhistory.dat");
+                    if (this.needDatabaseHistory()) {
+                        this.restoreState(runContext, historyFile);
+                    }
+
+                    // props
+                    final Properties props = this.properties(runContext, offsetFile, historyFile);
+
+                    // callback
+                    FluxConsumer changeConsumer = new FluxConsumer(this, sink);
+
+                    // start
+                    try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
+                        .using(this.getClass().getClassLoader())
+                        .using(props)
+                        .notifying(changeConsumer)
+                        .using((success, message, error) -> {
+                            if (error != null) {
+                                sink.error(error);
+                            }
+                        })
+                        .using(this.getClass().getClassLoader())
+                        .build()
+                    ) {
+                        engine.run();
+                    }
+
+                } catch (Throwable e) {
+                    sink.error(e);
+                } finally {
+                    sink.complete();
+                }
+            }, FluxSink.OverflowStrategy.BUFFER
+        ).subscribeOn(Schedulers.boundedElastic());
     }
 
     protected Properties properties(RunContext runContext, Path offsetFile, Path historyFile) throws Exception {
@@ -372,6 +420,16 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         )
         @PluginProperty(additionalProperties = URI.class)
         private final Map<String, URI> uris;
+    }
+
+    @Builder
+    @Getter
+    public static class StreamOutput implements io.kestra.core.models.tasks.Output {
+
+        private String stream;
+
+        private Map<String, Object> data;
+
     }
 
     public enum Key {
