@@ -25,7 +25,7 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for change data capture event on MySQL server and create new execution."
+    title = "React for change data capture event on MySQL server and create new execution."
 )
 @Plugin(
     examples = {
