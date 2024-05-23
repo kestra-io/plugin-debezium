@@ -100,6 +100,9 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     private Duration maxWait = Duration.ofSeconds(10);
 
     @Builder.Default
+    private Duration maxSnapshotDuration = Duration.ofHours(1);
+
+    @Builder.Default
     private MysqlInterface.SnapshotMode snapshotMode = MysqlInterface.SnapshotMode.INITIAL;
 
     private String serverId;
@@ -135,6 +138,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             .maxRecords(this.maxRecords)
             .maxDuration(this.maxDuration)
             .maxWait(this.maxWait)
+            .maxSnapshotDuration(this.maxSnapshotDuration)
             .snapshotMode(this.snapshotMode)
             .serverId(this.serverId)
             .build();

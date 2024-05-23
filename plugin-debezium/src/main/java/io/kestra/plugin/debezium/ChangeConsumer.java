@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent<SourceRecord, SourceRecord>> {
@@ -31,6 +32,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
     private final RunContext runContext;
 
     private final AtomicInteger count;
+    private final AtomicBoolean snapshot;
 
     @SuppressWarnings("unused")
     private ZonedDateTime lastRecord;
@@ -41,10 +43,11 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
     @Getter
     private final Map<String, AtomicInteger> recordsCount =  new ConcurrentHashMap<>();
 
-    public ChangeConsumer(AbstractDebeziumTask abstractDebeziumTask, RunContext runContext, AtomicInteger count, ZonedDateTime lastRecord) {
+    public ChangeConsumer(AbstractDebeziumTask abstractDebeziumTask, RunContext runContext, AtomicInteger count, AtomicBoolean snapshot, ZonedDateTime lastRecord) {
         this.abstractDebeziumTask = abstractDebeziumTask;
         this.runContext = runContext;
         this.count = count;
+        this.snapshot = snapshot;
         this.lastRecord = lastRecord;
     }
 
@@ -55,6 +58,11 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
 
         for (ChangeEvent<SourceRecord, SourceRecord> r : records) {
             SourceRecord record = r.value();
+            if (record.sourceOffset().containsKey("snapshot") && record.sourceOffset().get("snapshot").equals(Boolean.TRUE)) {
+                snapshot.compareAndSet(false, true);
+            } else {
+                snapshot.compareAndSet(true, false);
+            }
 
             Pair<Message, Message> message = MapConverter.convert(record);
 

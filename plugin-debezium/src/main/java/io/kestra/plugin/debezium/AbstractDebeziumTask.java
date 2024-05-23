@@ -29,6 +29,7 @@ import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -96,6 +97,9 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     @Builder.Default
     private Duration maxWait = Duration.ofSeconds(10);
 
+    @Builder.Default
+    private Duration maxSnapshotDuration = Duration.ofHours(1);
+
     protected abstract boolean needDatabaseHistory();
 
     static {
@@ -125,7 +129,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             .singleThreadExecutor(this.getClass().getSimpleName());
 
         AtomicInteger count = new AtomicInteger();
-        ZonedDateTime started = ZonedDateTime.now();
+        AtomicBoolean snapshot = new AtomicBoolean(false);
         ZonedDateTime lastRecord = ZonedDateTime.now();
 
         // restore state
@@ -143,7 +147,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         // callback
         CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
-        ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, lastRecord);
+        ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord);
 
         // start
         try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
@@ -151,12 +155,19 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             .using(props)
             .notifying(changeConsumer)
             .using(completionCallback)
-            .using(this.getClass().getClassLoader())
             .build()
         ) {
             executorService.execute(engine);
 
-            Await.until(() -> this.ended(executorService, count, started, lastRecord), Duration.ofSeconds(1));
+            ZonedDateTime snapshotStarted = ZonedDateTime.now();
+            boolean consumes;
+            do {
+                int previousCount = count.get();
+                ZonedDateTime captureStarted = ZonedDateTime.now();
+                Await.until(() -> this.ended(executorService, count, captureStarted, lastRecord, snapshot), Duration.ofSeconds(1));
+                consumes = count.get() > previousCount;
+                // if we are still snapshotting, allow waiting for more time until snapshot wait duration is reached
+            } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(this.maxSnapshotDuration)));
         }
 
         this.shutdown(runContext.logger(), executorService);
@@ -169,11 +180,11 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         // outputs state
         if (offsetFile.toFile().exists()) {
-            outputBuilder.stateOffset(runContext.putTaskStateFile(offsetFile.toFile(), this.stateName, offsetFile.getFileName().toFile().toString()));
+            outputBuilder.stateOffset(runContext.storage().putTaskStateFile(offsetFile.toFile(), this.stateName, offsetFile.getFileName().toFile().toString()));
         }
 
         if (this.needDatabaseHistory()) {
-            outputBuilder.stateHistory(runContext.putTaskStateFile(historyFile.toFile(), this.stateName, historyFile.getFileName().toFile().toString()));
+            outputBuilder.stateHistory(runContext.storage().putTaskStateFile(historyFile.toFile(), this.stateName, historyFile.getFileName().toFile().toString()));
         }
 
         // records
@@ -189,7 +200,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
                         return new AbstractMap.SimpleEntry<>(
                             e.getKey(),
-                            runContext.putTempFile(e.getValue().getLeft())
+                            runContext.storage().putFile(e.getValue().getLeft())
                         );
 
                     }))
@@ -297,20 +308,21 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     }
 
     @SuppressWarnings("RedundantIfStatement")
-    private boolean ended(ExecutorService executorService, AtomicInteger count, ZonedDateTime start, ZonedDateTime lastRecord) {
+    private boolean ended(ExecutorService executorService, AtomicInteger count, ZonedDateTime start, ZonedDateTime lastRecord, AtomicBoolean snapshot) {
         if (executorService.isShutdown()) {
             return true;
         }
 
-        if (this.maxRecords != null && count.get() >= this.maxRecords) {
+        // when snapshotting, we didn't take into account maxRecords
+        if (!snapshot.get() && this.maxRecords != null && count.get() >= this.maxRecords) {
             return true;
         }
 
-        if (this.maxDuration != null && ZonedDateTime.now().toEpochSecond() > start.plus(this.maxDuration).toEpochSecond()) {
+        if (this.maxDuration != null && ZonedDateTime.now().isAfter(start.plus(this.maxDuration))) {
             return true;
         }
 
-        if (this.maxWait != null && ZonedDateTime.now().toEpochSecond() > lastRecord.plus(this.maxWait).toEpochSecond()) {
+        if (this.maxWait != null && ZonedDateTime.now().isAfter(lastRecord.plus(this.maxWait))) {
             return true;
         }
 
@@ -319,7 +331,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     private void restoreState(RunContext runContext, Path path) throws IOException {
         try {
-            InputStream taskStateFile = runContext.getTaskStateFile(this.stateName, path.getFileName().toString());
+            InputStream taskStateFile = runContext.storage().getTaskStateFile(this.stateName, path.getFileName().toString());
             FileUtils.copyInputStreamToFile(taskStateFile, path.toFile());
         } catch (FileNotFoundException ignored) {
 

@@ -15,7 +15,7 @@ public interface AbstractDebeziumInterface {
             "- `INLINE`: Send a row like in the source with only data (remove after & before), all the columns will be present for each row.\n" +
             "- `WRAP`: Send a row like INLINE but wrapped in a `record` field.\n"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     @NotNull
     AbstractDebeziumTask.Format getFormat();
 
@@ -26,14 +26,14 @@ public interface AbstractDebeziumInterface {
             "- `NULL`: Send a row with all values as null.\n" +
             "- `DROP`: Don't send deleted row."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     @NotNull
     AbstractDebeziumTask.Deleted getDeleted();
 
     @Schema(
         title = "The name of deleted field if deleted is `ADD_FIELD`."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     @NotNull
     String getDeletedFieldName();
 
@@ -43,7 +43,7 @@ public interface AbstractDebeziumInterface {
             "- `ADD_FIELD`: Add key(s) merged with columns.\n" +
             "- `DROP`: Drop keys."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     @NotNull
     AbstractDebeziumTask.Key getKey();
 
@@ -53,14 +53,14 @@ public interface AbstractDebeziumInterface {
             "- `ADD_FIELD`: Add metadata in a column named `metadata`.\n" +
             "- `DROP`: Drop metadata."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     @NotNull
     AbstractDebeziumTask.Metadata getMetadata();
 
     @Schema(
         title = "The name of metadata field if metadata is `ADD_FIELD`."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     @NotNull
     String getMetadataFieldName();
 
@@ -71,7 +71,7 @@ public interface AbstractDebeziumInterface {
             "- `DATABASE`: This will split all rows by databases on output with name `database`.\n" +
             "- `OFF`: This will **NOT** split all rows resulting in a single `data` output."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     @NotNull
     AbstractDebeziumTask.SplitTable getSplitTable();
 
@@ -79,7 +79,7 @@ public interface AbstractDebeziumInterface {
         title = "Ignore DDL statement.",
         description = "Ignore CREATE, ALTER, DROP and TRUNCATE operations."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     @NotNull
     Boolean getIgnoreDdl();
 
@@ -162,7 +162,7 @@ public interface AbstractDebeziumInterface {
     @Schema(
         title = "The name of Debezium state file."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     @NotNull
     String getStateName();
 
@@ -170,20 +170,27 @@ public interface AbstractDebeziumInterface {
         title = "The maximum number of rows to fetch before stopping.",
         description = "It's not an hard limit and is evaluated every second."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     Integer getMaxRecords();
 
     @Schema(
         title = "The maximum total processing duration.",
-        description = "It's not an hard limit and is evaluated every second."
+        description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     Duration getMaxDuration();
 
     @Schema(
         title = "The maximum duration waiting for new rows.",
-        description = "It's not an hard limit and is evaluated every second."
+        description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     Duration getMaxWait();
+
+    @Schema(
+        title = "The maximum duration waiting for the snapshot to ends.",
+        description = "It's not an hard limit and is evaluated every second.\n The properties 'maxRecord', 'maxDuration' and 'maxWait' are evaluated only after the snapshot is done."
+    )
+    @PluginProperty
+    Duration getMaxSnapshotDuration();
 }
