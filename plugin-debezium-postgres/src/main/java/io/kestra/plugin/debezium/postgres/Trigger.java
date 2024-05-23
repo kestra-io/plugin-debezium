@@ -101,6 +101,9 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @Builder.Default
     private Duration maxWait = Duration.ofSeconds(10);
 
+    @Builder.Default
+    private Duration maxSnapshotDuration = Duration.ofHours(1);
+
     protected String database;
 
     @Builder.Default
@@ -157,6 +160,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             .maxRecords(this.maxRecords)
             .maxDuration(this.maxDuration)
             .maxWait(this.maxWait)
+            .maxSnapshotDuration(this.maxSnapshotDuration)
             .database(this.database)
             .pluginName(this.pluginName)
             .slotName(this.slotName)
