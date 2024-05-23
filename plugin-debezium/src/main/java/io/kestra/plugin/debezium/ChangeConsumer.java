@@ -82,7 +82,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
     public void handleBatch(
         List<ChangeEvent<SourceRecord, SourceRecord>> records,
         DebeziumEngine.RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> committer,
-        FluxSink<AbstractDebeziumTask.StreamOutput> sink
+        FluxSink<AbstractDebeziumRealtimeTrigger.StreamOutput> sink
     ) {
         lastRecord = ZonedDateTime.now();
 
@@ -102,8 +102,8 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
             }
 
             committer.markBatchFinished();
-        } catch (Throwable throwable) {
-            sink.error(throwable);
+        } catch (Exception exception) {
+            sink.error(exception);
         }
     }
 
@@ -124,16 +124,14 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         }
     }
 
-    private void emit(Map<String, Object> result, Message.Source source, FluxSink<AbstractDebeziumTask.StreamOutput> sink) {
+    private void emit(Map<String, Object> result, Message.Source source, FluxSink<AbstractDebeziumRealtimeTrigger.StreamOutput> sink) {
         String stream = switch (this.abstractDebeziumTask.getSplitTable()) {
 	        case OFF -> "data";
 	        case TABLE -> source.getDb() + "." + source.getTable();
 	        case DATABASE -> source.getDb();
-	        default ->
-		        throw new IllegalArgumentException("Invalid SplitTable '" + this.abstractDebeziumTask.getSplitTable() + "");
         };
 
-        AbstractDebeziumTask.StreamOutput output = AbstractDebeziumTask.StreamOutput.builder()
+        AbstractDebeziumRealtimeTrigger.StreamOutput output = AbstractDebeziumRealtimeTrigger.StreamOutput.builder()
             .stream(stream)
             .data(result)
             .build();

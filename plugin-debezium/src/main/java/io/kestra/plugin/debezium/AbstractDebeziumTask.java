@@ -123,9 +123,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     @Override
     public AbstractDebeziumTask.Output run(RunContext runContext) throws Exception {
-        // ugly hack to force use of Kestra plugins classLoader
-        Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
-
         ExecutorService executorService = runContext.getApplicationContext()
             .getBean(ExecutorsUtils.class)
             .singleThreadExecutor(this.getClass().getSimpleName());
@@ -223,54 +220,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         return outputBuilder
             .size(count.get())
             .build();
-    }
-
-    public Publisher<StreamOutput> stream(RunContext runContext) throws Exception {
-        // ugly hack to force use of Kestra plugins classLoader
-        Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
-        return Flux.<StreamOutput>create(sink -> {
-                try {
-                    // restore state
-                    Path offsetFile = runContext.tempDir().resolve("offsets.dat");
-                    this.restoreState(runContext, offsetFile);
-
-                    // database history
-                    Path historyFile = runContext.tempDir().resolve("dbhistory.dat");
-                    if (this.needDatabaseHistory()) {
-                        this.restoreState(runContext, historyFile);
-                    }
-
-                    // props
-                    final Properties props = this.properties(runContext, offsetFile, historyFile);
-
-                    // callback
-                    ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, new AtomicInteger(), ZonedDateTime.now());
-
-                    // start
-                    try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
-                        .using(this.getClass().getClassLoader())
-                        .using(props)
-                        .notifying(
-                            (list, recordCommitter) -> changeConsumer.handleBatch(list, recordCommitter, sink)
-                        )
-                        .using((success, message, error) -> {
-                            if (error != null) {
-                                sink.error(error);
-                            }
-                        })
-                        .using(this.getClass().getClassLoader())
-                        .build()
-                    ) {
-                        engine.run();
-                    }
-
-                } catch (Throwable e) {
-                    sink.error(e);
-                } finally {
-                    sink.complete();
-                }
-            }, FluxSink.OverflowStrategy.BUFFER
-        ).subscribeOn(Schedulers.boundedElastic());
     }
 
     protected Properties properties(RunContext runContext, Path offsetFile, Path historyFile) throws Exception {
@@ -379,7 +328,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         return false;
     }
 
-    private void restoreState(RunContext runContext, Path path) throws IOException {
+    protected void restoreState(RunContext runContext, Path path) throws IOException {
         try {
             InputStream taskStateFile = runContext.storage().getTaskStateFile(this.stateName, path.getFileName().toString());
             FileUtils.copyInputStreamToFile(taskStateFile, path.toFile());
@@ -422,16 +371,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         )
         @PluginProperty(additionalProperties = URI.class)
         private final Map<String, URI> uris;
-    }
-
-    @Builder
-    @Getter
-    public static class StreamOutput implements io.kestra.core.models.tasks.Output {
-
-        private String stream;
-
-        private Map<String, Object> data;
-
     }
 
     public enum Key {

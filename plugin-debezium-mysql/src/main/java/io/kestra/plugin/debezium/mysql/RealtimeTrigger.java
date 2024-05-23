@@ -5,19 +5,17 @@ import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.triggers.*;
-import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
+import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.reactivestreams.Publisher;
-import org.slf4j.Logger;
 import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 import java.util.Map;
-import java.util.Optional;
 
 @SuperBuilder
 @ToString
@@ -39,9 +37,10 @@ import java.util.Optional;
                 "maxRecords: 100",
             }
         )
-    }
+    },
+    beta = true
 )
-public class RealtimeTrigger extends AbstractTrigger implements RealtimeTriggerInterface, TriggerOutput<AbstractDebeziumTask.Output>, MysqlInterface, AbstractDebeziumInterface {
+public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements MysqlInterface, AbstractDebeziumInterface {
     @Builder.Default
     private final Duration interval = Duration.ofSeconds(60);
 
@@ -102,6 +101,9 @@ public class RealtimeTrigger extends AbstractTrigger implements RealtimeTriggerI
     private Duration maxWait = Duration.ofSeconds(10);
 
     @Builder.Default
+    private Duration maxSnapshotDuration = Duration.ofHours(1);
+
+    @Builder.Default
     private SnapshotMode snapshotMode = SnapshotMode.INITIAL;
 
     private String serverId;
@@ -134,13 +136,12 @@ public class RealtimeTrigger extends AbstractTrigger implements RealtimeTriggerI
             .maxRecords(this.maxRecords)
             .maxDuration(this.maxDuration)
             .maxWait(this.maxWait)
+            .maxSnapshotDuration(this.maxSnapshotDuration)
             .snapshotMode(this.snapshotMode)
             .serverId(this.serverId)
             .build();
 
-        return Flux.from(task.stream(conditionContext.getRunContext()))
-            .map(output -> TriggerService.generateRealtimeExecution(this, context, output))
-            .next();
+        return Flux.from(publisher(task, conditionContext.getRunContext()))
+            .map(output -> TriggerService.generateRealtimeExecution(this, context, output));
     }
-
 }

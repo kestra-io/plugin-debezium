@@ -10,6 +10,7 @@ import io.kestra.core.schedulers.AbstractScheduler;
 import io.kestra.core.schedulers.DefaultScheduler;
 import io.kestra.core.schedulers.SchedulerTriggerStateInterface;
 import io.kestra.core.utils.IdUtils;
+import io.kestra.plugin.debezium.AbstractDebeziumTest;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
@@ -26,7 +27,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 
 @MicronautTest
-class TriggerTest {
+class TriggerTest extends AbstractDebeziumTest {
     @Inject
     private ApplicationContext applicationContext;
 
@@ -43,8 +44,26 @@ class TriggerTest {
     @Inject
     protected LocalFlowRepositoryLoader repositoryLoader;
 
+    @Override
+    protected String getUrl() {
+        return "jdbc:mysql://127.0.0.1:63306/kestra";
+    }
+
+    @Override
+    protected String getUsername() {
+        return "root";
+    }
+
+    @Override
+    protected String getPassword() {
+        return "mysql_passwd";
+    }
+
     @Test
     void flow() throws Exception {
+        // init database
+        executeSqlScript("scripts/mysql.sql");
+
         // mock flow listeners
         CountDownLatch queueCount = new CountDownLatch(1);
 
@@ -72,11 +91,11 @@ class TriggerTest {
 
             repositoryLoader.load(Objects.requireNonNull(TriggerTest.class.getClassLoader().getResource("flows/trigger.yaml")));
 
-            queueCount.await(1, TimeUnit.MINUTES);
+            queueCount.await(10, TimeUnit.SECONDS);
 
             Integer trigger = (Integer) last.get().getTrigger().getVariables().get("size");
 
-            assertThat(trigger, greaterThanOrEqualTo(19));
+            assertThat(trigger, greaterThanOrEqualTo(5));
         }
     }
 }
