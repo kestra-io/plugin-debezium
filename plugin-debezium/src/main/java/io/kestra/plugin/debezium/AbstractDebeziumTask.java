@@ -16,12 +16,8 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.*;
 import java.net.URI;
@@ -92,13 +88,33 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     @Builder.Default
     protected String stateName = "debezium-state";
 
+    @Schema(
+        title = "The maximum number of rows to fetch before stopping.",
+        description = "It's not an hard limit and is evaluated every second."
+    )
+    @PluginProperty
     private Integer maxRecords;
 
+    @Schema(
+        title = "The maximum duration waiting for new rows.",
+        description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
+    )
+    @PluginProperty
     private Duration maxDuration;
 
+    @Schema(
+        title = "The maximum total processing duration.",
+        description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
+    )
+    @PluginProperty
     @Builder.Default
     private Duration maxWait = Duration.ofSeconds(10);
 
+    @Schema(
+        title = "The maximum duration waiting for the snapshot to ends.",
+        description = "It's not an hard limit and is evaluated every second.\n The properties 'maxRecord', 'maxDuration' and 'maxWait' are evaluated only after the snapshot is done."
+    )
+    @PluginProperty
     @Builder.Default
     private Duration maxSnapshotDuration = Duration.ofHours(1);
 

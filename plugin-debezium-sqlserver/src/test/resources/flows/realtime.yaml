@@ -9,7 +9,6 @@ triggers:
     username: sa
     password: Sqls3rv3r_Pa55word!
     database: deb
-    maxRecords: 5
     snapshotMode: INITIAL_ONLY
     properties:
       database.encrypt: false

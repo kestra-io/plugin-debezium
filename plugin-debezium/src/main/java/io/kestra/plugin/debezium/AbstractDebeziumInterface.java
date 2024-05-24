@@ -165,32 +165,4 @@ public interface AbstractDebeziumInterface {
     @PluginProperty
     @NotNull
     String getStateName();
-
-    @Schema(
-        title = "The maximum number of rows to fetch before stopping.",
-        description = "It's not an hard limit and is evaluated every second."
-    )
-    @PluginProperty
-    Integer getMaxRecords();
-
-    @Schema(
-        title = "The maximum total processing duration.",
-        description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
-    )
-    @PluginProperty
-    Duration getMaxDuration();
-
-    @Schema(
-        title = "The maximum duration waiting for new rows.",
-        description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
-    )
-    @PluginProperty
-    Duration getMaxWait();
-
-    @Schema(
-        title = "The maximum duration waiting for the snapshot to ends.",
-        description = "It's not an hard limit and is evaluated every second.\n The properties 'maxRecord', 'maxDuration' and 'maxWait' are evaluated only after the snapshot is done."
-    )
-    @PluginProperty
-    Duration getMaxSnapshotDuration();
 }

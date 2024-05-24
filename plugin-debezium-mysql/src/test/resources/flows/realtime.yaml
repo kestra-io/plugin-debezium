@@ -10,7 +10,6 @@ triggers:
     port: 63306
     username: root
     password: mysql_passwd
-    maxRecords: 5
     includedTables:
       - kestra.events
 

@@ -9,7 +9,6 @@ triggers:
     port: 65432
     username: postgres
     password: pg_passwd
-    maxRecords: 5
     includedTables:
       - public.events
 
