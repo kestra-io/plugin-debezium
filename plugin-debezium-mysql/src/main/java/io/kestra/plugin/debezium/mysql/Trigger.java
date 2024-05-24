@@ -8,13 +8,12 @@ import io.kestra.core.models.triggers.*;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
+import io.kestra.plugin.debezium.AbstractDebeziumTrigger;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.slf4j.Logger;
 
-import java.time.Duration;
-import java.util.Map;
 import java.util.Optional;
 
 @SuperBuilder
@@ -39,69 +38,7 @@ import java.util.Optional;
         )
     }
 )
-public class Trigger extends AbstractTrigger implements PollingTriggerInterface, TriggerOutput<AbstractDebeziumTask.Output>, MysqlInterface, AbstractDebeziumInterface {
-    @Builder.Default
-    private final Duration interval = Duration.ofSeconds(60);
-
-    @Builder.Default
-    protected AbstractDebeziumTask.Format format = AbstractDebeziumTask.Format.INLINE;
-
-    @Builder.Default
-    protected AbstractDebeziumTask.Deleted deleted = AbstractDebeziumTask.Deleted.ADD_FIELD;
-
-    @Builder.Default
-    protected String deletedFieldName = "deleted";
-
-    @Builder.Default
-    protected AbstractDebeziumTask.Key key = AbstractDebeziumTask.Key.ADD_FIELD;
-
-    @Builder.Default
-    protected AbstractDebeziumTask.Metadata metadata = AbstractDebeziumTask.Metadata.ADD_FIELD;
-
-    @Builder.Default
-    protected String metadataFieldName = "metadata";
-
-    @Builder.Default
-    protected AbstractDebeziumTask.SplitTable splitTable = AbstractDebeziumTask.SplitTable.TABLE;
-
-    @Builder.Default
-    protected Boolean ignoreDdl = true;
-
-    protected String hostname;
-
-    protected String port;
-
-    protected String username;
-
-    protected String password;
-
-    private Object includedDatabases;
-
-    private Object excludedDatabases;
-
-    private Object includedTables;
-
-    private Object excludedTables;
-
-    private Object includedColumns;
-
-    private Object excludedColumns;
-
-    private Map<String, String> properties;
-
-    @Builder.Default
-    protected String stateName = "debezium-state";
-
-    private Integer maxRecords;
-
-    private Duration maxDuration;
-
-    @Builder.Default
-    private Duration maxWait = Duration.ofSeconds(10);
-
-    @Builder.Default
-    private Duration maxSnapshotDuration = Duration.ofHours(1);
-
+public class Trigger extends AbstractDebeziumTrigger implements MysqlInterface, AbstractDebeziumInterface {
     @Builder.Default
     private MysqlInterface.SnapshotMode snapshotMode = MysqlInterface.SnapshotMode.INITIAL;
 
