@@ -5,17 +5,17 @@ import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.triggers.*;
-import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
+import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.slf4j.Logger;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 import java.util.Map;
-import java.util.Optional;
 
 @SuperBuilder
 @ToString
@@ -23,7 +23,7 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for change data capture event on PostgreSQL server and create new execution."
+    title = "React for change data capture event on PostgreSQL server and create new execution."
 )
 @Plugin(
     examples = {
@@ -39,9 +39,10 @@ import java.util.Optional;
                 "snapshotMode: ALWAYS"
             }
         )
-    }
+    },
+    beta = true
 )
-public class Trigger extends AbstractTrigger implements PollingTriggerInterface, TriggerOutput<AbstractDebeziumTask.Output>, PostgresInterface, AbstractDebeziumInterface {
+public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements PostgresInterface, AbstractDebeziumInterface {
     @Builder.Default
     private final Duration interval = Duration.ofSeconds(60);
 
@@ -116,7 +117,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     protected String publicationName = "kestra_publication";
 
     @Builder.Default
-    protected PostgresInterface.SslMode sslMode = SslMode.DISABLE;
+    protected SslMode sslMode = SslMode.DISABLE;
 
     protected String sslRootCert;
 
@@ -127,13 +128,10 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     protected String sslKeyPassword;
 
     @Builder.Default
-    private Capture.SnapshotMode snapshotMode = Capture.SnapshotMode.INITIAL;
+    private SnapshotMode snapshotMode = SnapshotMode.INITIAL;
 
     @Override
-    public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
-        RunContext runContext = conditionContext.getRunContext();
-        Logger logger = runContext.logger();
-
+    public Publisher<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         Capture task = Capture.builder()
             .id(this.id)
             .type(Capture.class.getName())
@@ -173,18 +171,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             .snapshotMode(this.snapshotMode)
             .build();
 
-        AbstractDebeziumTask.Output run = task.run(runContext);
-
-        if (logger.isDebugEnabled()) {
-            logger.debug("Found '{}' messages", run.getSize());
-        }
-
-        if (run.getSize() == 0) {
-            return Optional.empty();
-        }
-
-        Execution execution = TriggerService.generateExecution(this, conditionContext, context, run);
-
-        return Optional.of(execution);
+        return Flux.from(publisher(task, conditionContext.getRunContext()))
+            .map(output -> TriggerService.generateRealtimeExecution(this, context, output));
     }
 }
