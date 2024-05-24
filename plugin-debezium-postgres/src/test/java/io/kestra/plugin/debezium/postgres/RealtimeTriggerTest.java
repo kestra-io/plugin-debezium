@@ -91,7 +91,7 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
 
             repositoryLoader.load(Objects.requireNonNull(RealtimeTriggerTest.class.getClassLoader().getResource("flows/realtime.yaml")));
 
-            queueCount.await(1, TimeUnit.MINUTES);
+            queueCount.await(15, TimeUnit.SECONDS);
 
             Map<String, Object> data = (Map<String, Object>) last.get().getTrigger().getVariables().get("data");
 
