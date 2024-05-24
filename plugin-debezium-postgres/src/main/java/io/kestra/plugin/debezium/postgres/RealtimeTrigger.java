@@ -7,15 +7,11 @@ import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.triggers.*;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
 import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
-import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
-
-import java.time.Duration;
-import java.util.Map;
 
 @SuperBuilder
 @ToString
@@ -23,21 +19,28 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "React for change data capture event on PostgreSQL server and create new execution."
+    title = "Consume a message in real-time from a PostgreSQL database via change data capture and create one execution per message"
 )
 @Plugin(
     examples = {
         @Example(
-            code = {
-                "hostname: 127.0.0.1",
-                "port: \"5432\"",
-                "username: posgres",
-                "password: psql_passwd",
-                "maxRecords: 100",
-                "database: my_database",
-                "pluginName: PGOUTPUT",
-                "snapshotMode: ALWAYS"
-            }
+            code = """
+                id: debezium-postgres
+                namespace: company.myteam
+
+                tasks:
+                  - id: send_data
+                    type: io.kestra.plugin.core.log.Log
+                    message: "{{ trigger.data }}"
+
+                triggers:
+                  - id: realtime
+                    type: io.kestra.plugin.debezium.postgres.RealtimeTrigger
+                    database: postgres
+                    hostname: 127.0.0.1
+                    port: 65432
+                    username: postgres
+                    password: pg_passwd"""
         )
     },
     beta = true

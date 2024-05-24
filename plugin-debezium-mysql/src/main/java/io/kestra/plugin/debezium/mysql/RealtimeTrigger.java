@@ -6,7 +6,6 @@ import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.triggers.*;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
-import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -14,28 +13,34 @@ import lombok.experimental.SuperBuilder;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
-import java.time.Duration;
-import java.util.Map;
-
 @SuperBuilder
 @ToString
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "React for change data capture event on MySQL server and create new execution."
+    title = "Consume a message in real-time from a MySQL database via change data capture and create one execution per message"
 )
 @Plugin(
     examples = {
         @Example(
-            code = {
-                "snapshotMode: NEVER",
-                "hostname: 127.0.0.1",
-                "port: \"3306\"",
-                "username: mysql_user",
-                "password: mysql_passwd",
-                "maxRecords: 100",
-            }
+            code = """
+                id: debezium-mysql
+                namespace: company.myteam
+
+                tasks:
+                  - id: send_data
+                    type: io.kestra.plugin.core.log.Log
+                    message: "{{ trigger.data }}"
+
+                triggers:
+                  - id: realtime
+                    type: io.kestra.plugin.debezium.mysql.RealtimeTrigger
+                    serverId: 123456789
+                    hostname: 127.0.0.1
+                    port: 63306
+                    username: mysql_user
+                    password: mysql_passwd"""
         )
     },
     beta = true
