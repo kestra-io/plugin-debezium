@@ -75,7 +75,6 @@ class CaptureTest extends AbstractDebeziumTest {
         AbstractDebeziumTask.Output runOutput = task.run(runContext);
 
         assertThat(runOutput.getSize(), is(5));
-        System.out.println(runOutput.getUris());
 
         List<Map<String, Object>> events = new ArrayList<>();
         FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, runOutput.getUris().get("postgres.events")))), r -> events.add((Map<String, Object>) r));

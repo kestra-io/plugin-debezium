@@ -3,7 +3,7 @@ namespace: io.kestra.tests
 
 triggers:
   - id: watch
-    type: io.kestra.plugin.debezium.sqlserver.Trigger
+    type: io.kestra.plugin.debezium.sqlserver.RealtimeTrigger
     hostname: 127.0.0.1
     port: 61433
     username: sa

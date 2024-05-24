@@ -4,21 +4,19 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
-import io.kestra.core.models.executions.ExecutionTrigger;
-import io.kestra.core.models.flows.State;
-import io.kestra.core.models.triggers.*;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.utils.IdUtils;
+import io.kestra.core.models.triggers.TriggerContext;
+import io.kestra.core.models.triggers.TriggerService;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
+import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.slf4j.Logger;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 import java.util.Map;
-import java.util.Optional;
 
 @SuperBuilder
 @ToString
@@ -26,24 +24,25 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for change data capture event on Microsoft SQL Server and create new execution."
+    title = "React for change data capture event on SQLServer server and create new execution."
 )
 @Plugin(
     examples = {
         @Example(
             code = {
-                "snapshotMode: INITIAL",
                 "hostname: 127.0.0.1",
                 "port: \"1433\"",
                 "username: sqlserver_user",
                 "password: sqlserver_passwd",
-                "database: deb",
                 "maxRecords: 100",
+                "database: deb",
+                "snapshotMode: INITIAL"
             }
         )
-    }
+    },
+    beta = true
 )
-public class Trigger extends AbstractTrigger implements PollingTriggerInterface, TriggerOutput<AbstractDebeziumTask.Output>, SqlServerInterface, AbstractDebeziumInterface {
+public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements SqlServerInterface, AbstractDebeziumInterface {
     @Builder.Default
     private final Duration interval = Duration.ofSeconds(60);
 
@@ -114,10 +113,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     private String serverId;
 
     @Override
-    public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
-        RunContext runContext = conditionContext.getRunContext();
-        Logger logger = runContext.logger();
-
+    public Publisher<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         Capture task = Capture.builder()
             .id(this.id)
             .type(Capture.class.getName())
@@ -148,19 +144,8 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             .snapshotMode(this.snapshotMode)
             .database(this.database)
             .build();
-        
-        AbstractDebeziumTask.Output run = task.run(runContext);
 
-        if (logger.isDebugEnabled()) {
-            logger.debug("Found '{}' messages", run.getSize());
-        }
-
-        if (run.getSize() == 0) {
-            return Optional.empty();
-        }
-
-        Execution execution = TriggerService.generateExecution(this, conditionContext, context, run);
-
-        return Optional.of(execution);
+        return Flux.from(publisher(task, conditionContext.getRunContext()))
+            .map(output -> TriggerService.generateRealtimeExecution(this, context, output));
     }
 }
