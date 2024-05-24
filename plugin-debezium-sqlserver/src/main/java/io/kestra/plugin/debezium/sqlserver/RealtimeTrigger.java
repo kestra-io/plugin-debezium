@@ -75,10 +75,6 @@ public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements 
             .excludedColumns(this.excludedColumns)
             .properties(this.properties)
             .stateName(this.stateName)
-            .maxRecords(this.maxRecords)
-            .maxDuration(this.maxDuration)
-            .maxWait(this.maxWait)
-            .maxSnapshotDuration(this.maxSnapshotDuration)
             .snapshotMode(this.snapshotMode)
             .database(this.database)
             .build();

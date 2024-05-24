@@ -37,9 +37,6 @@ import java.util.concurrent.atomic.AtomicReference;
 @NoArgsConstructor
 public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger implements RealtimeTriggerInterface, TriggerOutput<AbstractDebeziumTask.Output> {
     @Builder.Default
-    private final Duration interval = Duration.ofSeconds(60);
-
-    @Builder.Default
     protected AbstractDebeziumTask.Format format = AbstractDebeziumTask.Format.INLINE;
 
     @Builder.Default
@@ -88,16 +85,6 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     @Builder.Default
     protected String stateName = "debezium-state";
 
-    protected Integer maxRecords;
-
-    protected Duration maxDuration;
-
-    @Builder.Default
-    protected Duration maxWait = Duration.ofSeconds(10);
-
-    @Builder.Default
-    protected Duration maxSnapshotDuration = Duration.ofHours(1);
-
     @Schema(
         title = "How to commit the offsets to the state store.",
         description = """
@@ -121,7 +108,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     @Getter(AccessLevel.NONE)
     private final AtomicReference<DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>>> engineReference = new AtomicReference<>();
 
-    public Publisher<AbstractDebeziumRealtimeTrigger.StreamOutput> publisher(AbstractDebeziumTask task, RunContext runContext) throws Exception {
+    public Publisher<AbstractDebeziumRealtimeTrigger.StreamOutput> publisher(AbstractDebeziumTask task, RunContext runContext) {
         return Flux.create(sink -> {
                 try {
                     // restore state
