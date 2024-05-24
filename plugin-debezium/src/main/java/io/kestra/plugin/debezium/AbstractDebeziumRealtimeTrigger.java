@@ -33,6 +33,17 @@ import java.util.concurrent.atomic.AtomicReference;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger implements RealtimeTriggerInterface, TriggerOutput<AbstractDebeziumTask.Output> {
+    @Schema(
+        title = "How to commit the offsets to the state store.",
+        description = """
+            Possible values are:
+            - ON_EACH_BATCH: after each batch of records consumed by this trigger, the offsets will be stored in the state store. This avoids any duplicated records being consumed but can be costly if a lot of events are produced.
+            - ON_STOP: when this trigger is stopped or killed, the offsets will be stored in the state store. This avoid any un-necessary write to the state store, but if the trigger is not stopped gracefully the state store may not be updated leading to duplicated records consumption."""
+    )
+    @PluginProperty
+    @Builder.Default
+    private OffsetCommitMode offsetsCommitMode = OffsetCommitMode.ON_EACH_BATCH;
+
     @Builder.Default
     @Getter(AccessLevel.NONE)
     private final AtomicBoolean isActive = new AtomicBoolean(true);
@@ -69,7 +80,16 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                         .using(this.getClass().getClassLoader())
                         .using(props)
                         .notifying(
-                            (list, recordCommitter) -> changeConsumer.handleBatch(list, recordCommitter, sink)
+                            (list, recordCommitter) -> {
+                                changeConsumer.handleBatch(list, recordCommitter, sink);
+                                if (offsetsCommitMode == OffsetCommitMode.ON_EACH_BATCH) {
+                                    try {
+                                        saveOffsets(task, runContext, offsetFile, historyFile);
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                }
+                            }
                         )
                         .using((success, message, error) -> {
                             if (error != null) {
@@ -82,16 +102,8 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                         engine.run();
                     }
 
-                    // This may be too late, and we may not be able to write the file.
-                    // If the problem occurs, the writing should be done on the stop method.
-                    // Another issue is if people kill Kestra,
-                    // we may need to periodically save offsets (for ex each 100 rows or 1mn).
-                    if (offsetFile.toFile().exists()) {
-                        runContext.storage().putTaskStateFile(offsetFile.toFile(), task.stateName, offsetFile.getFileName().toFile().toString());
-                    }
-
-                    if (task.needDatabaseHistory()) {
-                        runContext.storage().putTaskStateFile(historyFile.toFile(), task.stateName, historyFile.getFileName().toFile().toString());
+                    if (offsetsCommitMode == OffsetCommitMode.ON_STOP) {
+                        saveOffsets(task, runContext, offsetFile, historyFile);
                     }
                 } catch (Exception e) {
                     sink.error(e);
@@ -99,6 +111,16 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                     sink.complete();
                 }
             });
+    }
+
+    private static void saveOffsets(AbstractDebeziumTask task, RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
+        if (offsetFile.toFile().exists()) {
+            runContext.storage().putTaskStateFile(offsetFile.toFile(), task.stateName, offsetFile.getFileName().toFile().toString());
+        }
+
+        if (task.needDatabaseHistory() && historyFile.toFile().exists()) {
+            runContext.storage().putTaskStateFile(historyFile.toFile(), task.stateName, historyFile.getFileName().toFile().toString());
+        }
     }
 
     /**
@@ -154,5 +176,10 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
         private Map<String, Object> data;
 
+    }
+
+    public enum OffsetCommitMode {
+        ON_EACH_BATCH,
+        ON_STOP
     }
 }
