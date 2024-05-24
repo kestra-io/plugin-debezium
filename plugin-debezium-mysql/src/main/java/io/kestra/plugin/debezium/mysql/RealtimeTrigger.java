@@ -19,7 +19,7 @@ import reactor.core.publisher.Flux;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Consume a message in real-time from a MySQL database via change data capture and create one execution per message"
+    title = "Consume a message in real-time from a MySQL database via change data capture and create one execution per message."
 )
 @Plugin(
     examples = {

@@ -27,7 +27,7 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Consume messages periodically from a SQL Server database via change data capture and create one execution per batch"
+    title = "Consume messages periodically from a SQL Server database via change data capture and create one execution per batch."
 )
 @Plugin(
     examples = {
