@@ -3,10 +3,12 @@ package io.kestra.plugin.debezium;
 import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.models.triggers.RealtimeTriggerInterface;
 import io.kestra.core.models.triggers.TriggerOutput;
 import io.kestra.core.runners.RunContext;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -15,6 +17,7 @@ import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -33,6 +36,68 @@ import java.util.concurrent.atomic.AtomicReference;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger implements RealtimeTriggerInterface, TriggerOutput<AbstractDebeziumTask.Output> {
+    @Builder.Default
+    private final Duration interval = Duration.ofSeconds(60);
+
+    @Builder.Default
+    protected AbstractDebeziumTask.Format format = AbstractDebeziumTask.Format.INLINE;
+
+    @Builder.Default
+    protected AbstractDebeziumTask.Deleted deleted = AbstractDebeziumTask.Deleted.ADD_FIELD;
+
+    @Builder.Default
+    protected String deletedFieldName = "deleted";
+
+    @Builder.Default
+    protected AbstractDebeziumTask.Key key = AbstractDebeziumTask.Key.ADD_FIELD;
+
+    @Builder.Default
+    protected AbstractDebeziumTask.Metadata metadata = AbstractDebeziumTask.Metadata.ADD_FIELD;
+
+    @Builder.Default
+    protected String metadataFieldName = "metadata";
+
+    @Builder.Default
+    protected AbstractDebeziumTask.SplitTable splitTable = AbstractDebeziumTask.SplitTable.TABLE;
+
+    @Builder.Default
+    protected Boolean ignoreDdl = true;
+
+    protected String hostname;
+
+    protected String port;
+
+    protected String username;
+
+    protected String password;
+
+    protected Object includedDatabases;
+
+    protected Object excludedDatabases;
+
+    protected Object includedTables;
+
+    protected Object excludedTables;
+
+    protected Object includedColumns;
+
+    protected Object excludedColumns;
+
+    protected Map<String, String> properties;
+
+    @Builder.Default
+    protected String stateName = "debezium-state";
+
+    protected Integer maxRecords;
+
+    protected Duration maxDuration;
+
+    @Builder.Default
+    protected Duration maxWait = Duration.ofSeconds(10);
+
+    @Builder.Default
+    protected Duration maxSnapshotDuration = Duration.ofHours(1);
+
     @Schema(
         title = "How to commit the offsets to the state store.",
         description = """

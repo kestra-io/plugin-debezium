@@ -43,68 +43,6 @@ import java.util.Map;
     beta = true
 )
 public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements PostgresInterface, AbstractDebeziumInterface {
-    @Builder.Default
-    private final Duration interval = Duration.ofSeconds(60);
-
-    @Builder.Default
-    protected AbstractDebeziumTask.Format format = AbstractDebeziumTask.Format.INLINE;
-
-    @Builder.Default
-    protected AbstractDebeziumTask.Deleted deleted = AbstractDebeziumTask.Deleted.ADD_FIELD;
-
-    @Builder.Default
-    protected String deletedFieldName = "deleted";
-
-    @Builder.Default
-    protected AbstractDebeziumTask.Key key = AbstractDebeziumTask.Key.ADD_FIELD;
-
-    @Builder.Default
-    protected AbstractDebeziumTask.Metadata metadata = AbstractDebeziumTask.Metadata.ADD_FIELD;
-
-    @Builder.Default
-    protected String metadataFieldName = "metadata";
-
-    @Builder.Default
-    protected AbstractDebeziumTask.SplitTable splitTable = AbstractDebeziumTask.SplitTable.TABLE;
-
-    @Builder.Default
-    protected Boolean ignoreDdl = true;
-
-    protected String hostname;
-
-    protected String port;
-
-    protected String username;
-
-    protected String password;
-
-    private Object includedDatabases;
-
-    private Object excludedDatabases;
-
-    private Object includedTables;
-
-    private Object excludedTables;
-
-    private Object includedColumns;
-
-    private Object excludedColumns;
-
-    private Map<String, String> properties;
-
-    @Builder.Default
-    protected String stateName = "debezium-state";
-
-    private Integer maxRecords;
-
-    private Duration maxDuration;
-
-    @Builder.Default
-    private Duration maxWait = Duration.ofSeconds(10);
-
-    @Builder.Default
-    private Duration maxSnapshotDuration = Duration.ofHours(1);
-
     protected String database;
 
     @Builder.Default
