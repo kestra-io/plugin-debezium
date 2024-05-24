@@ -17,17 +17,17 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.*;
 
 @MicronautTest
-class TriggerTest extends AbstractDebeziumTest {
+class RealtimeTriggerTest extends AbstractDebeziumTest {
     @Inject
     private ApplicationContext applicationContext;
 
@@ -79,7 +79,7 @@ class TriggerTest extends AbstractDebeziumTest {
             AtomicReference<Execution> last = new AtomicReference<>();
 
             // wait for execution
-            executionQueue.receive(TriggerTest.class, execution -> {
+            executionQueue.receive(RealtimeTriggerTest.class, execution -> {
                 last.set(execution.getLeft());
 
                 queueCount.countDown();
@@ -89,13 +89,15 @@ class TriggerTest extends AbstractDebeziumTest {
             worker.run();
             scheduler.run();
 
-            repositoryLoader.load(Objects.requireNonNull(TriggerTest.class.getClassLoader().getResource("flows/trigger.yaml")));
+            repositoryLoader.load(Objects.requireNonNull(RealtimeTriggerTest.class.getClassLoader().getResource("flows/realtime.yaml")));
 
-            queueCount.await(10, TimeUnit.SECONDS);
+            queueCount.await(1, TimeUnit.MINUTES);
 
-            Integer trigger = (Integer) last.get().getTrigger().getVariables().get("size");
+            Map<String, Object> data = (Map<String, Object>) last.get().getTrigger().getVariables().get("data");
 
-            assertThat(trigger, greaterThanOrEqualTo(5));
+            assertThat(data, notNullValue());
+
+            assertThat(data.size(), greaterThanOrEqualTo(5));
         }
     }
 }

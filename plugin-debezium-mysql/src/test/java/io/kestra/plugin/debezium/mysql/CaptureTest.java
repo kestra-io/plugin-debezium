@@ -7,6 +7,7 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
+import io.kestra.plugin.debezium.AbstractDebeziumTest;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
@@ -24,18 +25,37 @@ import java.util.Map;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @MicronautTest
-class CaptureTest {
+class CaptureTest extends AbstractDebeziumTest {
     @Inject
     private RunContextFactory runContextFactory;
 
     @Inject
     private StorageInterface storageInterface;
 
+    @Override
+    protected String getUrl() {
+        return "jdbc:mysql://127.0.0.1:63306/kestra";
+    }
+
+    @Override
+    protected String getUsername() {
+        return "root";
+    }
+
+    @Override
+    protected String getPassword() {
+        return "mysql_passwd";
+    }
+
     @SuppressWarnings("unchecked")
     @Test
     void run() throws Exception {
+        // init database
+        executeSqlScript("scripts/mysql.sql");
+
         Capture task = Capture.builder()
             .id(IdUtils.create())
             .type(Capture.class.getName())
@@ -43,29 +63,27 @@ class CaptureTest {
             .snapshotMode(MysqlInterface.SnapshotMode.NEVER)
             .hostname("127.0.0.1")
             .port("63306")
-            .username("root")
-            .password("mysql_passwd")
-            .maxRecords(19)
+            .username(getUsername())
+            .password(getPassword())
+            .maxRecords(5)
+            .includedTables(List.of("kestra.events"))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
         AbstractDebeziumTask.Output runOutput = task.run(runContext);
 
-        assertThat(runOutput.getSize(), is(19));
+        assertThat(runOutput.getSize(), is(5));
 
-        List<Map<String, Object>> employee = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, runOutput.getUris().get("second.EmployeeTerritory")))), r -> employee.add((Map<String, Object>) r));
+        List<Map<String, Object>> events = new ArrayList<>();
+        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, runOutput.getUris().get("kestra.events")))), r -> events.add((Map<String, Object>) r));
 
-        List<Map<String, Object>> types = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, runOutput.getUris().get("kestra.mysql_types")))), r -> types.add((Map<String, Object>) r));
-
-        IOUtils.toString(storageInterface.get(null, runOutput.getUris().get("kestra.mysql_types")), Charsets.UTF_8);
-        assertThat(employee.size(), is(14));
-        assertThat(employee.stream().filter(o -> !((Boolean) o.get("deleted"))).count(), is(7L));
-
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, runOutput.getUris().get("second.EmployeeTerritory")))), r -> employee.add((Map<String, Object>) r));
-        assertThat(types.size(), is(5));
-        assertThat(types.stream().filter(o -> !((Boolean) o.get("deleted"))).count(), is(4L));
+        IOUtils.toString(storageInterface.get(null, runOutput.getUris().get("kestra.events")), Charsets.UTF_8);
+        assertThat(events.size(), is(5));
+        assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Machine Head")));
+        assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Dropkick Murphys")));
+        assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Pink Floyd")));
+        assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("TV show")));
+        assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Nothing")));
 
         // rerun state will prevent new records
         runOutput = task.run(runContext);

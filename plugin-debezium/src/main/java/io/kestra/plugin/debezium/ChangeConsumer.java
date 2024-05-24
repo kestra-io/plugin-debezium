@@ -11,6 +11,7 @@ import lombok.Getter;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.kafka.connect.source.SourceRecord;
+import reactor.core.publisher.FluxSink;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -78,6 +79,34 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         committer.markBatchFinished();
     }
 
+    public void handleBatch(
+        List<ChangeEvent<SourceRecord, SourceRecord>> records,
+        DebeziumEngine.RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> committer,
+        FluxSink<AbstractDebeziumRealtimeTrigger.StreamOutput> sink
+    ) {
+        lastRecord = ZonedDateTime.now();
+
+        try {
+            for (ChangeEvent<SourceRecord, SourceRecord> r : records) {
+                SourceRecord record = r.value();
+
+                Pair<Message, Message> message = MapConverter.convert(record);
+
+                Map<String, Object> result = this.handle(message);
+
+                if (result != null) {
+                    this.emit(result, message.getValue().getSource(), sink);
+                }
+
+                committer.markProcessed(r);
+            }
+
+            committer.markBatchFinished();
+        } catch (Exception exception) {
+            sink.error(exception);
+        }
+    }
+
     private Map<String, Object> handle(Pair<Message, Message> message) {
         if (this.isFilter(message)) {
             return null;
@@ -93,6 +122,21 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
             default:
                 throw new IllegalArgumentException("Invalid Format '" + this.abstractDebeziumTask.getFormat() + "");
         }
+    }
+
+    private void emit(Map<String, Object> result, Message.Source source, FluxSink<AbstractDebeziumRealtimeTrigger.StreamOutput> sink) {
+        String stream = switch (this.abstractDebeziumTask.getSplitTable()) {
+	        case OFF -> "data";
+	        case TABLE -> source.getDb() + "." + source.getTable();
+	        case DATABASE -> source.getDb();
+        };
+
+        AbstractDebeziumRealtimeTrigger.StreamOutput output = AbstractDebeziumRealtimeTrigger.StreamOutput.builder()
+            .stream(stream)
+            .data(result)
+            .build();
+
+        sink.next(output);
     }
 
     private void write(Map<String, Object> result, Message.Source source) throws IOException {

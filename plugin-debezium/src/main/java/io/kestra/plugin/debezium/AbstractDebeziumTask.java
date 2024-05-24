@@ -16,12 +16,14 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.scheduler.Schedulers;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -121,9 +123,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     @Override
     public AbstractDebeziumTask.Output run(RunContext runContext) throws Exception {
-        // ugly hack to force use of Kestra plugins classLoader
-        Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
-
         ExecutorService executorService = runContext.getApplicationContext()
             .getBean(ExecutorsUtils.class)
             .singleThreadExecutor(this.getClass().getSimpleName());
@@ -329,7 +328,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         return false;
     }
 
-    private void restoreState(RunContext runContext, Path path) throws IOException {
+    protected void restoreState(RunContext runContext, Path path) throws IOException {
         try {
             InputStream taskStateFile = runContext.storage().getTaskStateFile(this.stateName, path.getFileName().toString());
             FileUtils.copyInputStreamToFile(taskStateFile, path.toFile());
