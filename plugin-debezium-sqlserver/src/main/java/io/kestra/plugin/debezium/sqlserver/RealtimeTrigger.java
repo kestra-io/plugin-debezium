@@ -20,11 +20,12 @@ import reactor.core.publisher.Flux;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Consume a message in real-time from a SQL Server database via change data capture and create one execution per message."
+    title = "Consume a message in real-time from a SQL Server database via change data capture and create one execution per row."
 )
 @Plugin(
     examples = {
         @Example(
+            full = true,
             code = """
                 id: debezium-sqlserver
                 namespace: company.myteam
@@ -43,8 +44,7 @@ import reactor.core.publisher.Flux;
                     password: password
                     database: deb"""
         )
-    },
-    beta = true
+    }
 )
 public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements SqlServerInterface, AbstractDebeziumInterface {
     protected String database;

@@ -19,11 +19,12 @@ import reactor.core.publisher.Flux;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Consume a message in real-time from a MySQL database via change data capture and create one execution per message."
+    title = "Consume a message in real-time from a MySQL database via change data capture and create one execution per row."
 )
 @Plugin(
     examples = {
         @Example(
+            full = true,
             code = """
                 id: debezium-mysql
                 namespace: company.myteam
@@ -42,8 +43,7 @@ import reactor.core.publisher.Flux;
                     username: mysql_user
                     password: mysql_passwd"""
         )
-    },
-    beta = true
+    }
 )
 public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements MysqlInterface, AbstractDebeziumInterface {
     @Builder.Default
