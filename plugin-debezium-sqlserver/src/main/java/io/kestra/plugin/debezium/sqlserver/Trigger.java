@@ -27,7 +27,8 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Consume messages periodically from a SQL Server database via change data capture and create one execution per batch."
+    title = "Consume messages periodically from a SQL Server database via change data capture and create one execution per batch.",
+    description = "If you would like to consume each message from change data capture in real-time and create one execution per message, you can use the [io.kestra.plugin.debezium.sqlserver.RealtimeTrigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.sqlserver.realtimetrigger) instead."
 )
 @Plugin(
     examples = {
