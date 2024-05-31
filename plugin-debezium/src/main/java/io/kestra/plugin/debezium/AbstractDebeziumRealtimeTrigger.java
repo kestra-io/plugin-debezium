@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger implements RealtimeTriggerInterface, TriggerOutput<AbstractDebeziumTask.Output> {
+public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger implements RealtimeTriggerInterface, TriggerOutput<AbstractDebeziumRealtimeTrigger.StreamOutput> {
     @Builder.Default
     protected AbstractDebeziumTask.Format format = AbstractDebeziumTask.Format.INLINE;
 
