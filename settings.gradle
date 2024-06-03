@@ -1,5 +1,6 @@
 rootProject.name = 'plugin-debeziums'
 include 'plugin-debezium'
 include 'plugin-debezium-mysql'
+include 'plugin-debezium-mongodb'
 include 'plugin-debezium-postgres'
 include 'plugin-debezium-sqlserver'

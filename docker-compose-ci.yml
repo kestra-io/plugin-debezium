@@ -42,3 +42,18 @@ services:
       ACCEPT_EULA: Y
       SA_PASSWORD: Sqls3rv3r_Pa55word!
 
+  mongodb:
+    build:
+      context: ./docker/mongo/
+      dockerfile: Dockerfile
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo_user
+      MONGO_INITDB_ROOT_PASSWORD: mongo_passwd
+      MONGO_INITDB_DATABASE: kestra
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: |
+        test $$(mongosh --quiet -u mongo_user -p mongo_passwd --eval "try { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] }).ok } catch (_) { rs.status().ok }") -eq 1
+      interval: 10s
+      start_period: 30s
