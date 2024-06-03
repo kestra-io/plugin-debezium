@@ -21,7 +21,9 @@ import reactor.core.publisher.Flux;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Consume a message in real-time from a MongoDB database via change data capture and create one execution per row."
+    title = "Consume a message in real-time from a MongoDB database via change data capture and create one execution per row.",
+    description = "If you would like to consume multiple messages processed within a given time frame and process them in batch, you can use the [io.kestra.plugin.debezium.mongodb.Trigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.mongodb.trigger) instead."
+
 )
 @Plugin(
     examples = {

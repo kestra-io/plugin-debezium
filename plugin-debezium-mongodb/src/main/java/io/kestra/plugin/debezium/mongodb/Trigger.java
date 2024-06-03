@@ -24,7 +24,9 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for change data capture event on MongoDB server and create new execution."
+    title = "Wait for change data capture event on MongoDB server and create new execution.",
+    description = "If you would like to consume each message from change data capture in real-time and create one execution per message, you can use the [io.kestra.plugin.debezium.mongodb.RealtimeTrigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.mongodb.realtimetrigger) instead."
+
 )
 @Plugin(
     examples = {
