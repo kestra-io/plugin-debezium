@@ -62,7 +62,7 @@ import java.util.Optional;
                     message: "{{ trigger.data }}"
 
                 triggers:
-                  - id: realtime
+                  - id: trigger
                     type: io.kestra.plugin.debezium.mongodb.Trigger
                     snapshotMode: INITIAL
                     connectionString: mongodb://mongo_user:mongo_passwd@mongodb0.example.com:27017/?replicaSet=rs0
