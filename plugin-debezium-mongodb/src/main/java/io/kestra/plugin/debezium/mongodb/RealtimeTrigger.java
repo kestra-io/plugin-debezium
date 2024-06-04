@@ -79,16 +79,6 @@ public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements 
     private String connectionString;
 
     @Override
-    public String getHostname() {
-        return "";
-    }
-
-    @Override
-    public String getPort() {
-        return "";
-    }
-
-    @Override
     public Publisher<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         Capture task = Capture.builder()
             .id(this.id)
