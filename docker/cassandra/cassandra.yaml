@@ -1,0 +1,30 @@
+# Cassandra storage configuration file
+
+# The name of the cluster. This is mainly used to prevent machines in one logical
+# cluster from joining another.
+cluster_name: 'Test Cluster'
+
+# The snitch determines how Cassandra treats the topology of the network for
+# replication purposes.
+endpoint_snitch: GossipingPropertyFileSnitch
+
+# Directories where Cassandra should store data on disk.
+data_file_directories:
+    - /var/lib/cassandra/data
+
+# Commit log.
+commitlog_directory: /var/lib/cassandra/commitlog
+
+# Saved caches.
+saved_caches_directory: /var/lib/cassandra/saved_caches
+
+# Whether or not to enable the commit log.
+commitlog_sync: batch
+commitlog_sync_batch_window_in_ms: 2
+commitlog_segment_size_in_mb: 32
+
+# Enables Change Data Capture (CDC)
+cdc_enabled: true
+
+# Partitioner directive
+partitioner: org.apache.cassandra.dht.Murmur3Partitioner

@@ -42,3 +42,21 @@ services:
       ACCEPT_EULA: Y
       SA_PASSWORD: Sqls3rv3r_Pa55word!
 
+  cassandra:
+    image: cassandra:4.1.5
+    environment:
+#      - CASSANDRA_CLUSTER_NAME=TestCluster
+#      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - CASSANDRA_USER=kestra
+      - CASSANDRA_PASSWORD=passwd
+    ports:
+      - "9042:9042"
+#    volumes:
+#      - cassandra-data:/var/lib/cassandra
+#      - cassandra-data:/home/cassandra/.cassandra
+#      - ./docker/cassandra/cassandra.yaml:/etc/cassandra/cassandra.yaml
+#      - ./data/cassandra.cql:/etc/cassandra/cassandra.cql
+#      - ./docker/cassandra/entrypoint.sh:/etc/cassandra/entrypoint.sh
+#    command: ["/etc/cassandra/entrypoint.sh"]
+#    user: "cassandra" # Run as the cassandra user
+

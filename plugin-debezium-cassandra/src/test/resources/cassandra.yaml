@@ -1,0 +1,22 @@
+
+cluster_name: 'Test Cluster'
+
+endpoint_snitch: GossipingPropertyFileSnitch
+
+data_file_directories:
+    - /var/lib/cassandra/data
+
+commitlog_directory: /var/lib/cassandra/commitlog
+
+hints_directory: /var/lib/cassandra/hints
+
+saved_caches_directory: /var/lib/cassandra/saved_caches
+
+commitlog_sync: batch
+commitlog_sync_batch_window_in_ms: 2
+commitlog_segment_size_in_mb: 32
+
+cdc_enabled: true
+cdc_raw_directory:
+
+partitioner: org.apache.cassandra.dht.Murmur3Partitioner
