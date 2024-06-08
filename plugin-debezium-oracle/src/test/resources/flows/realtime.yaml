@@ -9,7 +9,7 @@ triggers:
     port: 1521
     username: c##dbzuser
     password: dbz
-    databaseName: XE
+    sid: XE
 
 tasks:
   - id: end
