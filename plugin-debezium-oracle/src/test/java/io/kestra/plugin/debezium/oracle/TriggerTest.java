@@ -66,12 +66,12 @@ class TriggerTest extends AbstractDebeziumTest {
 
     protected void initDatabase() throws SQLException, FileNotFoundException, URISyntaxException {
         try {
-            RunScript.execute(getConnection(), new StringReader("DROP TABLE events;"));
+            RunScript.execute(getConnection(), new StringReader("DROP TABLE trigger_events;"));
         } catch (Exception ignored) {
 
         }
 
-        executeSqlScript("scripts/oracle.sql");
+        executeSqlScript("scripts/oracle-trigger.sql");
     }
 
     @Test
