@@ -79,6 +79,7 @@ class CaptureTest extends AbstractDebeziumTest {
             .sid("XE")
             .password("dbz")
             .maxRecords(5)
+            .includedTables("KESTRA.EVENTS")
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
