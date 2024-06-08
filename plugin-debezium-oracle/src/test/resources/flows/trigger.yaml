@@ -1,0 +1,17 @@
+id: trigger
+namespace: io.kestra.tests
+
+triggers:
+  - id: watch
+    type: io.kestra.plugin.debezium.oracle.Trigger
+    snapshotMode: INITIAL_ONLY
+    hostname: 127.0.0.1
+    port: 1521
+    username: c##dbzuser
+    password: dbz
+    databaseName: XE
+
+tasks:
+  - id: end
+    type: io.kestra.core.tasks.debugs.Return
+    format: "{{task.id}} > {{taskrun.startDate}}"

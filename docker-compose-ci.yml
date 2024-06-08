@@ -73,3 +73,20 @@ services:
 #      retries: 7
 #      timeout: 240s
 #      start_period: 240s
+
+  oracle:
+    image: gvenzl/oracle-xe:21-full
+    ports:
+      - "1521:1521"
+    environment:
+      APP_USER: dbzuser
+      APP_USER_PASSWORD: dbz
+      ORACLE_PASSWORD: passwd
+    volumes:
+      - ./docker/oracle:/container-entrypoint-initdb.d
+    healthcheck:
+      test: healthcheck.sh
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
