@@ -72,7 +72,7 @@ class CaptureTest extends AbstractDebeziumTest {
         Capture task = Capture.builder()
             .id(IdUtils.create())
             .type(Capture.class.getName())
-            .snapshotMode(OracleInterface.SnapshotMode.ALWAYS)
+            .snapshotMode(OracleInterface.SnapshotMode.INITIAL_ONLY)
             .hostname("127.0.0.1")
             .port("1521")
             .username("c##dbzuser")
