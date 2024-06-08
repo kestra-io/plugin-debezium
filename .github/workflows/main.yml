@@ -25,8 +25,20 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
     steps:
       - uses: actions/checkout@v4
+
+      # Caches
+      - name: Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle*.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       # JDK
       - name: Set up JDK
@@ -37,17 +49,6 @@ jobs:
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v3
-
-      # Caches
-      - name: Gradle cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradlew-${{ hashFiles('**/*.gradle*', '**/gradle*.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradlew-
 
       # Services
       - name: Build the docker-compose stack
@@ -85,6 +86,31 @@ jobs:
       - name: Build with Gradle
         if: ${{ github.event.inputs.skip-test == 'false' || github.event.inputs.skip-test == '' }}
         run: ./gradlew check
+
+      # Allure check
+      - name: Auth to Google Cloud
+        id: auth
+        if: ${{ always() && env.GOOGLE_SERVICE_ACCOUNT != 0 }}
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}'
+
+      - uses: rlespinasse/github-slug-action@v4
+
+      - name: Publish allure report
+        uses: andrcuns/allure-publish-action@v2.6.0
+        if: ${{ always() && env.GOOGLE_SERVICE_ACCOUNT != 0 && (github.event.inputs.skip-test == 'false' || github.event.inputs.skip-test == '') }}
+        env:
+          GITHUB_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JAVA_HOME: /usr/lib/jvm/default-jvm/
+        with:
+          storageType: gcs
+          resultsGlob: "**/build/allure-results"
+          bucket: internal-kestra-host
+          baseUrl: "https://internal.kestra.io"
+          prefix: ${{ format('{0}/{1}/{2}', github.repository, env.GITHUB_HEAD_REF_SLUG != '' && env.GITHUB_HEAD_REF_SLUG || github.ref_name, 'allure/java') }}
+          copyLatest: true
+          ignoreMissingResults: true
 
       # Publish
       - name: Publish package to Sonatype
@@ -128,18 +154,17 @@ jobs:
           files: |
             build/libs/*.jar
 
-      # Cleanup services
-      - name: Cleanup services
-        if: ${{ always() }}
-        run: sudo rm -rf certs
-
       # Slack
       - name: Slack notification
-        uses: Gamesight/slack-workflow-status@master
+        uses: 8398a7/action-slack@v3
         if: ${{ always() && env.SLACK_WEBHOOK_URL != 0 }}
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          channel: 'C02DQ1A7JLR'
-          name: GitHub Actions
+          status: ${{ job.status }}
+          job_name: Check & Publish
+          fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
+          username: GitHub Actions
           icon_emoji: ':github-actions:'
+          channel: 'C02DQ1A7JLR'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
