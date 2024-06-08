@@ -42,3 +42,19 @@ services:
       ACCEPT_EULA: Y
       SA_PASSWORD: Sqls3rv3r_Pa55word!
 
+  oracle:
+    image: gvenzl/oracle-xe:21-full
+    ports:
+      - "1521:1521"
+    environment:
+      APP_USER: dbzuser
+      APP_USER_PASSWORD: dbz
+      ORACLE_PASSWORD: passwd
+    volumes:
+      - ./docker/oracle:/container-entrypoint-initdb.d
+    healthcheck:
+      test: healthcheck.sh
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
