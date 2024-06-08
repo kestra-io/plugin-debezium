@@ -10,6 +10,7 @@ triggers:
     username: c##dbzuser
     password: dbz
     sid: XE
+    includedTables: KESTRA.EVENTS
 
 tasks:
   - id: end

@@ -75,6 +75,7 @@ public class Capture extends AbstractDebeziumTask implements OracleInterface {
             props.setProperty("database.pdb.name", runContext.render(this.pluggableDatabase.toUpperCase(Locale.ROOT)));
         }
         props.setProperty("include.schema.changes", "false");
+        props.setProperty("schema.history.internal.store.only.captured.tables.ddl", "false");
 
         if (this.snapshotMode != null) {
             props.setProperty("snapshot.mode", this.snapshotMode.name().toLowerCase(Locale.ROOT));
