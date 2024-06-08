@@ -22,6 +22,7 @@ public interface OracleInterface {
     @Schema(
         title = "Specifies the criteria for running a snapshot when the connector starts.",
         description = " Possible settings are:\n" +
+            "- `ALWAYS`: The connector runs a snapshot on each connector start.\n" +
             "- `INITIAL`: The connector runs a snapshot only when no offsets have been recorded for the logical server name.\n" +
             "- `INITIAL_ONLY`: The connector runs a snapshot only when no offsets have been recorded for the logical server name and then stops; i.e. it will not read change events from the binlog.\n" +
             "- `WHEN_NEEDED`: The connector runs a snapshot upon startup whenever it deems it necessary. That is, when no offsets are available, or when a previously recorded offset specifies a binlog location or GTID that is not available in the server.\n" +
@@ -33,6 +34,7 @@ public interface OracleInterface {
     SnapshotMode getSnapshotMode();
 
     public enum SnapshotMode {
+        ALWAYS,
         INITIAL,
         INITIAL_ONLY,
         WHEN_NEEDED,
