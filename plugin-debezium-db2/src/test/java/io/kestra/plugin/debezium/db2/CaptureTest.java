@@ -9,6 +9,7 @@ import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
@@ -26,6 +27,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @MicronautTest
+@Disabled("The tests are disabled for CI, as db2 container have long time initialization")
 class CaptureTest extends AbstractDebeziumTest {
     @Inject
     private RunContextFactory runContextFactory;

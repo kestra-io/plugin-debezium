@@ -15,6 +15,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -27,6 +28,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 @MicronautTest
+@Disabled("The tests are disabled for CI, as db2 container have long time initialization")
 class RealtimeTriggerTest extends AbstractDebeziumTest {
     @Inject
     private ApplicationContext applicationContext;
