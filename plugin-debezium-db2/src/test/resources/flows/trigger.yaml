@@ -1,0 +1,20 @@
+id: trigger
+namespace: io.kestra.tests
+
+triggers:
+  - id: watch
+    type: io.kestra.plugin.debezium.db2.Trigger
+    snapshotMode: INITIAL
+    hostname: 127.0.0.1
+    port: 5023
+    username: db2inst1
+    password: password
+    database: kestra
+    maxRecords: 5
+    includedTables:
+      - DB2INST1.EVENTS
+
+tasks:
+  - id: end
+    type: io.kestra.core.tasks.debugs.Return
+    format: "{{task.id}} > {{taskrun.startDate}}"
