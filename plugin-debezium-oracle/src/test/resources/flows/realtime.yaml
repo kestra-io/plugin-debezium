@@ -10,6 +10,7 @@ triggers:
     username: c##dbzuser
     password: dbz
     sid: XE
+    stateName: someStateNameForRealtimeTrigger
     includedTables: KESTRA.REALTIMETRIGGER_EVENTS
 
 tasks:
