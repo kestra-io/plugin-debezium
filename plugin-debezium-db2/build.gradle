@@ -1,0 +1,23 @@
+project.description = 'Stream DB2 database changes with Debezium in Kestra workflows.'
+
+jar {
+    manifest {
+        attributes(
+                "X-Kestra-Name": project.name,
+                "X-Kestra-Title": "Debezium DB2",
+                "X-Kestra-Group": project.group + ".debezium.db2",
+                "X-Kestra-Description": project.description,
+                "X-Kestra-Version": project.version
+        )
+    }
+}
+
+dependencies {
+    implementation project(':plugin-debezium')
+    testImplementation project(':plugin-debezium').sourceSets.test.output
+
+    implementation group: 'com.ibm.db2.jcc', name: 'db2jcc', version: 'db2jcc4'
+    // Solution to weird bug because of NoClassDefFoundError: com/ibm/db2/jcc/DB2Driver
+
+    implementation group: 'io.debezium', name: 'debezium-connector-db2', version: debeziumVersion
+}

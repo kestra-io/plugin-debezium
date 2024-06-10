@@ -4,13 +4,12 @@ namespace: io.kestra.tests
 triggers:
   - id: watch
     type: io.kestra.plugin.debezium.oracle.Trigger
-    snapshotMode: INITIAL_ONLY
+    snapshotMode: ALWAYS
     hostname: 127.0.0.1
     port: 1521
     username: c##dbzuser
     password: dbz
     sid: XE
-    stateName: someStateNameForTrigger
     includedTables: KESTRA.TRIGGER_EVENTS
 
 tasks:

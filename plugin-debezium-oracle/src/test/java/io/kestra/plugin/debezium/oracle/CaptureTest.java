@@ -25,7 +25,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -79,7 +78,6 @@ class CaptureTest extends AbstractDebeziumTest {
             .username("c##dbzuser")
             .sid("XE")
             .password("dbz")
-            .stateName(UUID.randomUUID().toString())
             .maxRecords(5)
             .includedTables("KESTRA.EVENTS")
             .build();
