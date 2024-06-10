@@ -4,12 +4,13 @@ namespace: io.kestra.tests
 triggers:
   - id: watch
     type: io.kestra.plugin.debezium.oracle.RealtimeTrigger
-    snapshotMode: ALWAYS
+    snapshotMode: INITIAL_ONLY
     hostname: 127.0.0.1
     port: 1521
     username: c##dbzuser
     password: dbz
     sid: XE
+    stateName: someStateNameForRealtimeTrigger
     includedTables: KESTRA.REALTIMETRIGGER_EVENTS
 
 tasks:
