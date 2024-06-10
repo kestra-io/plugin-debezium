@@ -58,5 +58,10 @@ public class Message {
         public void setTsMs(Long value) {
             this.timestamp = Instant.ofEpochMilli(value);
         }
+
+        @JsonSetter("collection")
+        public void setCollection(String value) {
+            this.table = value;
+        }
     }
 }
