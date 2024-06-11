@@ -21,11 +21,7 @@ tasks.withType(JavaCompile) {
 
 group "io.kestra.plugin"
 
-subprojects {
-    group "io.kestra.plugin"
-    sourceCompatibility = 21
-    targetCompatibility = 21
-
+allprojects {
     repositories {
         mavenLocal()
         mavenCentral()
@@ -33,6 +29,12 @@ subprojects {
             maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" }
         }
     }
+}
+
+subprojects {
+    group "io.kestra.plugin"
+    sourceCompatibility = 21
+    targetCompatibility = 21
 
     apply plugin: "java-library"
     apply plugin: "idea"
@@ -143,6 +145,14 @@ subprojects {
 /**********************************************************************************************************************\
  * Jacoco
  **********************************************************************************************************************/
+subprojects {
+    apply plugin: 'jacoco'
+
+    test {
+        finalizedBy jacocoTestReport
+    }
+}
+
 dependencies {
     jacocoAggregation subprojects
 }
