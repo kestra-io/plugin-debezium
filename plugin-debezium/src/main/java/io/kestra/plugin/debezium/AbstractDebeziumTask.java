@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import io.kestra.core.runners.DefaultRunContext;
 import static io.kestra.core.utils.Rethrow.throwFunction;
 
 @SuperBuilder
@@ -139,7 +140,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     @Override
     public AbstractDebeziumTask.Output run(RunContext runContext) throws Exception {
-        ExecutorService executorService = runContext.getApplicationContext()
+        ExecutorService executorService = ((DefaultRunContext)runContext).getApplicationContext()
             .getBean(ExecutorsUtils.class)
             .singleThreadExecutor(this.getClass().getSimpleName());
 
