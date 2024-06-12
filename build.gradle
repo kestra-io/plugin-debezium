@@ -1,6 +1,7 @@
 plugins {
     id 'java-library'
     id "idea"
+    id 'jacoco-report-aggregation'
     id "com.adarshr.test-logger" version "4.0.0" apply(false)
     id "com.github.johnrengelman.shadow" version "8.1.1" apply(false)
     id 'ru.vyarus.java-lib' version '3.0.0' apply(false)
@@ -20,11 +21,7 @@ tasks.withType(JavaCompile) {
 
 group "io.kestra.plugin"
 
-subprojects {
-    group "io.kestra.plugin"
-    sourceCompatibility = 21
-    targetCompatibility = 21
-
+allprojects {
     repositories {
         mavenLocal()
         mavenCentral()
@@ -37,6 +34,12 @@ subprojects {
             }
         }
     }
+}
+
+subprojects {
+    group "io.kestra.plugin"
+    sourceCompatibility = 21
+    targetCompatibility = 21
 
     apply plugin: "java-library"
     apply plugin: "idea"
@@ -58,6 +61,14 @@ subprojects {
         // Logs
         compileOnly 'org.slf4j:slf4j-api:2.0.13'
         compileOnly 'ch.qos.logback:logback-classic:1.5.6'
+    }
+
+    configurations.all {
+        resolutionStrategy {
+            // ugly bug on crypto plugin
+            force('org.bouncycastle:bcprov-jdk18on:1.77')
+            force('org.bouncycastle:bcpkix-jdk18on:1.77')
+        }
     }
 }
 
@@ -109,6 +120,54 @@ subprojects {
 
         testImplementation group: 'com.h2database', name: 'h2', version: '2.2.224'
     }
+}
+
+/**********************************************************************************************************************\
+ * Allure Reports
+ **********************************************************************************************************************/
+subprojects {
+    dependencies {
+        testImplementation platform("io.qameta.allure:allure-bom:2.27.0")
+        testImplementation "io.qameta.allure:allure-junit5"
+    }
+
+    configurations {
+        agent {
+            canBeResolved = true
+            canBeConsumed = true
+        }
+    }
+
+    dependencies {
+        agent "org.aspectj:aspectjweaver:1.9.22.1"
+    }
+
+    test {
+        jvmArgs = [ "-javaagent:${configurations.agent.singleFile}" ]
+    }
+}
+
+/**********************************************************************************************************************\
+ * Jacoco
+ **********************************************************************************************************************/
+subprojects {
+    apply plugin: 'jacoco'
+
+    test {
+        finalizedBy jacocoTestReport
+    }
+}
+
+dependencies {
+    jacocoAggregation subprojects
+}
+
+tasks.named('testCodeCoverageReport') {
+    dependsOn = subprojects.test
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('testCodeCoverageReport', JacocoReport)
 }
 
 /**********************************************************************************************************************\

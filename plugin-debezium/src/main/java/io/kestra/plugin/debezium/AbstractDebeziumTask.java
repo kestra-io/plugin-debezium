@@ -257,8 +257,13 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         }
 
         // connection
-        props.setProperty("database.hostname", runContext.render(this.hostname));
-        props.setProperty("database.port", runContext.render(this.port));
+        if (this.hostname != null) {
+            props.setProperty("database.hostname", runContext.render(this.hostname));
+        }
+
+        if (this.port != null) {
+            props.setProperty("database.port", runContext.render(this.port));
+        }
 
         if (this.username != null) {
             props.setProperty("database.user", runContext.render(this.username));

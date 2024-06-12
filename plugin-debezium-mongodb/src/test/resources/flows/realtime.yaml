@@ -1,0 +1,15 @@
+id: trigger
+namespace: io.kestra.tests
+
+triggers:
+  - id: watch
+    type: io.kestra.plugin.debezium.mongodb.RealtimeTrigger
+    snapshotMode: INITIAL
+    connectionString: mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/?replicaSet=rs0
+    includedCollections:
+      - kestra.mongo_types
+
+tasks:
+  - id: end
+    type: io.kestra.core.tasks.debugs.Return
+    format: "{{task.id}} > {{taskrun.startDate}}"
