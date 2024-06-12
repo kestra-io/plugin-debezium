@@ -12,7 +12,7 @@ import io.kestra.core.schedulers.SchedulerTriggerStateInterface;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.kestra.core.junit.annotations.KestraTest;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import org.h2.tools.RunScript;
@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
-@MicronautTest
+@KestraTest
 class RealtimeTriggerTest extends AbstractDebeziumTest {
     @Inject
     private ApplicationContext applicationContext;
