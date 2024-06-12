@@ -89,12 +89,12 @@ class TriggerTest extends AbstractDebeziumTest {
             AtomicReference<Execution> last = new AtomicReference<>();
 
             // wait for execution
-            executionQueue.receive(execution -> {
+            executionQueue.receive(null, execution -> {
                 last.set(execution.getLeft());
 
                 queueCount.countDown();
                 assertThat(execution.getLeft().getFlowId(), is("trigger"));
-            });
+            }, false);
 
             worker.run();
             scheduler.run();
