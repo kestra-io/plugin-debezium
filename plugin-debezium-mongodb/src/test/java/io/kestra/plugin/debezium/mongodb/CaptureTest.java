@@ -11,7 +11,7 @@ import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
 import io.kestra.plugin.debezium.mongodb.Capture;
 import io.kestra.plugin.debezium.mongodb.MongodbInterface;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.kestra.core.junit.annotations.KestraTest;
 import org.apache.commons.io.IOUtils;
 import org.h2.tools.RunScript;
 import org.junit.jupiter.api.Disabled;
@@ -32,7 +32,7 @@ import java.util.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
-@MicronautTest
+@KestraTest
 @Disabled("Until there will be automatic way to execute mongo.js scripts")
 class CaptureTest {
     @Inject

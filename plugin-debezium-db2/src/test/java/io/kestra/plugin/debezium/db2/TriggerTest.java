@@ -7,34 +7,31 @@ import io.kestra.core.repositories.LocalFlowRepositoryLoader;
 import io.kestra.core.runners.FlowListeners;
 import io.kestra.core.runners.Worker;
 import io.kestra.core.schedulers.AbstractScheduler;
-import io.kestra.core.schedulers.DefaultScheduler;
-import io.kestra.core.schedulers.SchedulerTriggerStateInterface;
+import io.kestra.core.utils.TestsUtils;
+import io.kestra.jdbc.runner.JdbcScheduler;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.kestra.core.junit.annotations.KestraTest;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
 
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 
-@MicronautTest
+@KestraTest
 @Disabled("The tests are disabled for CI, as db2 container have long time initialization")
 class TriggerTest extends AbstractDebeziumTest {
     @Inject
     private ApplicationContext applicationContext;
-
-    @Inject
-    private SchedulerTriggerStateInterface triggerState;
 
     @Inject
     private FlowListeners flowListenersService;
@@ -71,19 +68,14 @@ class TriggerTest extends AbstractDebeziumTest {
 
         // scheduler
         try (
-            AbstractScheduler scheduler = new DefaultScheduler(
+            AbstractScheduler scheduler = new JdbcScheduler(
                 this.applicationContext,
-                this.flowListenersService,
-                this.triggerState
+                this.flowListenersService
             );
             Worker worker = applicationContext.createBean(Worker.class, IdUtils.create(), 8, null);
         ) {
-            AtomicReference<Execution> last = new AtomicReference<>();
-
             // wait for execution
-            executionQueue.receive(TriggerTest.class, execution -> {
-                last.set(execution.getLeft());
-
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
                 queueCount.countDown();
                 assertThat(execution.getLeft().getFlowId(), is("trigger"));
             });
@@ -93,9 +85,9 @@ class TriggerTest extends AbstractDebeziumTest {
 
             repositoryLoader.load(Objects.requireNonNull(TriggerTest.class.getClassLoader().getResource("flows/trigger.yaml")));
 
-            queueCount.await(15, TimeUnit.SECONDS);
+            boolean await = queueCount.await(15, TimeUnit.SECONDS);
 
-            Integer trigger = (Integer) last.get().getTrigger().getVariables().get("size");
+            Integer trigger = (Integer) receive.blockLast().getTrigger().getVariables().get("size");
 
             assertThat(trigger, greaterThanOrEqualTo(5));
         }

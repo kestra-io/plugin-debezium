@@ -7,34 +7,31 @@ import io.kestra.core.repositories.LocalFlowRepositoryLoader;
 import io.kestra.core.runners.FlowListeners;
 import io.kestra.core.runners.Worker;
 import io.kestra.core.schedulers.AbstractScheduler;
-import io.kestra.core.schedulers.DefaultScheduler;
-import io.kestra.core.schedulers.SchedulerTriggerStateInterface;
+import io.kestra.core.utils.TestsUtils;
+import io.kestra.jdbc.runner.JdbcScheduler;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.kestra.core.junit.annotations.KestraTest;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
 
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
-@MicronautTest
+@KestraTest
 @Disabled("Until there will be automatic way to execute mongo.js scripts")
 class RealtimeTriggerTest extends AbstractDebeziumTest {
     @Inject
     private ApplicationContext applicationContext;
-
-    @Inject
-    private SchedulerTriggerStateInterface triggerState;
 
     @Inject
     private FlowListeners flowListenersService;
@@ -68,19 +65,14 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
 
         // scheduler
         try (
-            AbstractScheduler scheduler = new DefaultScheduler(
+            AbstractScheduler scheduler = new JdbcScheduler(
                 this.applicationContext,
-                this.flowListenersService,
-                this.triggerState
+                this.flowListenersService
             );
             Worker worker = applicationContext.createBean(Worker.class, IdUtils.create(), 8, null);
         ) {
-            AtomicReference<Execution> last = new AtomicReference<>();
-
             // wait for execution
-            executionQueue.receive(RealtimeTriggerTest.class, execution -> {
-                last.set(execution.getLeft());
-
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
                 queueCount.countDown();
                 assertThat(execution.getLeft().getFlowId(), is("trigger"));
             });
@@ -90,9 +82,10 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
 
             repositoryLoader.load(Objects.requireNonNull(RealtimeTriggerTest.class.getClassLoader().getResource("flows/realtime.yaml")));
 
-            queueCount.await(15, TimeUnit.SECONDS);
+            boolean await = queueCount.await(15, TimeUnit.SECONDS);
+            assertThat(await, is(true));
 
-            Map<String, Object> data = (Map<String, Object>) last.get().getTrigger().getVariables().get("data");
+            Map<String, Object> data = (Map<String, Object>) receive.blockLast().getTrigger().getVariables().get("data");
 
             assertThat(data, notNullValue());
 
