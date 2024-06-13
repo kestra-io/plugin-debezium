@@ -32,9 +32,9 @@ import java.util.Optional;
             code = {
                 "snapshotMode: NEVER",
                 "hostname: 127.0.0.1",
-                "port: \"3306\"",
-                "username: mysql_user",
-                "password: mysql_passwd",
+                "port: \"9042\"",
+                "username: cassandra_user",
+                "password: cassandra_passwd",
                 "maxRecords: 100",
             }
         )

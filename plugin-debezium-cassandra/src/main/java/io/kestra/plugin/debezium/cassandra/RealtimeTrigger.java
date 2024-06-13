@@ -31,9 +31,9 @@ import reactor.core.publisher.Flux;
             code = {
                 "serverId: 123456789",
                 "hostname: 127.0.0.1",
-                "port: 63306",
-                "username: mysql_user",
-                "password: mysql_passwd"
+                "port: 9042",
+                "username: cassandra_user",
+                "password: cassandra_passwd"
             }
         )
     }

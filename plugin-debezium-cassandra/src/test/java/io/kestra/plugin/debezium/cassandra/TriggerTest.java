@@ -46,23 +46,23 @@ class TriggerTest extends AbstractDebeziumTest {
 
     @Override
     protected String getUrl() {
-        return "jdbc:mysql://127.0.0.1:63306/kestra";
+        return "jdbc:cassandra://localhost:9042/";
     }
 
     @Override
     protected String getUsername() {
-        return "root";
+        return "kestra";
     }
 
     @Override
     protected String getPassword() {
-        return "mysql_passwd";
+        return "passwd";
     }
 
     @Test
     void flow() throws Exception {
         // init database
-        executeSqlScript("scripts/mysql.sql");
+//        executeSqlScript("scripts/cassandra.cql");
 
         // mock flow listeners
         CountDownLatch queueCount = new CountDownLatch(1);

@@ -1,8 +1,5 @@
 project.description = 'Stream Cassandra database changes with Debezium in Kestra workflows.'
 
-sourceCompatibility = 11
-targetCompatibility = 11
-
 jar {
     manifest {
         attributes(
@@ -13,11 +10,6 @@ jar {
                 "X-Kestra-Version": project.version
         )
     }
-}
-
-compileJava.doFirst {
-    println "source compatibility  " + sourceCompatibility
-    println "target compatibility  " + targetCompatibility
 }
 
 configurations.configureEach {

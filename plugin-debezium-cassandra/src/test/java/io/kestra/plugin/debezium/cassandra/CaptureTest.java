@@ -35,7 +35,7 @@ class CaptureTest extends AbstractDebeziumTest {
 
     @Override
     protected String getUrl() {
-        return "jdbc:cassandra://127.0.0.1:9042/kestra";
+        return "jdbc:cassandra://localhost:9042/";
     }
 
     @Override
@@ -52,7 +52,7 @@ class CaptureTest extends AbstractDebeziumTest {
     @Test
     void run() throws Exception {
         // init database
-//        executeSqlScript("scripts/mysql.sql");
+//        executeSqlScript("scripts/cassandra.cql");
 
         Capture task = Capture.builder()
             .id(IdUtils.create())

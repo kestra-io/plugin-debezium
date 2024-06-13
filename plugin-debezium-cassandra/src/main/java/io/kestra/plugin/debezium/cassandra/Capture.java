@@ -28,9 +28,9 @@ import java.util.Properties;
             code = {
                 "snapshotMode: NEVER",
                 "hostname: 127.0.0.1",
-                "port: \"3306\"",
-                "username: mysql_user",
-                "password: mysql_passwd",
+                "port: \"9042\"",
+                "username: cassandra_user",
+                "password: cassandra_passwd",
                 "maxRecords: 100",
             }
         )
@@ -54,7 +54,7 @@ public class Capture extends AbstractDebeziumTask implements CassandraInterface 
 
         props.setProperty("connector.class", Cassandra4Connector.class.getName());
 
-        props.setProperty("cassandra.config", cassandraConfig.toAbsolutePath().toString());
+        props.setProperty("cassandra.config", cassandraConfig.toAbsolutePath().toString()); // TODO: Make as field
 
         props.setProperty("cassandra.hosts", this.hostname);
         props.setProperty("cassandra.port", this.port);
