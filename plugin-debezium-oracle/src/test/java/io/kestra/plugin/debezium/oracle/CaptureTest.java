@@ -7,7 +7,7 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.kestra.core.junit.annotations.KestraTest;
 import org.apache.commons.io.IOUtils;
 import org.h2.tools.RunScript;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@MicronautTest
+@KestraTest
 class CaptureTest extends AbstractDebeziumTest {
     @Inject
     private RunContextFactory runContextFactory;
