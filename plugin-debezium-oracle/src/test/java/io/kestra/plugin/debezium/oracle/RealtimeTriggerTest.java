@@ -7,6 +7,7 @@ import io.kestra.core.repositories.LocalFlowRepositoryLoader;
 import io.kestra.core.runners.FlowListeners;
 import io.kestra.core.runners.Worker;
 import io.kestra.core.schedulers.AbstractScheduler;
+import io.kestra.core.utils.TestsUtils;
 import io.kestra.jdbc.runner.JdbcScheduler;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
@@ -16,6 +17,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import org.h2.tools.RunScript;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
 
 import java.io.FileNotFoundException;
 import java.io.StringReader;
@@ -25,7 +27,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -86,12 +87,8 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
             );
             Worker worker = applicationContext.createBean(Worker.class, IdUtils.create(), 8, null);
         ) {
-            AtomicReference<Execution> last = new AtomicReference<>();
-
             // wait for execution
-            executionQueue.receive(execution -> {
-                last.set(execution.getLeft());
-
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
                 queueCount.countDown();
                 assertThat(execution.getLeft().getFlowId(), is("trigger"));
             });
@@ -101,9 +98,10 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
 
             repositoryLoader.load(Objects.requireNonNull(RealtimeTriggerTest.class.getClassLoader().getResource("flows/realtime.yaml")));
 
-            queueCount.await(15, TimeUnit.SECONDS);
+            boolean await = queueCount.await(15, TimeUnit.SECONDS);
+            assertThat(await, is(true));
 
-            Map<String, Object> data = (Map<String, Object>) last.get().getTrigger().getVariables().get("data");
+            Map<String, Object> data = (Map<String, Object>) receive.blockLast().getTrigger().getVariables().get("data");
 
             assertThat(data, notNullValue());
 
