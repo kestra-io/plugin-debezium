@@ -1,5 +1,8 @@
 project.description = 'Stream Cassandra database changes with Debezium in Kestra workflows.'
 
+sourceCompatibility = 11
+targetCompatibility = 11
+
 jar {
     manifest {
         attributes(
@@ -12,12 +15,17 @@ jar {
     }
 }
 
-configurations.all {
-    resolutionStrategy {
-        force 'io.confluent:kafka-connect-protobuf-converter:7.0.1'
-        force 'io.confluent:kafka-connect-avro-converter:7.0.1'
-        force 'org.yaml:snakeyaml:1.26'
-        // Add more forced dependencies as needed
+compileJava.doFirst {
+    println "source compatibility  " + sourceCompatibility
+    println "target compatibility  " + targetCompatibility
+}
+
+configurations.configureEach {
+    if (name != "agent") {
+        resolutionStrategy {
+            force 'org.yaml:snakeyaml:1.26'
+            force 'org.eclipse.jetty:jetty-servlet:9.4.53.v20231009'
+        }
     }
 }
 
@@ -26,8 +34,39 @@ dependencies {
     testImplementation project(':plugin-debezium').sourceSets.test.output
 
     testImplementation("javax.servlet:javax.servlet-api:3.0.1")
+
     implementation(group: 'io.debezium', name: 'debezium-connector-cassandra-4', version: debeziumVersion) {
         exclude group: 'io.confluent', module: 'kafka-connect-protobuf-converter'
         exclude group: 'io.confluent', module: 'kafka-connect-avro-converter'
     }
+}
+
+def jvmArgsList = [
+    '--add-exports', 'java.base/jdk.internal.misc=ALL-UNNAMED',
+    '--add-exports', 'java.base/jdk.internal.ref=ALL-UNNAMED',
+    '--add-exports', 'java.base/sun.nio.ch=ALL-UNNAMED',
+    '--add-exports', 'java.management.rmi/com.sun.jmx.remote.internal.rmi=ALL-UNNAMED',
+    '--add-exports', 'java.rmi/sun.rmi.registry=ALL-UNNAMED',
+    '--add-exports', 'java.rmi/sun.rmi.server=ALL-UNNAMED',
+    '--add-exports', 'java.sql/java.sql=ALL-UNNAMED',
+    '--add-opens', 'java.base/java.lang.module=ALL-UNNAMED',
+    '--add-opens', 'java.base/jdk.internal.loader=ALL-UNNAMED',
+    '--add-opens', 'java.base/jdk.internal.ref=ALL-UNNAMED',
+    '--add-opens', 'java.base/jdk.internal.reflect=ALL-UNNAMED',
+    '--add-opens', 'java.base/jdk.internal.math=ALL-UNNAMED',
+    '--add-opens', 'java.base/jdk.internal.module=ALL-UNNAMED',
+    '--add-opens', 'java.base/jdk.internal.util.jar=ALL-UNNAMED',
+    '--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED',
+    '--add-opens', 'jdk.management/com.sun.management.internal=ALL-UNNAMED',
+    '--add-opens', 'java.base/java.io=ALL-UNNAMED'
+]
+
+// Add JVM arguments for tests
+test {
+    jvmArgs jvmArgsList
+}
+
+// Add JVM arguments for running the application
+tasks.withType(JavaExec) {
+    jvmArgs jvmArgsList
 }

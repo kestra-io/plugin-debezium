@@ -57,7 +57,7 @@ class CaptureTest extends AbstractDebeziumTest {
         Capture task = Capture.builder()
             .id(IdUtils.create())
             .type(Capture.class.getName())
-            .snapshotMode(CassandraInterface.SnapshotMode.INITIAL)
+            .snapshotMode(CassandraInterface.SnapshotMode.ALWAYS)
             .hostname("127.0.0.1")
             .port("9042")
             .username(getUsername())

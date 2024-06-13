@@ -28,23 +28,13 @@ import reactor.core.publisher.Flux;
         @Example(
             title = "Consume a message from a Cassandra database via change data capture in real-time.",
             full = true,
-            code = """
-                id: debezium-mysql
-                namespace: company.myteam
-
-                tasks:
-                  - id: send_data
-                    type: io.kestra.plugin.core.log.Log
-                    message: "{{ trigger.data }}"
-
-                triggers:
-                  - id: realtime
-                    type: io.kestra.plugin.debezium.mysql.RealtimeTrigger
-                    serverId: 123456789
-                    hostname: 127.0.0.1
-                    port: 63306
-                    username: mysql_user
-                    password: mysql_passwd"""
+            code = {
+                "serverId: 123456789",
+                "hostname: 127.0.0.1",
+                "port: 63306",
+                "username: mysql_user",
+                "password: mysql_passwd"
+            }
         )
     }
 )
