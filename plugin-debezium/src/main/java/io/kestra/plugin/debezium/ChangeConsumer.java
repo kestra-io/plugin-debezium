@@ -154,7 +154,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         }
 
         if (!this.records.containsKey(stream)) {
-            Path tempFile = runContext.tempFile(stream);
+            Path tempFile = runContext.workingDir().createTempFile(stream);
             this.records.put(stream, Pair.of(tempFile.toFile(), new FileOutputStream(tempFile.toFile())));
         }
 

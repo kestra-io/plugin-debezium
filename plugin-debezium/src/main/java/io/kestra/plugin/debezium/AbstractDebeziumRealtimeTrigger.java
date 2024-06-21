@@ -111,11 +111,11 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         return Flux.create(sink -> {
                 try {
                     // restore state
-                    Path offsetFile = runContext.tempDir().resolve("offsets.dat");
+                    Path offsetFile = runContext.workingDir().path().resolve("offsets.dat");
                     task.restoreState(runContext, offsetFile);
 
                     // database history
-                    Path historyFile = runContext.tempDir().resolve("dbhistory.dat");
+                    Path historyFile = runContext.workingDir().path().resolve("dbhistory.dat");
                     if (task.needDatabaseHistory()) {
                         task.restoreState(runContext, historyFile);
                     }

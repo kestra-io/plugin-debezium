@@ -41,11 +41,11 @@ public abstract class PostgresService {
         }
 
         if (postgres.getSslRootCert() != null) {
-            properties.put("database.sslrootcert", runContext.tempFile(runContext.render(postgres.getSslRootCert()).getBytes(StandardCharsets.UTF_8), ".pem").toAbsolutePath().toString());
+            properties.put("database.sslrootcert", runContext.workingDir().createTempFile(runContext.render(postgres.getSslRootCert()).getBytes(StandardCharsets.UTF_8), ".pem").toAbsolutePath().toString());
         }
 
         if (postgres.getSslCert() != null) {
-            properties.put("database.sslcert", runContext.tempFile(runContext.render(postgres.getSslCert()).getBytes(StandardCharsets.UTF_8), ".pem").toAbsolutePath().toString());
+            properties.put("database.sslcert", runContext.workingDir().createTempFile(runContext.render(postgres.getSslCert()).getBytes(StandardCharsets.UTF_8), ".pem").toAbsolutePath().toString());
         }
 
         if (postgres.getSslKey() != null) {
@@ -106,6 +106,6 @@ public abstract class PostgresService {
 
         PrivateKey privateKey = new JcaPEMKeyConverter().getPrivateKey(keyInfo);
 
-        return runContext.tempFile(privateKey.getEncoded(), ".der").toAbsolutePath().toString();
+        return runContext.workingDir().createTempFile(privateKey.getEncoded(), ".der").toAbsolutePath().toString();
     }
 }
