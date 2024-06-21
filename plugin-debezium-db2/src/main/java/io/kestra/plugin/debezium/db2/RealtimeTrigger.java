@@ -29,7 +29,7 @@ import reactor.core.publisher.Flux;
             full = true,
             code = """
                 id: debezium-db2
-                namespace: company.myteam
+                namespace: company.team
 
                 tasks:
                   - id: send_data
