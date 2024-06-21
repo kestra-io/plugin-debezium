@@ -177,11 +177,6 @@ nexusPublishing {
     }
 }
 
-tasks.withType(GenerateModuleMetadata).configureEach {
-    // Suppression this validation error as we want to enforce the Kestra platform
-    suppressedValidationErrors.add('enforced-platform')
-}
-
 subprojects { Project subproject ->
     apply plugin: "com.adarshr.test-logger"
     apply plugin: "com.github.johnrengelman.shadow"
@@ -217,6 +212,11 @@ subprojects { Project subproject ->
         if (subproject.name != "plugin-debezium") {
             dependsOn(project(":plugin-debezium").tasks.named("shadowJar"))
         }
+    }
+
+    tasks.withType(GenerateModuleMetadata).configureEach {
+        // Suppression this validation error as we want to enforce the Kestra platform
+        suppressedValidationErrors.add('enforced-platform')
     }
 }
 
