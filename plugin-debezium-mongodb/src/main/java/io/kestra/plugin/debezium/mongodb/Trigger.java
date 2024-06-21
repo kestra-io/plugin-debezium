@@ -35,7 +35,7 @@ import java.util.Optional;
             full = true,
             code = """
                 id: debezium-mongodb
-                namespace: company.myteam
+                namespace: company.team
 
                 tasks:
                   - id: send_data
@@ -54,7 +54,7 @@ import java.util.Optional;
             full = true,
             code = """
                 id: debezium-mongodb
-                namespace: company.myteam
+                namespace: company.team
 
                 tasks:
                   - id: send_data

@@ -32,7 +32,7 @@ import reactor.core.publisher.Flux;
             full = true,
             code = """
                 id: debezium-mongodb
-                namespace: company.myteam
+                namespace: company.team
 
                 tasks:
                   - id: send_data
@@ -51,7 +51,7 @@ import reactor.core.publisher.Flux;
             full = true,
             code = """
                 id: debezium-mongodb
-                namespace: company.myteam
+                namespace: company.team
 
                 tasks:
                   - id: send_data
