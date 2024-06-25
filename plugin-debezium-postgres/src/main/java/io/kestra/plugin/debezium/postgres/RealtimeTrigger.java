@@ -111,6 +111,6 @@ public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements 
             .build();
 
         return Flux.from(publisher(task, conditionContext.getRunContext()))
-            .map(output -> TriggerService.generateRealtimeExecution(this, context, output));
+            .map(output -> TriggerService.generateRealtimeExecution(this, conditionContext, context, output));
     }
 }
