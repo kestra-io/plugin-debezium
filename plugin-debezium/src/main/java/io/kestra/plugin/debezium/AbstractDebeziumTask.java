@@ -4,11 +4,13 @@ import ch.qos.logback.classic.LoggerContext;
 import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
+import io.kestra.core.exceptions.ResourceExpiredException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.storages.StorageContext;
 import io.kestra.core.utils.Await;
 import io.kestra.core.utils.ExecutorsUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -196,11 +198,25 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         // outputs state
         if (offsetFile.toFile().exists()) {
-            outputBuilder.stateOffset(runContext.storage().putTaskStateFile(offsetFile.toFile(), this.stateName, offsetFile.getFileName().toFile().toString()));
+            try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
+                outputBuilder.stateOffsetKey(runContext.stateStore().putState(
+                    this.stateName,
+                    offsetFile.getFileName().toFile().toString(),
+                    runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
+                    fis.readAllBytes()
+                ));
+            }
         }
 
         if (this.needDatabaseHistory()) {
-            outputBuilder.stateHistory(runContext.storage().putTaskStateFile(historyFile.toFile(), this.stateName, historyFile.getFileName().toFile().toString()));
+            try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
+                outputBuilder.stateHistoryKey(runContext.stateStore().putState(
+                    this.stateName,
+                    historyFile.getFileName().toFile().toString(),
+                    runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
+                    fis.readAllBytes()
+                ));
+            }
         }
 
         // records
@@ -352,9 +368,13 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     protected void restoreState(RunContext runContext, Path path) throws IOException {
         try {
-            InputStream taskStateFile = runContext.storage().getTaskStateFile(this.stateName, path.getFileName().toString());
+            InputStream taskStateFile = runContext.stateStore().getState(
+                this.stateName,
+                path.getFileName().toString(),
+                runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null)
+            );
             FileUtils.copyInputStreamToFile(taskStateFile, path.toFile());
-        } catch (FileNotFoundException ignored) {
+        } catch (FileNotFoundException | ResourceExpiredException ignored) {
 
         }
     }
@@ -374,14 +394,14 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The state with offset"
+            title = "The KV Store key under which the state with offset is stored"
         )
-        private URI stateOffset;
+        private String stateOffsetKey;
 
         @Schema(
-            title = "The state with database history"
+            title = "The KV Store key under which the state with database history is stored"
         )
-        private URI stateHistory;
+        private String stateHistoryKey;
 
         @Schema(
             title = "The size of the rows fetch"
