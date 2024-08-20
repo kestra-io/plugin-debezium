@@ -8,6 +8,7 @@ import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.models.triggers.RealtimeTriggerInterface;
 import io.kestra.core.models.triggers.TriggerOutput;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.storages.StorageContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -15,6 +16,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.ZonedDateTime;
@@ -166,11 +168,25 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
     private static void saveOffsets(AbstractDebeziumTask task, RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
         if (offsetFile.toFile().exists()) {
-            runContext.storage().putTaskStateFile(offsetFile.toFile(), task.stateName, offsetFile.getFileName().toFile().toString());
+            try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
+                runContext.stateStore().putState(
+                    task.stateName,
+                    offsetFile.getFileName().toFile().toString(),
+                    runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
+                    fis.readAllBytes()
+                );
+            }
         }
 
         if (task.needDatabaseHistory() && historyFile.toFile().exists()) {
-            runContext.storage().putTaskStateFile(historyFile.toFile(), task.stateName, historyFile.getFileName().toFile().toString());
+            try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
+                runContext.stateStore().putState(
+                    task.stateName,
+                    historyFile.getFileName().toFile().toString(),
+                    runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
+                    fis.readAllBytes()
+                );
+            }
         }
     }
 

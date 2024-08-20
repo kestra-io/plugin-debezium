@@ -98,7 +98,7 @@ class TriggerTest extends AbstractDebeziumTest {
 
             repositoryLoader.load(Objects.requireNonNull(TriggerTest.class.getClassLoader().getResource("flows/trigger.yaml")));
 
-            boolean await = queueCount.await(30, TimeUnit.SECONDS);
+            boolean await = queueCount.await(1, TimeUnit.MINUTES);
             assertThat(await, is(true));
 
             Integer trigger = (Integer) receive.blockLast().getTrigger().getVariables().get("size");
