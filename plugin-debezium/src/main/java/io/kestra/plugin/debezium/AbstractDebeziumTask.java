@@ -394,22 +394,22 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The KV Store key under which the state with offset is stored"
+            title = "The KV Store key under which the state of the offset is stored"
         )
         private String stateOffsetKey;
 
         @Schema(
-            title = "The KV Store key under which the state with database history is stored"
+            title = "The KV Store key under which the state of the database history is stored"
         )
         private String stateHistoryKey;
 
         @Schema(
-            title = "The size of the rows fetch"
+            title = "The number of fetched rows"
         )
         private Integer size;
 
         @Schema(
-            title = "Uri of the generated internal storage file"
+            title = "URI of the generated internal storage file"
         )
         @PluginProperty(additionalProperties = URI.class)
         private final Map<String, URI> uris;

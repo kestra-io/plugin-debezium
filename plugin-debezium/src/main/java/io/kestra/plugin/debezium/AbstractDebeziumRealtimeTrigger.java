@@ -87,11 +87,11 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     protected String stateName = "debezium-state";
 
     @Schema(
-        title = "How to commit the offsets to the state store.",
+        title = "How to commit the offsets to the KV Store.",
         description = """
             Possible values are:
-            - ON_EACH_BATCH: after each batch of records consumed by this trigger, the offsets will be stored in the state store. This avoids any duplicated records being consumed but can be costly if a lot of events are produced.
-            - ON_STOP: when this trigger is stopped or killed, the offsets will be stored in the state store. This avoid any un-necessary write to the state store, but if the trigger is not stopped gracefully the state store may not be updated leading to duplicated records consumption."""
+            - ON_EACH_BATCH: after each batch of records consumed by this trigger, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
+            - ON_STOP: when this trigger is stopped or killed, the offsets will be stored in the KV Store. This avoid any un-necessary writes to the KV Store, but if the trigger is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption."""
     )
     @PluginProperty
     @Builder.Default

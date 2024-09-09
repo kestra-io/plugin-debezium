@@ -160,7 +160,7 @@ public interface AbstractDebeziumInterface {
     Map<String, String> getProperties();
 
     @Schema(
-        title = "The name of Debezium state file."
+        title = "The name of the Debezium state file stored in the KV Store for that namespace."
     )
     @PluginProperty
     @NotNull
