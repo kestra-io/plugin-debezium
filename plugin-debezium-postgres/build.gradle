@@ -17,7 +17,7 @@ dependencies {
     testImplementation project(':plugin-debezium').sourceSets.test.output
 
     api group: 'io.debezium', name: 'debezium-connector-postgres', version: debeziumVersion
-    api 'org.bouncycastle:bcprov-jdk18on:1.77'
-    api 'org.bouncycastle:bcpkix-jdk18on:1.77'
+    api 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+    api 'org.bouncycastle:bcpkix-jdk18on:1.78.1'
     api 'name.neuhalfen.projects.crypto.bouncycastle.openpgp:bouncy-gpg:2.3.0'
 }
