@@ -12,6 +12,8 @@ triggers:
     sid: XE
     stateName: someStateNameForTrigger
     includedTables: KESTRA.TRIGGER_EVENTS
+    properties:
+      snapshot.lock.timeout.ms: 30000
 
 tasks:
   - id: end
