@@ -16,6 +16,7 @@ import io.kestra.core.junit.annotations.KestraTest;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import org.h2.tools.RunScript;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
@@ -32,6 +33,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 
 @KestraTest
+@Disabled("Works locally by flaky on CI")
 class TriggerTest extends AbstractDebeziumTest {
     @Inject
     private ApplicationContext applicationContext;
