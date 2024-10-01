@@ -79,6 +79,13 @@ class TriggerTest extends AbstractDebeziumTest {
         // mock flow listeners
         CountDownLatch queueCount = new CountDownLatch(1);
 
+        // wait for execution
+        Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
+            if (execution.getLeft().getFlowId().equals("trigger")) {
+                queueCount.countDown();
+            }
+        });
+
         // scheduler
         try (
             AbstractScheduler scheduler = new JdbcScheduler(
@@ -87,11 +94,6 @@ class TriggerTest extends AbstractDebeziumTest {
             );
             Worker worker = applicationContext.createBean(Worker.class, IdUtils.create(), 8, null);
         ) {
-            // wait for execution
-            Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
-                queueCount.countDown();
-                assertThat(execution.getLeft().getFlowId(), is("trigger"));
-            });
 
             worker.run();
             scheduler.run();
@@ -100,10 +102,10 @@ class TriggerTest extends AbstractDebeziumTest {
 
             boolean await = queueCount.await(1, TimeUnit.MINUTES);
             assertThat(await, is(true));
-
-            Integer trigger = (Integer) receive.blockLast().getTrigger().getVariables().get("size");
-
-            assertThat(trigger, greaterThanOrEqualTo(5));
         }
+
+        Integer trigger = (Integer) receive.blockLast().getTrigger().getVariables().get("size");
+
+        assertThat(trigger, greaterThanOrEqualTo(5));
     }
 }

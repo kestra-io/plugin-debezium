@@ -79,6 +79,13 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
         // mock flow listeners
         CountDownLatch queueCount = new CountDownLatch(1);
 
+        // wait for execution
+        Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
+            if (execution.getLeft().getFlowId().equals("realtime-trigger")) {
+                queueCount.countDown();
+            }
+        });
+
         // scheduler
         try (
             AbstractScheduler scheduler = new JdbcScheduler(
@@ -87,12 +94,6 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
             );
             Worker worker = applicationContext.createBean(Worker.class, IdUtils.create(), 8, null);
         ) {
-            // wait for execution
-            Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
-                queueCount.countDown();
-                assertThat(execution.getLeft().getFlowId(), is("trigger"));
-            });
-
             worker.run();
             scheduler.run();
 
@@ -100,12 +101,12 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
 
             boolean await = queueCount.await(15, TimeUnit.SECONDS);
             assertThat(await, is(true));
-
-            Map<String, Object> data = (Map<String, Object>) receive.blockLast().getTrigger().getVariables().get("data");
-
-            assertThat(data, notNullValue());
-
-            assertThat(data.size(), greaterThanOrEqualTo(5));
         }
+
+        Map<String, Object> data = (Map<String, Object>) receive.blockLast().getTrigger().getVariables().get("data");
+
+        assertThat(data, notNullValue());
+
+        assertThat(data.size(), greaterThanOrEqualTo(5));
     }
 }

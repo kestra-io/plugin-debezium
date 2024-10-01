@@ -1,4 +1,4 @@
-id: trigger
+id: realtime-trigger
 namespace: io.kestra.tests
 
 triggers:

@@ -12,6 +12,7 @@ triggers:
     sid: XE
     stateName: someStateNameForTrigger
     includedTables: KESTRA.TRIGGER_EVENTS
+    maxRecords: 5
 
 tasks:
   - id: end
