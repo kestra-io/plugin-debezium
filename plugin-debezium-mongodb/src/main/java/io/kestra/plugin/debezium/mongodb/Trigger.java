@@ -101,8 +101,10 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @NotNull
     private String connectionString;
 
+    @Builder.Default
     protected String hostname = "";
 
+    @Builder.Default
     protected String port = "";
 
     protected String username;
