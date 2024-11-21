@@ -1,7 +1,6 @@
 package io.kestra.plugin.debezium.mysql;
 
 import com.google.common.base.Charsets;
-import io.debezium.data.Envelope;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
@@ -18,7 +17,6 @@ import jakarta.inject.Inject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -75,9 +73,9 @@ class CaptureTest extends AbstractDebeziumTest {
         assertThat(runOutput.getSize(), is(5));
 
         List<Map<String, Object>> events = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, runOutput.getUris().get("kestra.events")))), r -> events.add((Map<String, Object>) r));
+        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, null, runOutput.getUris().get("kestra.events")))), r -> events.add((Map<String, Object>) r));
 
-        IOUtils.toString(storageInterface.get(null, runOutput.getUris().get("kestra.events")), Charsets.UTF_8);
+        IOUtils.toString(storageInterface.get(null, null, runOutput.getUris().get("kestra.events")), Charsets.UTF_8);
         assertThat(events.size(), is(5));
         assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Machine Head")));
         assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Dropkick Murphys")));
