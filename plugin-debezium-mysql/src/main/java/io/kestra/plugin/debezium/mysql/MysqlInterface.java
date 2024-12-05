@@ -1,6 +1,7 @@
 package io.kestra.plugin.debezium.mysql;
 
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import jakarta.validation.constraints.NotNull;
@@ -16,9 +17,8 @@ public interface MysqlInterface {
             "- `SCHEMA_ONLY`: The connector runs a snapshot of the schemas and not the data. This setting is useful when you do not need the topics to contain a consistent snapshot of the data but need them to have only the changes since the connector was started.\n" +
             "- `SCHEMA_ONLY_RECOVERY`: This is a recovery setting for a connector that has already been capturing changes. When you restart the connector, this setting enables recovery of a corrupted or lost database history topic. You might set it periodically to \"clean up\" a database history topic that has been growing unexpectedly. Database history topics require infinite retention."
     )
-    @PluginProperty(dynamic = false)
     @NotNull
-    SnapshotMode getSnapshotMode();
+    Property<SnapshotMode> getSnapshotMode();
 
     @Schema(
         title = "A numeric ID of this database client.",
@@ -28,7 +28,7 @@ public interface MysqlInterface {
             "is to explicitly set a value."
     )
     @PluginProperty(dynamic = true)
-    String getServerId();
+    Property<String> getServerId();
 
     public enum SnapshotMode {
         INITIAL,
