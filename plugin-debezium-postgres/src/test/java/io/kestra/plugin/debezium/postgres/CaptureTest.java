@@ -59,15 +59,15 @@ class CaptureTest extends AbstractDebeziumTest {
             .username(Property.of(TestUtils.username()))
             .password(Property.of(TestUtils.password()))
             .port(Property.of("65432"))
-            .database("postgres")
-            .pluginName(PostgresInterface.PluginName.PGOUTPUT)
+            .database(Property.of("postgres"))
+            .pluginName(Property.of(PostgresInterface.PluginName.PGOUTPUT))
             // SSL is disabled or we cannot test triggers which are very important for Debezium
 //            .sslMode(TestUtils.sslMode())
 //            .sslRootCert(TestUtils.ca())
 //            .sslCert(TestUtils.cert())
 //            .sslKey(TestUtils.key())
 //            .sslKeyPassword(TestUtils.keyPass())
-            .snapshotMode(Capture.SnapshotMode.INITIAL)
+            .snapshotMode(Property.of(Capture.SnapshotMode.INITIAL))
             .maxRecords(Property.of(5))
             .includedTables(List.of("public.events"))
             .build();

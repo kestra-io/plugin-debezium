@@ -1,6 +1,7 @@
 package io.kestra.plugin.debezium.postgres;
 
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import jakarta.validation.constraints.NotNull;
@@ -9,9 +10,8 @@ public interface PostgresInterface {
     @Schema(
         title = "The name of the PostgreSQL database from which to stream the changes."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    String getDatabase();
+    Property<String> getDatabase();
 
     @Schema(
         title = "The name of the [PostgreSQL logical decoding](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-output-plugin) plug-in installed on the PostgreSQL server.",
@@ -21,9 +21,8 @@ public interface PostgresInterface {
             "`wal2json_streaming` or `wal2json_rds_streaming`. With a streaming plug-in, PostgreSQL sends the " +
             "connector a separate message for each change in a transaction."
     )
-    @PluginProperty(dynamic = false)
     @NotNull
-    PluginName getPluginName();
+    Property<PluginName> getPluginName();
 
     @Schema(
         title = "The name of the PostgreSQL publication created for streaming changes when using `PGOUTPUT`.",
@@ -35,9 +34,8 @@ public interface PostgresInterface {
             "If the publication already exists, either for all tables or configured with a subset of tables, Debezium " +
             "uses the publication as it is defined."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    String getPublicationName();
+    Property<String> getPublicationName();
 
     @Schema(
         title = "The name of the PostgreSQL logical decoding slot that was created for streaming changes from a particular plug-in for a particular database/schema.",
@@ -45,9 +43,8 @@ public interface PostgresInterface {
             "Slot names must conform to [PostgreSQL replication slot naming rules](https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION), " +
             "which state: \"Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character.\""
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    String getSlotName();
+    Property<String> getSlotName();
 
     @Schema(
         title = "Whether to use an encrypted connection to the PostgreSQL server. Options include:\n" +
@@ -57,35 +54,30 @@ public interface PostgresInterface {
             "- `VERIFY_FULL` behaves like verify-ca but also verifies that the server certificate matches the host to which the connector is trying to connect.\n\n" +
             "See the [PostgreSQL documentation](https://www.postgresql.org/docs/current/static/libpq-connect.html) for more information."
     )
-    @PluginProperty(dynamic = false)
-    SslMode getSslMode();
+    Property<SslMode> getSslMode();
 
     @Schema(
         title = "The root certificate(s) against which the server is validated.",
         description = "Must be a PEM encoded certificate."
     )
-    @PluginProperty(dynamic = true)
-    String getSslRootCert();
+    Property<String> getSslRootCert();
 
     @Schema(
         title = "The SSL certificate for the client.",
         description = "Must be a PEM encoded certificate."
     )
-    @PluginProperty(dynamic = true)
-    String getSslCert();
+    Property<String> getSslCert();
 
     @Schema(
         title = "The SSL private key of the client.",
         description = "Must be a PEM encoded key."
     )
-    @PluginProperty(dynamic = true)
-    String getSslKey();
+    Property<String> getSslKey();
 
     @Schema(
         title = "The password to access the client private key `sslKey`."
     )
-    @PluginProperty(dynamic = true)
-    String getSslKeyPassword();
+    Property<String> getSslKeyPassword();
 
     @Schema(
         title = "Specifies the criteria for running a snapshot when the connector starts.",
@@ -95,9 +87,8 @@ public interface PostgresInterface {
             "- `NEVER`: The connector never performs snapshots. When a connector is configured this way, its behavior when it starts is as follows. If there is a previously stored LSN, the connector continues streaming changes from that position. If no LSN has been stored, the connector starts streaming changes from the point in time when the PostgreSQL logical replication slot was created on the server. The never snapshot mode is useful only when you know all data of interest is still reflected in the WAL.\n" +
             "- `INITIAL_ONLY`: The connector performs an initial snapshot and then stops, without processing any subsequent changes.\n"
     )
-    @PluginProperty(dynamic = false)
     @NotNull
-    SnapshotMode getSnapshotMode();
+    Property<SnapshotMode> getSnapshotMode();
 
     enum SnapshotMode {
         INITIAL,

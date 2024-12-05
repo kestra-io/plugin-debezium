@@ -4,6 +4,7 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.*;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
 import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
@@ -48,30 +49,30 @@ import reactor.core.publisher.Flux;
     }
 )
 public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements PostgresInterface, AbstractDebeziumInterface {
-    protected String database;
+    protected Property<String> database;
 
     @Builder.Default
-    protected PluginName pluginName = PluginName.PGOUTPUT;
+    protected Property<PluginName> pluginName = Property.of(PluginName.PGOUTPUT);
 
     @Builder.Default
-    protected String slotName = "kestra";
+    protected Property<String> slotName = Property.of("kestra");
 
     @Builder.Default
-    protected String publicationName = "kestra_publication";
+    protected Property<String> publicationName = Property.of("kestra_publication");
 
     @Builder.Default
-    protected SslMode sslMode = SslMode.DISABLE;
+    protected Property<SslMode> sslMode = Property.of(SslMode.DISABLE);
 
-    protected String sslRootCert;
+    protected Property<String> sslRootCert;
 
-    protected String sslCert;
+    protected Property<String> sslCert;
 
-    protected String sslKey;
+    protected Property<String> sslKey;
 
-    protected String sslKeyPassword;
+    protected Property<String> sslKeyPassword;
 
     @Builder.Default
-    private SnapshotMode snapshotMode = SnapshotMode.INITIAL;
+    private Property<Capture.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
 
     @Override
     public Publisher<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
