@@ -34,16 +34,16 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
     protected AbstractDebeziumTask.Key key = AbstractDebeziumTask.Key.ADD_FIELD;
 
     @Builder.Default
-    protected AbstractDebeziumTask.Metadata metadata = AbstractDebeziumTask.Metadata.ADD_FIELD;
+    protected Property<AbstractDebeziumTask.Metadata> metadata = Property.of(AbstractDebeziumTask.Metadata.ADD_FIELD);
 
     @Builder.Default
-    protected String metadataFieldName = "metadata";
+    protected Property<String> metadataFieldName = Property.of("metadata");
 
     @Builder.Default
-    protected AbstractDebeziumTask.SplitTable splitTable = AbstractDebeziumTask.SplitTable.TABLE;
+    protected Property<AbstractDebeziumTask.SplitTable> splitTable = Property.of(AbstractDebeziumTask.SplitTable.TABLE);
 
     @Builder.Default
-    protected Boolean ignoreDdl = true;
+    protected Property<Boolean> ignoreDdl = Property.of(true);
 
     protected Property<String> hostname;
 

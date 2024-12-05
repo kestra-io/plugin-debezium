@@ -2,6 +2,7 @@ package io.kestra.plugin.debezium;
 
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.serializers.JacksonMapper;
@@ -104,7 +105,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         }
     }
 
-    private Map<String, Object> handle(Pair<Message, Message> message) {
+    private Map<String, Object> handle(Pair<Message, Message> message) throws IllegalVariableEvaluationException {
         if (this.isFilter(message)) {
             return null;
         }
@@ -121,8 +122,8 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         }
     }
 
-    private void emit(Map<String, Object> result, Message.Source source, FluxSink<AbstractDebeziumRealtimeTrigger.StreamOutput> sink) {
-        String stream = switch (this.abstractDebeziumTask.getSplitTable()) {
+    private void emit(Map<String, Object> result, Message.Source source, FluxSink<AbstractDebeziumRealtimeTrigger.StreamOutput> sink) throws IllegalVariableEvaluationException {
+        String stream = switch (runContext.render(this.abstractDebeziumTask.getSplitTable()).as(AbstractDebeziumTask.SplitTable.class).orElseThrow()) {
 	        case OFF -> "data";
 	        case TABLE -> source.getDb() + "." + source.getTable();
 	        case DATABASE -> source.getDb();
@@ -136,10 +137,10 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         sink.next(output);
     }
 
-    private void write(Map<String, Object> result, Message.Source source) throws IOException {
+    private void write(Map<String, Object> result, Message.Source source) throws IOException, IllegalVariableEvaluationException {
         String stream;
 
-        switch (this.abstractDebeziumTask.getSplitTable()) {
+        switch (runContext.render(this.abstractDebeziumTask.getSplitTable()).as(AbstractDebeziumTask.SplitTable.class).orElseThrow()) {
             case OFF:
                 stream = "data";
                 break;
@@ -150,7 +151,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
                 stream = source.getDb();
                 break;
             default:
-                throw new IllegalArgumentException("Invalid SplitTable '" + this.abstractDebeziumTask.getSplitTable() + "");
+                throw new IllegalArgumentException("Invalid SplitTable '" + this.abstractDebeziumTask.getSplitTable().toString() + "");
         }
 
         if (!this.records.containsKey(stream)) {
@@ -170,8 +171,8 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
     }
 
     @SuppressWarnings("RedundantIfStatement")
-    private boolean isFilter(Pair<Message, Message> message) {
-        if (!(message.getValue() instanceof Envelope) && abstractDebeziumTask.getIgnoreDdl()) {
+    private boolean isFilter(Pair<Message, Message> message) throws IllegalVariableEvaluationException {
+        if (!(message.getValue() instanceof Envelope) && runContext.render(abstractDebeziumTask.getIgnoreDdl()).as(Boolean.class).orElseThrow()) {
             return true;
         }
 
@@ -196,7 +197,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         return result;
     }
 
-    private Map<String, Object> handleFormatInline(Pair<Message, Message> message) {
+    private Map<String, Object> handleFormatInline(Pair<Message, Message> message) throws IllegalVariableEvaluationException {
         Envelope value = (Envelope) message.getValue();
 
         Map<String, Object> result = this.formatInlineWithoutAdditional(value);
@@ -208,7 +209,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         return result;
     }
 
-    private Map<String, Object> handleFormatWrap(Pair<Message, Message> message) {
+    private Map<String, Object> handleFormatWrap(Pair<Message, Message> message) throws IllegalVariableEvaluationException {
         Envelope value = (Envelope) message.getValue();
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -247,8 +248,8 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         }
     }
 
-    private void addMetadata(Map<String, Object> result, Envelope envelope) {
-        if (this.abstractDebeziumTask.getMetadata() == AbstractDebeziumTask.Metadata.ADD_FIELD) {
+    private void addMetadata(Map<String, Object> result, Envelope envelope) throws IllegalVariableEvaluationException {
+        if (runContext.render(this.abstractDebeziumTask.getMetadata()).as(AbstractDebeziumTask.Metadata.class).orElseThrow() == AbstractDebeziumTask.Metadata.ADD_FIELD) {
             Map<Object, Object> metadata = new HashMap<>();
 
             if (envelope.getProperties() != null) {
@@ -271,7 +272,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
                 metadata.put("timestamp", envelope.getTimestamp());
             }
 
-            result.put(abstractDebeziumTask.getMetadataFieldName(), metadata);
+            result.put(runContext.render(abstractDebeziumTask.getMetadataFieldName()).as(String.class).orElseThrow(), metadata);
         }
     }
 

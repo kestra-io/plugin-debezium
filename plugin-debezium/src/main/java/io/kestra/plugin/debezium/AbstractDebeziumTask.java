@@ -57,16 +57,16 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     protected Key key = Key.ADD_FIELD;
 
     @Builder.Default
-    protected Metadata metadata = Metadata.ADD_FIELD;
+    protected Property<Metadata> metadata = Property.of(Metadata.ADD_FIELD);
 
     @Builder.Default
-    protected String metadataFieldName = "metadata";
+    protected Property<String> metadataFieldName = Property.of("metadata");
 
     @Builder.Default
-    protected SplitTable splitTable = SplitTable.TABLE;
+    protected Property<SplitTable> splitTable = Property.of(SplitTable.TABLE);
 
     @Builder.Default
-    protected Boolean ignoreDdl = true;
+    protected Property<Boolean> ignoreDdl = Property.of(true);
 
     protected Property<String> hostname;
 

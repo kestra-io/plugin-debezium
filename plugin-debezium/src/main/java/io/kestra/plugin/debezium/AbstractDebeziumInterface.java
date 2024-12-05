@@ -53,16 +53,14 @@ public interface AbstractDebeziumInterface {
             "- `ADD_FIELD`: Add metadata in a column named `metadata`.\n" +
             "- `DROP`: Drop metadata."
     )
-    @PluginProperty
     @NotNull
-    AbstractDebeziumTask.Metadata getMetadata();
+    Property<AbstractDebeziumTask.Metadata> getMetadata();
 
     @Schema(
         title = "The name of metadata field if metadata is `ADD_FIELD`."
     )
-    @PluginProperty
     @NotNull
-    String getMetadataFieldName();
+    Property<String> getMetadataFieldName();
 
     @Schema(
         title = "Split table on separate output `uris`.",
@@ -71,17 +69,15 @@ public interface AbstractDebeziumInterface {
             "- `DATABASE`: This will split all rows by databases on output with name `database`.\n" +
             "- `OFF`: This will **NOT** split all rows resulting in a single `data` output."
     )
-    @PluginProperty
     @NotNull
-    AbstractDebeziumTask.SplitTable getSplitTable();
+    Property<AbstractDebeziumTask.SplitTable> getSplitTable();
 
     @Schema(
         title = "Ignore DDL statement.",
         description = "Ignore CREATE, ALTER, DROP and TRUNCATE operations."
     )
-    @PluginProperty
     @NotNull
-    Boolean getIgnoreDdl();
+    Property<Boolean> getIgnoreDdl();
 
     @Schema(
         title = "Hostname of the remote server."
