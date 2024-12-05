@@ -1,9 +1,9 @@
 package io.kestra.plugin.debezium;
 
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import java.time.Duration;
 import java.util.Map;
 import jakarta.validation.constraints.NotNull;
 
@@ -86,28 +86,24 @@ public interface AbstractDebeziumInterface {
     @Schema(
         title = "Hostname of the remote server."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    String getHostname();
+    Property<String> getHostname();
 
     @Schema(
         title = "Port of the remote server."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    String getPort();
+    Property<String> getPort();
 
     @Schema(
         title = "Username on the remote server."
     )
-    @PluginProperty(dynamic = true)
-    String getUsername();
+    Property<String> getUsername();
 
     @Schema(
         title = "Password on the remote server."
     )
-    @PluginProperty(dynamic = true)
-    String getPassword();
+    Property<String> getPassword();
 
     @Schema(
         title = "An optional, comma-separated list of regular expressions that match the names of the databases for which to capture changes.",
@@ -156,13 +152,11 @@ public interface AbstractDebeziumInterface {
         title = "Additional configuration properties.",
         description = "Any additional configuration properties that is valid for the current driver."
     )
-    @PluginProperty(dynamic = true)
-    Map<String, String> getProperties();
+    Property<Map<String, String>> getProperties();
 
     @Schema(
         title = "The name of the Debezium state file stored in the KV Store for that namespace."
     )
-    @PluginProperty
     @NotNull
-    String getStateName();
+    Property<String> getStateName();
 }

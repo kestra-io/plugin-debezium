@@ -3,7 +3,9 @@ package io.kestra.plugin.debezium;
 import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.models.triggers.RealtimeTriggerInterface;
 import io.kestra.core.models.triggers.TriggerOutput;
@@ -61,13 +63,13 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     @Builder.Default
     protected Boolean ignoreDdl = true;
 
-    protected String hostname;
+    protected Property<String> hostname;
 
-    protected String port;
+    protected Property<String> port;
 
-    protected String username;
+    protected Property<String> username;
 
-    protected String password;
+    protected Property<String> password;
 
     protected Object includedDatabases;
 
@@ -81,10 +83,10 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
     protected Object excludedColumns;
 
-    protected Map<String, String> properties;
+    protected Property<Map<String, String>> properties;
 
     @Builder.Default
-    protected String stateName = "debezium-state";
+    protected Property<String> stateName = Property.of("debezium-state");
 
     @Schema(
         title = "How to commit the offsets to the KV Store.",
@@ -170,22 +172,26 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         if (offsetFile.toFile().exists()) {
             try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
                 runContext.stateStore().putState(
-                    task.stateName,
+                    runContext.render(task.stateName).as(String.class).orElseThrow(),
                     offsetFile.getFileName().toFile().toString(),
                     runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
                     fis.readAllBytes()
                 );
+            } catch (IllegalVariableEvaluationException e) {
+                throw new RuntimeException(e);
             }
         }
 
         if (task.needDatabaseHistory() && historyFile.toFile().exists()) {
             try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
                 runContext.stateStore().putState(
-                    task.stateName,
+                    runContext.render(task.stateName).as(String.class).orElseThrow(),
                     historyFile.getFileName().toFile().toString(),
                     runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
                     fis.readAllBytes()
                 );
+            } catch (IllegalVariableEvaluationException e) {
+                throw new RuntimeException(e);
             }
         }
     }

@@ -1,6 +1,7 @@
 package io.kestra.plugin.debezium.oracle;
 
 import com.google.common.base.Charsets;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
@@ -74,13 +75,13 @@ class CaptureTest extends AbstractDebeziumTest {
             .id(IdUtils.create())
             .type(Capture.class.getName())
             .snapshotMode(OracleInterface.SnapshotMode.INITIAL_ONLY)
-            .hostname("127.0.0.1")
-            .port("1521")
-            .username("c##dbzuser")
+            .hostname(Property.of("127.0.0.1"))
+            .port(Property.of("1521"))
+            .username(Property.of("c##dbzuser"))
             .sid("XE")
-            .password("dbz")
-            .stateName(UUID.randomUUID().toString())
-            .maxRecords(5)
+            .password(Property.of("dbz"))
+            .stateName(Property.of(UUID.randomUUID().toString()))
+            .maxRecords(Property.of(5))
             .includedTables("KESTRA.EVENTS")
             .build();
 

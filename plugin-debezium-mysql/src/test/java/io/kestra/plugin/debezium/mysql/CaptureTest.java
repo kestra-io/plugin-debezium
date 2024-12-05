@@ -1,6 +1,7 @@
 package io.kestra.plugin.debezium.mysql;
 
 import com.google.common.base.Charsets;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
@@ -59,11 +60,11 @@ class CaptureTest extends AbstractDebeziumTest {
             .type(Capture.class.getName())
             .serverId("123456789")
             .snapshotMode(MysqlInterface.SnapshotMode.NEVER)
-            .hostname("127.0.0.1")
-            .port("63306")
-            .username(getUsername())
-            .password(getPassword())
-            .maxRecords(5)
+            .hostname(Property.of("127.0.0.1"))
+            .port(Property.of("63306"))
+            .username(Property.of(getUsername()))
+            .password(Property.of(getPassword()))
+            .maxRecords(Property.of(5))
             .includedTables(List.of("kestra.events"))
             .build();
 

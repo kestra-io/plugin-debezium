@@ -1,6 +1,7 @@
 package io.kestra.plugin.debezium.db2;
 
 import com.google.common.base.Charsets;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
@@ -60,12 +61,12 @@ class CaptureTest extends AbstractDebeziumTest {
             .id(IdUtils.create())
             .type(Capture.class.getName())
             .snapshotMode(Db2Interface.SnapshotMode.INITIAL)
-            .hostname("127.0.0.1")
-            .port("5023")
-            .username(getUsername())
-            .password(getPassword())
+            .hostname(Property.of("127.0.0.1"))
+            .port(Property.of("5023"))
+            .username(Property.of(getUsername()))
+            .password(Property.of(getPassword()))
             .database("kestra")
-            .maxRecords(5)
+            .maxRecords(Property.of(5))
             .includedTables(List.of("DB2INST1.EVENTS"))
             .build();
 

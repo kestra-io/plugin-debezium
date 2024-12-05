@@ -1,5 +1,6 @@
 package io.kestra.plugin.debezium.sqlserver;
 
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
@@ -55,13 +56,13 @@ class CaptureTest extends AbstractDebeziumTest {
             .id(IdUtils.create())
             .type(Capture.class.getName())
             .snapshotMode(SqlServerInterface.SnapshotMode.INITIAL_ONLY)
-            .hostname("127.0.0.1")
-            .port("61433")
-            .username(getUsername())
-            .password(getPassword())
+            .hostname(Property.of("127.0.0.1"))
+            .port(Property.of("61433"))
+            .username(Property.of(getUsername()))
+            .password(Property.of(getPassword()))
             .database("deb")
-            .maxRecords(5)
-            .properties(Map.of("database.encrypt", "false"))
+            .maxRecords(Property.of(5))
+            .properties(Property.of(Map.of("database.encrypt", "false")))
             .includedTables(List.of("dbo.events"))
             .build();
 

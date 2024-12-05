@@ -4,6 +4,7 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.*;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
@@ -102,14 +103,14 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     private String connectionString;
 
     @Builder.Default
-    protected String hostname = "";
+    protected Property<String> hostname = Property.of("");
 
     @Builder.Default
-    protected String port = "";
+    protected Property<String> port = Property.of("");
 
-    protected String username;
+    protected Property<String> username;
 
-    protected String password;
+    protected Property<String> password;
 
     private Object includedDatabases;
 
@@ -127,17 +128,17 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
 
     private Object excludedColumns;
 
-    private Map<String, String> properties;
+    private Property<Map<String, String>> properties;
 
     @Builder.Default
-    protected String stateName = "debezium-state";
+    protected Property<String> stateName = Property.of("debezium-state");
 
-    private Integer maxRecords;
+    private Property<Integer> maxRecords;
 
-    private Duration maxDuration;
+    private Property<Duration> maxDuration;
 
     @Builder.Default
-    private Duration maxWait = Duration.ofSeconds(10);
+    private Property<Duration> maxWait = Property.of(Duration.ofSeconds(10));
 
     @Builder.Default
     private MongodbInterface.SnapshotMode snapshotMode = MongodbInterface.SnapshotMode.INITIAL;
