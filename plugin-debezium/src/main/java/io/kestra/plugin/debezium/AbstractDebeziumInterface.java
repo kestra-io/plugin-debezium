@@ -15,9 +15,8 @@ public interface AbstractDebeziumInterface {
             "- `INLINE`: Send a row like in the source with only data (remove after & before), all the columns will be present for each row.\n" +
             "- `WRAP`: Send a row like INLINE but wrapped in a `record` field.\n"
     )
-    @PluginProperty
     @NotNull
-    AbstractDebeziumTask.Format getFormat();
+    Property<AbstractDebeziumTask.Format> getFormat();
 
     @Schema(
         title = "Specify how to handle deleted rows.",
@@ -26,16 +25,14 @@ public interface AbstractDebeziumInterface {
             "- `NULL`: Send a row with all values as null.\n" +
             "- `DROP`: Don't send deleted row."
     )
-    @PluginProperty
     @NotNull
-    AbstractDebeziumTask.Deleted getDeleted();
+    Property<AbstractDebeziumTask.Deleted> getDeleted();
 
     @Schema(
         title = "The name of deleted field if deleted is `ADD_FIELD`."
     )
-    @PluginProperty
     @NotNull
-    String getDeletedFieldName();
+    Property<String> getDeletedFieldName();
 
     @Schema(
         title = "Specify how to handle key.",
@@ -43,9 +40,8 @@ public interface AbstractDebeziumInterface {
             "- `ADD_FIELD`: Add key(s) merged with columns.\n" +
             "- `DROP`: Drop keys."
     )
-    @PluginProperty
     @NotNull
-    AbstractDebeziumTask.Key getKey();
+    Property<AbstractDebeziumTask.Key> getKey();
 
     @Schema(
         title = "Specify how to handle metadata.",

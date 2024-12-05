@@ -110,7 +110,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
             return null;
         }
 
-        switch (abstractDebeziumTask.getFormat()) {
+        switch (runContext.render(abstractDebeziumTask.getFormat()).as(AbstractDebeziumTask.Format.class).orElseThrow()) {
             case RAW:
                 return this.handleFormatRaw(message);
             case INLINE:
@@ -176,18 +176,18 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
             return true;
         }
 
-        if (message.getValue() == null && abstractDebeziumTask.getDeleted() == AbstractDebeziumTask.Deleted.DROP) {
+        if (message.getValue() == null && runContext.render(abstractDebeziumTask.getDeleted()).as(AbstractDebeziumTask.Deleted.class).orElseThrow() == AbstractDebeziumTask.Deleted.DROP) {
             return true;
         }
 
-        if (!(message.getValue() instanceof Envelope) && this.abstractDebeziumTask.getFormat() != AbstractDebeziumTask.Format.RAW) {
+        if (!(message.getValue() instanceof Envelope) && runContext.render(this.abstractDebeziumTask.getFormat()).as(AbstractDebeziumTask.Format.class).orElseThrow() != AbstractDebeziumTask.Format.RAW) {
             return true;
         }
 
         return false;
     }
 
-    private Map<String, Object> handleFormatRaw(Pair<Message, Message> message) {
+    private Map<String, Object> handleFormatRaw(Pair<Message, Message> message) throws IllegalVariableEvaluationException {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("key", message.getKey());
         result.put("value", message.getValue());
@@ -234,16 +234,16 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         return result;
     }
 
-    private void addDeleted(Map<String, Object> result, Pair<Message, Message> message) {
-        if (this.abstractDebeziumTask.getDeleted() == AbstractDebeziumTask.Deleted.ADD_FIELD && message.getValue() instanceof Envelope) {
+    private void addDeleted(Map<String, Object> result, Pair<Message, Message> message) throws IllegalVariableEvaluationException {
+        if (runContext.render(this.abstractDebeziumTask.getDeleted()).as(AbstractDebeziumTask.Deleted.class).orElseThrow() == AbstractDebeziumTask.Deleted.ADD_FIELD && message.getValue() instanceof Envelope) {
             io.debezium.data.Envelope.Operation operation = ((Envelope) message.getValue()).getOperation();
 
-            result.put(this.abstractDebeziumTask.getDeletedFieldName(), operation == io.debezium.data.Envelope.Operation.DELETE || operation == io.debezium.data.Envelope.Operation.TRUNCATE);
+            result.put(runContext.render(this.abstractDebeziumTask.getDeletedFieldName()).as(String.class).orElseThrow(), operation == io.debezium.data.Envelope.Operation.DELETE || operation == io.debezium.data.Envelope.Operation.TRUNCATE);
         }
     }
 
-    private void addKey(Map<String, Object> result, Pair<Message, Message> message) {
-        if (this.abstractDebeziumTask.getKey() == AbstractDebeziumTask.Key.ADD_FIELD && message.getKey() != null) {
+    private void addKey(Map<String, Object> result, Pair<Message, Message> message) throws IllegalVariableEvaluationException {
+        if (runContext.render(this.abstractDebeziumTask.getKey()).as(AbstractDebeziumTask.Key.class).orElseThrow() == AbstractDebeziumTask.Key.ADD_FIELD && message.getKey() != null) {
             result.putAll(JacksonMapper.toMap(message.getKey()));
         }
     }

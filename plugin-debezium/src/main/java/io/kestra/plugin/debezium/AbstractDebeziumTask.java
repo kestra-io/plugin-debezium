@@ -45,16 +45,16 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @NoArgsConstructor
 public abstract class AbstractDebeziumTask extends Task implements RunnableTask<AbstractDebeziumTask.Output>, AbstractDebeziumInterface {
     @Builder.Default
-    protected Format format = Format.INLINE;
+    protected Property<Format> format = Property.of(Format.INLINE);
 
     @Builder.Default
-    protected Deleted deleted = Deleted.ADD_FIELD;
+    protected Property<Deleted> deleted = Property.of(Deleted.ADD_FIELD);
 
     @Builder.Default
-    protected String deletedFieldName = "deleted";
+    protected Property<String> deletedFieldName = Property.of("deleted");
 
     @Builder.Default
-    protected Key key = Key.ADD_FIELD;
+    protected Property<Key> key = Property.of(Key.ADD_FIELD);
 
     @Builder.Default
     protected Property<Metadata> metadata = Property.of(Metadata.ADD_FIELD);
