@@ -1,6 +1,7 @@
 package io.kestra.plugin.debezium.oracle;
 
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import jakarta.validation.constraints.NotNull;
@@ -11,13 +12,13 @@ public interface OracleInterface {
         title = "The name of the database to capture changes from."
     )
     @NotNull
-    String getSid();
+    Property<String> getSid();
 
     @Schema(
         title = "The name of the Oracle pluggable database that the connector captures changes from. Used in container database (CDB) installations only.",
         description = "For non-container database (non-CDB) installation, do not specify the pluggableDatabase property."
     )
-    String getPluggableDatabase();
+    Property<String> getPluggableDatabase();
 
     @Schema(
         title = "Specifies the criteria for running a snapshot when the connector starts.",
@@ -31,7 +32,7 @@ public interface OracleInterface {
     )
     @PluginProperty(dynamic = false)
     @NotNull
-    SnapshotMode getSnapshotMode();
+    Property<SnapshotMode> getSnapshotMode();
 
     public enum SnapshotMode {
         ALWAYS,
