@@ -27,33 +27,35 @@ import java.util.Properties;
 
 public abstract class PostgresService {
     public static void handleProperties(Properties properties, RunContext runContext, PostgresInterface postgres) throws IllegalVariableEvaluationException, IOException, OperatorCreationException, PKCSException {
-        properties.put("database.dbname", runContext.render(postgres.getDatabase()));
-        properties.put("plugin.name", postgres.getPluginName().name().toLowerCase(Locale.ROOT));
-        properties.put("snapshot.mode", postgres.getSnapshotMode().name().toLowerCase(Locale.ROOT));
-        properties.put("slot.name", runContext.render(postgres.getSlotName()));
+        properties.put("database.dbname", runContext.render(postgres.getDatabase()).as(String.class).orElseThrow());
+        properties.put("plugin.name", runContext.render(postgres.getPluginName()).as(PostgresInterface.PluginName.class).orElseThrow().name().toLowerCase(Locale.ROOT));
+        properties.put("snapshot.mode", runContext.render(postgres.getSnapshotMode()).as(PostgresInterface.SnapshotMode.class).orElseThrow().name().toLowerCase(Locale.ROOT));
+        properties.put("slot.name", runContext.render(postgres.getSlotName()).as(String.class).orElseThrow());
 
         if (postgres.getPublicationName() != null) {
-            properties.put("publication.name", runContext.render(postgres.getPublicationName()));
+            properties.put("publication.name", runContext.render(postgres.getPublicationName()).as(String.class).orElseThrow());
         }
 
         if (postgres.getSslMode() != null) {
-            properties.put("database.sslmode", postgres.getSslMode().name().toUpperCase(Locale.ROOT).replace("_", "-"));
+            properties.put("database.sslmode", runContext.render(postgres.getSslMode()).as(PostgresInterface.SslMode.class).orElseThrow().name().toUpperCase(Locale.ROOT).replace("_", "-"));
         }
 
         if (postgres.getSslRootCert() != null) {
-            properties.put("database.sslrootcert", runContext.workingDir().createTempFile(runContext.render(postgres.getSslRootCert()).getBytes(StandardCharsets.UTF_8), ".pem").toAbsolutePath().toString());
+            properties.put("database.sslrootcert", runContext.workingDir().createTempFile(runContext.render(postgres.getSslRootCert()).as(String.class).orElseThrow().getBytes(StandardCharsets.UTF_8), ".pem").toAbsolutePath().toString());
         }
 
         if (postgres.getSslCert() != null) {
-            properties.put("database.sslcert", runContext.workingDir().createTempFile(runContext.render(postgres.getSslCert()).getBytes(StandardCharsets.UTF_8), ".pem").toAbsolutePath().toString());
+            properties.put("database.sslcert", runContext.workingDir().createTempFile(runContext.render(postgres.getSslCert()).as(String.class).orElseThrow().getBytes(StandardCharsets.UTF_8), ".pem").toAbsolutePath().toString());
         }
 
         if (postgres.getSslKey() != null) {
-            properties.put("database.sslkey", convertPrivateKey(runContext, postgres.getSslKey(), postgres.getSslKeyPassword()));
+            properties.put("database.sslkey", convertPrivateKey(runContext,
+                runContext.render(postgres.getSslKey()).as(String.class).orElseThrow(),
+                runContext.render(postgres.getSslKeyPassword()).as(String.class).orElseThrow()));
         }
 
         if (postgres.getSslKeyPassword() != null) {
-            properties.put("database.sslpassword", runContext.render(postgres.getSslKeyPassword()));
+            properties.put("database.sslpassword", runContext.render(postgres.getSslKeyPassword()).as(String.class).orElseThrow());
         }
     }
 

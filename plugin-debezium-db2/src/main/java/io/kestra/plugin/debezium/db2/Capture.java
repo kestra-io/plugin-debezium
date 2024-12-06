@@ -3,6 +3,7 @@ package io.kestra.plugin.debezium.db2;
 import io.debezium.connector.db2.Db2Connector;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -38,10 +39,10 @@ import java.util.Properties;
 )
 public class Capture extends AbstractDebeziumTask implements Db2Interface {
 
-    protected String database;
+    protected Property<String> database;
 
     @Builder.Default
-    private Db2Interface.SnapshotMode snapshotMode = Db2Interface.SnapshotMode.INITIAL;
+    private Property<Db2Interface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
 
     @Override
     protected boolean needDatabaseHistory() {
@@ -54,12 +55,12 @@ public class Capture extends AbstractDebeziumTask implements Db2Interface {
 
         props.setProperty("connector.class", Db2Connector.class.getName());
 
-        props.setProperty("database.dbname", runContext.render(this.database));
+        props.setProperty("database.dbname", runContext.render(this.database).as(String.class).orElseThrow());
 
         props.setProperty("include.schema.changes", "false");
 
         if (this.snapshotMode != null) {
-            props.setProperty("snapshot.mode", this.snapshotMode.name().toLowerCase(Locale.ROOT));
+            props.setProperty("snapshot.mode", runContext.render(this.snapshotMode).as(SnapshotMode.class).orElseThrow().name().toLowerCase(Locale.ROOT));
         }
 
         return props;

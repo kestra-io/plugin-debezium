@@ -1,6 +1,7 @@
 package io.kestra.plugin.debezium.db2;
 
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import jakarta.validation.constraints.NotNull;
@@ -9,9 +10,8 @@ public interface Db2Interface {
     @Schema(
         title = "The name of the DB2 database from which to stream the changes."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    String getDatabase();
+    Property<String> getDatabase();
 
     @Schema(
         title = "Specifies the criteria for running a snapshot when the connector starts.",
@@ -23,9 +23,8 @@ public interface Db2Interface {
             "- `NO_DATA`: The connector captures the structure of all relevant tables, performing all the steps described in the INITIAL, except that it does not create READ events to represent the data set at the point of the connector’s start-up.\n" +
             "- `RECOVERY`: Set this option to restore a database schema history topic that is lost or corrupted. After a restart, the connector runs a snapshot that rebuilds the topic from the source tables."
     )
-    @PluginProperty(dynamic = false)
     @NotNull
-    SnapshotMode getSnapshotMode();
+    Property<SnapshotMode> getSnapshotMode();
 
     public enum SnapshotMode {
         ALWAYS,

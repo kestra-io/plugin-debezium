@@ -4,6 +4,7 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.*;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
@@ -75,41 +76,41 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     private final Duration interval = Duration.ofSeconds(60);
 
     @Builder.Default
-    protected AbstractDebeziumTask.Format format = AbstractDebeziumTask.Format.INLINE;
+    protected Property<AbstractDebeziumTask.Format> format = Property.of(AbstractDebeziumTask.Format.INLINE);
 
     @Builder.Default
-    protected AbstractDebeziumTask.Deleted deleted = AbstractDebeziumTask.Deleted.ADD_FIELD;
+    protected Property<AbstractDebeziumTask.Deleted> deleted = Property.of(AbstractDebeziumTask.Deleted.ADD_FIELD);
 
     @Builder.Default
-    protected String deletedFieldName = "deleted";
+    protected Property<String> deletedFieldName = Property.of("deleted");
 
     @Builder.Default
-    protected AbstractDebeziumTask.Key key = AbstractDebeziumTask.Key.ADD_FIELD;
+    protected Property<AbstractDebeziumTask.Key> key = Property.of(AbstractDebeziumTask.Key.ADD_FIELD);
 
     @Builder.Default
-    protected AbstractDebeziumTask.Metadata metadata = AbstractDebeziumTask.Metadata.ADD_FIELD;
+    protected Property<AbstractDebeziumTask.Metadata> metadata = Property.of(AbstractDebeziumTask.Metadata.ADD_FIELD);
 
     @Builder.Default
-    protected String metadataFieldName = "metadata";
+    protected Property<String> metadataFieldName = Property.of("metadata");
 
     @Builder.Default
-    protected AbstractDebeziumTask.SplitTable splitTable = AbstractDebeziumTask.SplitTable.TABLE;
+    protected Property<AbstractDebeziumTask.SplitTable> splitTable = Property.of(AbstractDebeziumTask.SplitTable.TABLE);
 
     @Builder.Default
-    protected Boolean ignoreDdl = true;
+    protected Property<Boolean> ignoreDdl = Property.of(true);
 
     @NotNull
-    private String connectionString;
+    private Property<String> connectionString;
 
     @Builder.Default
-    protected String hostname = "";
+    protected Property<String> hostname = Property.of("");
 
     @Builder.Default
-    protected String port = "";
+    protected Property<String> port = Property.of("");
 
-    protected String username;
+    protected Property<String> username;
 
-    protected String password;
+    protected Property<String> password;
 
     private Object includedDatabases;
 
@@ -127,20 +128,20 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
 
     private Object excludedColumns;
 
-    private Map<String, String> properties;
+    private Property<Map<String, String>> properties;
 
     @Builder.Default
-    protected String stateName = "debezium-state";
+    protected Property<String> stateName = Property.of("debezium-state");
 
-    private Integer maxRecords;
+    private Property<Integer> maxRecords;
 
-    private Duration maxDuration;
-
-    @Builder.Default
-    private Duration maxWait = Duration.ofSeconds(10);
+    private Property<Duration> maxDuration;
 
     @Builder.Default
-    private MongodbInterface.SnapshotMode snapshotMode = MongodbInterface.SnapshotMode.INITIAL;
+    private Property<Duration> maxWait = Property.of(Duration.ofSeconds(10));
+
+    @Builder.Default
+    private Property<MongodbInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
 
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {

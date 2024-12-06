@@ -1,5 +1,6 @@
 package io.kestra.plugin.debezium.postgres;
 
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
@@ -54,20 +55,20 @@ class CaptureTest extends AbstractDebeziumTest {
         Capture task = Capture.builder()
             .id(IdUtils.create())
             .type(Capture.class.getName())
-            .hostname(TestUtils.hostname())
-            .username(TestUtils.username())
-            .password(TestUtils.password())
-            .port("65432")
-            .database("postgres")
-            .pluginName(PostgresInterface.PluginName.PGOUTPUT)
+            .hostname(Property.of(TestUtils.hostname()))
+            .username(Property.of(TestUtils.username()))
+            .password(Property.of(TestUtils.password()))
+            .port(Property.of("65432"))
+            .database(Property.of("postgres"))
+            .pluginName(Property.of(PostgresInterface.PluginName.PGOUTPUT))
             // SSL is disabled or we cannot test triggers which are very important for Debezium
 //            .sslMode(TestUtils.sslMode())
 //            .sslRootCert(TestUtils.ca())
 //            .sslCert(TestUtils.cert())
 //            .sslKey(TestUtils.key())
 //            .sslKeyPassword(TestUtils.keyPass())
-            .snapshotMode(Capture.SnapshotMode.INITIAL)
-            .maxRecords(5)
+            .snapshotMode(Property.of(Capture.SnapshotMode.INITIAL))
+            .maxRecords(Property.of(5))
             .includedTables(List.of("public.events"))
             .build();
 

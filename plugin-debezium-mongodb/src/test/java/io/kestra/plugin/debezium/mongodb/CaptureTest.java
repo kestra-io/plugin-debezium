@@ -1,6 +1,7 @@
 package io.kestra.plugin.debezium.mongodb;
 
 import com.google.common.base.Charsets;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
@@ -36,9 +37,9 @@ class CaptureTest {
         Capture task = Capture.builder()
             .id(IdUtils.create())
             .type(Capture.class.getName())
-            .snapshotMode(MongodbInterface.SnapshotMode.INITIAL)
-            .connectionString("mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/?replicaSet=rs0")
-            .maxRecords(20)
+            .snapshotMode(Property.of(MongodbInterface.SnapshotMode.INITIAL))
+            .connectionString(Property.of("mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/?replicaSet=rs0"))
+            .maxRecords(Property.of(20))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());

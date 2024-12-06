@@ -3,7 +3,9 @@ package io.kestra.plugin.debezium;
 import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.models.triggers.RealtimeTriggerInterface;
 import io.kestra.core.models.triggers.TriggerOutput;
@@ -38,36 +40,36 @@ import java.util.concurrent.atomic.AtomicReference;
 @NoArgsConstructor
 public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger implements RealtimeTriggerInterface, TriggerOutput<AbstractDebeziumRealtimeTrigger.StreamOutput> {
     @Builder.Default
-    protected AbstractDebeziumTask.Format format = AbstractDebeziumTask.Format.INLINE;
+    protected Property<AbstractDebeziumTask.Format> format = Property.of(AbstractDebeziumTask.Format.INLINE);
 
     @Builder.Default
-    protected AbstractDebeziumTask.Deleted deleted = AbstractDebeziumTask.Deleted.ADD_FIELD;
+    protected Property<AbstractDebeziumTask.Deleted> deleted = Property.of(AbstractDebeziumTask.Deleted.ADD_FIELD);
 
     @Builder.Default
-    protected String deletedFieldName = "deleted";
+    protected Property<String> deletedFieldName = Property.of("deleted");
 
     @Builder.Default
-    protected AbstractDebeziumTask.Key key = AbstractDebeziumTask.Key.ADD_FIELD;
+    protected Property<AbstractDebeziumTask.Key> key = Property.of(AbstractDebeziumTask.Key.ADD_FIELD);
 
     @Builder.Default
-    protected AbstractDebeziumTask.Metadata metadata = AbstractDebeziumTask.Metadata.ADD_FIELD;
+    protected Property<AbstractDebeziumTask.Metadata> metadata = Property.of(AbstractDebeziumTask.Metadata.ADD_FIELD);
 
     @Builder.Default
-    protected String metadataFieldName = "metadata";
+    protected Property<String> metadataFieldName = Property.of("metadata");
 
     @Builder.Default
-    protected AbstractDebeziumTask.SplitTable splitTable = AbstractDebeziumTask.SplitTable.TABLE;
+    protected Property<AbstractDebeziumTask.SplitTable> splitTable = Property.of(AbstractDebeziumTask.SplitTable.TABLE);
 
     @Builder.Default
-    protected Boolean ignoreDdl = true;
+    protected Property<Boolean> ignoreDdl = Property.of(true);
 
-    protected String hostname;
+    protected Property<String> hostname;
 
-    protected String port;
+    protected Property<String> port;
 
-    protected String username;
+    protected Property<String> username;
 
-    protected String password;
+    protected Property<String> password;
 
     protected Object includedDatabases;
 
@@ -81,10 +83,10 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
     protected Object excludedColumns;
 
-    protected Map<String, String> properties;
+    protected Property<Map<String, String>> properties;
 
     @Builder.Default
-    protected String stateName = "debezium-state";
+    protected Property<String> stateName = Property.of("debezium-state");
 
     @Schema(
         title = "How to commit the offsets to the KV Store.",
@@ -170,22 +172,26 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         if (offsetFile.toFile().exists()) {
             try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
                 runContext.stateStore().putState(
-                    task.stateName,
+                    runContext.render(task.stateName).as(String.class).orElseThrow(),
                     offsetFile.getFileName().toFile().toString(),
                     runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
                     fis.readAllBytes()
                 );
+            } catch (IllegalVariableEvaluationException e) {
+                throw new RuntimeException(e);
             }
         }
 
         if (task.needDatabaseHistory() && historyFile.toFile().exists()) {
             try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
                 runContext.stateStore().putState(
-                    task.stateName,
+                    runContext.render(task.stateName).as(String.class).orElseThrow(),
                     historyFile.getFileName().toFile().toString(),
                     runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
                     fis.readAllBytes()
                 );
+            } catch (IllegalVariableEvaluationException e) {
+                throw new RuntimeException(e);
             }
         }
     }

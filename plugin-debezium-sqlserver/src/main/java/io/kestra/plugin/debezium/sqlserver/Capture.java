@@ -3,6 +3,7 @@ package io.kestra.plugin.debezium.sqlserver;
 import io.debezium.connector.sqlserver.SqlServerConnector;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -36,10 +37,10 @@ import java.util.Properties;
     }
 )
 public class Capture extends AbstractDebeziumTask implements SqlServerInterface {
-    protected String database;
+    protected Property<String> database;
 
     @Builder.Default
-    private SqlServerInterface.SnapshotMode snapshotMode = SqlServerInterface.SnapshotMode.INITIAL;
+    private Property<SqlServerInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
 
     @Override
     protected boolean needDatabaseHistory() {

@@ -1,6 +1,7 @@
 package io.kestra.plugin.debezium;
 
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.models.triggers.PollingTriggerInterface;
 import io.kestra.core.models.triggers.TriggerOutput;
@@ -21,36 +22,36 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
     protected final Duration interval = Duration.ofSeconds(60);
 
     @Builder.Default
-    protected AbstractDebeziumTask.Format format = AbstractDebeziumTask.Format.INLINE;
+    protected Property<AbstractDebeziumTask.Format> format = Property.of(AbstractDebeziumTask.Format.INLINE);
 
     @Builder.Default
-    protected AbstractDebeziumTask.Deleted deleted = AbstractDebeziumTask.Deleted.ADD_FIELD;
+    protected Property<AbstractDebeziumTask.Deleted> deleted = Property.of(AbstractDebeziumTask.Deleted.ADD_FIELD);
 
     @Builder.Default
-    protected String deletedFieldName = "deleted";
+    protected Property<String> deletedFieldName = Property.of("deleted");
 
     @Builder.Default
-    protected AbstractDebeziumTask.Key key = AbstractDebeziumTask.Key.ADD_FIELD;
+    protected Property<AbstractDebeziumTask.Key> key = Property.of(AbstractDebeziumTask.Key.ADD_FIELD);
 
     @Builder.Default
-    protected AbstractDebeziumTask.Metadata metadata = AbstractDebeziumTask.Metadata.ADD_FIELD;
+    protected Property<AbstractDebeziumTask.Metadata> metadata = Property.of(AbstractDebeziumTask.Metadata.ADD_FIELD);
 
     @Builder.Default
-    protected String metadataFieldName = "metadata";
+    protected Property<String> metadataFieldName = Property.of("metadata");
 
     @Builder.Default
-    protected AbstractDebeziumTask.SplitTable splitTable = AbstractDebeziumTask.SplitTable.TABLE;
+    protected Property<AbstractDebeziumTask.SplitTable> splitTable = Property.of(AbstractDebeziumTask.SplitTable.TABLE);
 
     @Builder.Default
-    protected Boolean ignoreDdl = true;
+    protected Property<Boolean> ignoreDdl = Property.of(true);
 
-    protected String hostname;
+    protected Property<String> hostname;
 
-    protected String port;
+    protected Property<String> port;
 
-    protected String username;
+    protected Property<String> username;
 
-    protected String password;
+    protected Property<String> password;
 
     protected Object includedDatabases;
 
@@ -64,38 +65,34 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
 
     protected Object excludedColumns;
 
-    protected Map<String, String> properties;
+    protected Property<Map<String, String>> properties;
 
     @Builder.Default
-    protected String stateName = "debezium-state";
+    protected Property<String> stateName = Property.of("debezium-state");
 
     @Schema(
         title = "The maximum number of rows to fetch before stopping.",
         description = "It's not an hard limit and is evaluated every second."
     )
-    @PluginProperty
-    protected Integer maxRecords;
+    protected Property<Integer> maxRecords;
 
     @Schema(
         title = "The maximum duration waiting for new rows.",
         description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
-    @PluginProperty
-    protected Duration maxDuration;
+    protected Property<Duration> maxDuration;
 
     @Schema(
         title = "The maximum total processing duration.",
         description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
-    @PluginProperty
     @Builder.Default
-    protected Duration maxWait = Duration.ofSeconds(10);
+    protected Property<Duration> maxWait = Property.of(Duration.ofSeconds(10));
 
     @Schema(
         title = "The maximum duration waiting for the snapshot to ends.",
         description = "It's not an hard limit and is evaluated every second.\n The properties 'maxRecord', 'maxDuration' and 'maxWait' are evaluated only after the snapshot is done."
     )
-    @PluginProperty
     @Builder.Default
-    protected Duration maxSnapshotDuration = Duration.ofHours(1);
+    protected Property<Duration> maxSnapshotDuration = Property.of(Duration.ofHours(1));
 }

@@ -3,6 +3,7 @@ package io.kestra.plugin.debezium.postgres;
 import io.debezium.connector.postgresql.PostgresConnector;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -37,30 +38,30 @@ import java.util.Properties;
     }
 )
 public class Capture extends AbstractDebeziumTask implements PostgresInterface {
-    protected String database;
+    protected Property<String> database;
 
     @Builder.Default
-    protected PluginName pluginName = PluginName.PGOUTPUT;
+    protected Property<PluginName> pluginName = Property.of(PluginName.PGOUTPUT);
 
     @Builder.Default
-    protected String slotName = "kestra";
+    protected Property<String> slotName = Property.of("kestra");
 
     @Builder.Default
-    protected String publicationName = "kestra_publication";
+    protected Property<String> publicationName = Property.of("kestra_publication");
 
     @Builder.Default
-    protected PostgresInterface.SslMode sslMode = SslMode.DISABLE;
+    protected Property<PostgresInterface.SslMode> sslMode = Property.of(SslMode.DISABLE);
 
-    protected String sslRootCert;
+    protected Property<String> sslRootCert;
 
-    protected String sslCert;
+    protected Property<String> sslCert;
 
-    protected String sslKey;
+    protected Property<String> sslKey;
 
-    protected String sslKeyPassword;
+    protected Property<String> sslKeyPassword;
 
     @Builder.Default
-    private Capture.SnapshotMode snapshotMode = Capture.SnapshotMode.INITIAL;
+    private Property<Capture.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
 
     @Override
     protected boolean needDatabaseHistory() {

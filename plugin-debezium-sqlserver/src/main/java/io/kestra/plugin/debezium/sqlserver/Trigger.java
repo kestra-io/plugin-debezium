@@ -6,6 +6,7 @@ import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.executions.ExecutionTrigger;
 import io.kestra.core.models.flows.State;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.*;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.utils.IdUtils;
@@ -46,10 +47,10 @@ import java.util.Optional;
     }
 )
 public class Trigger extends AbstractDebeziumTrigger implements SqlServerInterface, AbstractDebeziumInterface {
-    protected String database;
+    protected Property<String> database;
 
     @Builder.Default
-    private SqlServerInterface.SnapshotMode snapshotMode = SqlServerInterface.SnapshotMode.INITIAL;
+    private Property<SqlServerInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
 
     private String serverId;
 
@@ -88,7 +89,7 @@ public class Trigger extends AbstractDebeziumTrigger implements SqlServerInterfa
             .snapshotMode(this.snapshotMode)
             .database(this.database)
             .build();
-        
+
         AbstractDebeziumTask.Output run = task.run(runContext);
 
         if (logger.isDebugEnabled()) {

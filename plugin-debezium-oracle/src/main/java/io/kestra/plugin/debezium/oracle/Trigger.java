@@ -4,6 +4,7 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.*;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
@@ -42,11 +43,11 @@ import java.util.Optional;
 )
 public class Trigger extends AbstractDebeziumTrigger implements OracleInterface, AbstractDebeziumInterface {
     @Builder.Default
-    private OracleInterface.SnapshotMode snapshotMode = OracleInterface.SnapshotMode.INITIAL;
+    private Property<OracleInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
 
-    private String sid;
+    private Property<String> sid;
 
-    private String pluggableDatabase;
+    private Property<String> pluggableDatabase;
 
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {

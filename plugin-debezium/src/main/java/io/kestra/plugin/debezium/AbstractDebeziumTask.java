@@ -4,9 +4,11 @@ import ch.qos.logback.classic.LoggerContext;
 import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.exceptions.ResourceExpiredException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
@@ -43,36 +45,36 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @NoArgsConstructor
 public abstract class AbstractDebeziumTask extends Task implements RunnableTask<AbstractDebeziumTask.Output>, AbstractDebeziumInterface {
     @Builder.Default
-    protected Format format = Format.INLINE;
+    protected Property<Format> format = Property.of(Format.INLINE);
 
     @Builder.Default
-    protected Deleted deleted = Deleted.ADD_FIELD;
+    protected Property<Deleted> deleted = Property.of(Deleted.ADD_FIELD);
 
     @Builder.Default
-    protected String deletedFieldName = "deleted";
+    protected Property<String> deletedFieldName = Property.of("deleted");
 
     @Builder.Default
-    protected Key key = Key.ADD_FIELD;
+    protected Property<Key> key = Property.of(Key.ADD_FIELD);
 
     @Builder.Default
-    protected Metadata metadata = Metadata.ADD_FIELD;
+    protected Property<Metadata> metadata = Property.of(Metadata.ADD_FIELD);
 
     @Builder.Default
-    protected String metadataFieldName = "metadata";
+    protected Property<String> metadataFieldName = Property.of("metadata");
 
     @Builder.Default
-    protected SplitTable splitTable = SplitTable.TABLE;
+    protected Property<SplitTable> splitTable = Property.of(SplitTable.TABLE);
 
     @Builder.Default
-    protected Boolean ignoreDdl = true;
+    protected Property<Boolean> ignoreDdl = Property.of(true);
 
-    protected String hostname;
+    protected Property<String> hostname;
 
-    protected String port;
+    protected Property<String> port;
 
-    protected String username;
+    protected Property<String> username;
 
-    protected String password;
+    protected Property<String> password;
 
     private Object includedDatabases;
 
@@ -86,24 +88,23 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     private Object excludedColumns;
 
-    private Map<String, String> properties;
+    private Property<Map<String, String>> properties;
 
     @Builder.Default
-    protected String stateName = "debezium-state";
+    protected Property<String> stateName = Property.of("debezium-state");
 
     @Schema(
         title = "The maximum number of rows to fetch before stopping.",
         description = "It's not an hard limit and is evaluated every second."
     )
     @PluginProperty
-    private Integer maxRecords;
+    private Property<Integer> maxRecords;
 
     @Schema(
         title = "The maximum duration waiting for new rows.",
         description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
-    @PluginProperty
-    private Duration maxDuration;
+    private Property<Duration> maxDuration;
 
     @Schema(
         title = "The maximum total processing duration.",
@@ -111,15 +112,14 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     )
     @PluginProperty
     @Builder.Default
-    private Duration maxWait = Duration.ofSeconds(10);
+    private Property<Duration> maxWait = Property.of(Duration.ofSeconds(10));
 
     @Schema(
         title = "The maximum duration waiting for the snapshot to ends.",
         description = "It's not an hard limit and is evaluated every second.\n The properties 'maxRecord', 'maxDuration' and 'maxWait' are evaluated only after the snapshot is done."
     )
-    @PluginProperty
     @Builder.Default
-    private Duration maxSnapshotDuration = Duration.ofHours(1);
+    private Property<Duration> maxSnapshotDuration = Property.of(Duration.ofHours(1));
 
     protected abstract boolean needDatabaseHistory();
 
@@ -182,10 +182,16 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             do {
                 int previousCount = count.get();
                 ZonedDateTime captureStarted = ZonedDateTime.now();
-                Await.until(() -> this.ended(executorService, count, captureStarted, lastRecord, snapshot), Duration.ofSeconds(1));
+                Await.until(() -> {
+                    try {
+                        return this.ended(executorService, count, captureStarted, lastRecord, snapshot, runContext);
+                    } catch (IllegalVariableEvaluationException e) {
+                        throw new RuntimeException(e);
+                    }
+                }, Duration.ofSeconds(1));
                 consumes = count.get() > previousCount;
                 // if we are still snapshotting, allow waiting for more time until snapshot wait duration is reached
-            } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(this.maxSnapshotDuration)));
+            } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(runContext.render(this.maxSnapshotDuration).as(Duration.class).orElseThrow())));
         }
 
         this.shutdown(runContext.logger(), executorService);
@@ -200,7 +206,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         if (offsetFile.toFile().exists()) {
             try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
                 outputBuilder.stateOffsetKey(runContext.stateStore().putState(
-                    this.stateName,
+                    runContext.render(this.stateName).as(String.class).orElseThrow(),
                     offsetFile.getFileName().toFile().toString(),
                     runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
                     fis.readAllBytes()
@@ -211,7 +217,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         if (this.needDatabaseHistory()) {
             try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
                 outputBuilder.stateHistoryKey(runContext.stateStore().putState(
-                    this.stateName,
+                    runContext.render(this.stateName).as(String.class).orElseThrow(),
                     historyFile.getFileName().toFile().toString(),
                     runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
                     fis.readAllBytes()
@@ -275,19 +281,19 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         // connection
         if (this.hostname != null) {
-            props.setProperty("database.hostname", runContext.render(this.hostname));
+            props.setProperty("database.hostname", runContext.render(this.hostname).as(String.class).orElseThrow());
         }
 
         if (this.port != null) {
-            props.setProperty("database.port", runContext.render(this.port));
+            props.setProperty("database.port", runContext.render(this.port).as(String.class).orElseThrow());
         }
 
         if (this.username != null) {
-            props.setProperty("database.user", runContext.render(this.username));
+            props.setProperty("database.user", runContext.render(this.username).as(String.class).orElseThrow());
         }
 
         if (this.password != null) {
-            props.setProperty("database.password", runContext.render(this.password));
+            props.setProperty("database.password", runContext.render(this.password).as(String.class).orElseThrow());
         }
 
         // https://debezium.io/documentation/reference/configuration/avro.html
@@ -325,7 +331,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         }
 
         if (this.properties != null) {
-            for (Map.Entry<String, String> entry : this.properties.entrySet()) {
+            for (Map.Entry<String, String> entry : runContext.render(this.properties).asMap(String.class, String.class).entrySet()) {
                 props.setProperty(runContext.render(entry.getKey()), runContext.render(entry.getValue()));
             }
         }
@@ -345,21 +351,24 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     }
 
     @SuppressWarnings("RedundantIfStatement")
-    private boolean ended(ExecutorService executorService, AtomicInteger count, ZonedDateTime start, ZonedDateTime lastRecord, AtomicBoolean snapshot) {
+    private boolean ended(ExecutorService executorService, AtomicInteger count, ZonedDateTime start, ZonedDateTime lastRecord, AtomicBoolean snapshot, RunContext runContext) throws IllegalVariableEvaluationException {
         if (executorService.isShutdown()) {
             return true;
         }
 
         // when snapshotting, we didn't take into account maxRecords
-        if (!snapshot.get() && this.maxRecords != null && count.get() >= this.maxRecords) {
+        var renderedMaxRecords = runContext.render(maxRecords).as(Integer.class);
+        if (!snapshot.get() && renderedMaxRecords.isPresent() && count.get() >= renderedMaxRecords.get()) {
             return true;
         }
 
-        if (this.maxDuration != null && ZonedDateTime.now().isAfter(start.plus(this.maxDuration))) {
+        var renderedMaxDuration = runContext.render(maxDuration).as(Duration.class);
+        if (renderedMaxDuration.isPresent() && ZonedDateTime.now().isAfter(start.plus(renderedMaxDuration.get()))) {
             return true;
         }
 
-        if (this.maxWait != null && ZonedDateTime.now().isAfter(lastRecord.plus(this.maxWait))) {
+        var renderedMaxWait = runContext.render(maxWait).as(Duration.class);
+        if (renderedMaxWait.isPresent() && ZonedDateTime.now().isAfter(lastRecord.plus(renderedMaxWait.get()))) {
             return true;
         }
 
@@ -369,13 +378,15 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     protected void restoreState(RunContext runContext, Path path) throws IOException {
         try {
             InputStream taskStateFile = runContext.stateStore().getState(
-                this.stateName,
+                runContext.render(this.stateName).as(String.class).orElseThrow(),
                 path.getFileName().toString(),
                 runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null)
             );
             FileUtils.copyInputStreamToFile(taskStateFile, path.toFile());
         } catch (FileNotFoundException | ResourceExpiredException ignored) {
 
+        } catch (IllegalVariableEvaluationException e) {
+            throw new RuntimeException(e);
         }
     }
 
