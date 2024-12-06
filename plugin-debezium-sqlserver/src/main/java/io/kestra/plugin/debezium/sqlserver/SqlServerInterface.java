@@ -2,6 +2,7 @@ package io.kestra.plugin.debezium.sqlserver;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -14,9 +15,8 @@ public interface SqlServerInterface {
     @Schema(
         title = "The name of the Microsoft SQL Server database from which to stream the changes."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    String getDatabase();
+    Property<String> getDatabase();
 
     @Schema(
         title = "Specifies the criteria for running a snapshot when the connector starts.",
@@ -25,15 +25,14 @@ public interface SqlServerInterface {
             "- `INITIAL_ONLY`: Takes a snapshot of structure and data like initial but instead does not transition into streaming changes once the snapshot has completed.\n" +
             "- `SCHEMA_ONLY`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be propagated to topics.\n"
     )
-    @PluginProperty(dynamic = false)
     @NotNull
-    SnapshotMode getSnapshotMode();
+    Property<SnapshotMode> getSnapshotMode();
 
     static void handleProperties(Properties properties, RunContext runContext, SqlServerInterface sqlServer) throws IllegalVariableEvaluationException, IOException {
-        properties.put("database.names", runContext.render(sqlServer.getDatabase()));
+        properties.put("database.names", runContext.render(sqlServer.getDatabase()).as(String.class).orElseThrow());
 
         if (sqlServer.getSnapshotMode() != null) {
-            properties.setProperty("snapshot.mode", sqlServer.getSnapshotMode().name().toLowerCase(Locale.ROOT));
+            properties.setProperty("snapshot.mode", runContext.render(sqlServer.getSnapshotMode()).as(SnapshotMode.class).orElseThrow().name().toLowerCase(Locale.ROOT));
         }
     }
 

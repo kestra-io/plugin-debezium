@@ -4,6 +4,7 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.TriggerContext;
 import io.kestra.core.models.triggers.TriggerService;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
@@ -49,10 +50,10 @@ import reactor.core.publisher.Flux;
     }
 )
 public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements SqlServerInterface, AbstractDebeziumInterface {
-    protected String database;
+    protected Property<String> database;
 
     @Builder.Default
-    private SqlServerInterface.SnapshotMode snapshotMode = SqlServerInterface.SnapshotMode.INITIAL;
+    private Property<SqlServerInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
 
     private String serverId;
 
