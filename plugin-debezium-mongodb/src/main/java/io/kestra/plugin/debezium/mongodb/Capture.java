@@ -3,6 +3,7 @@ package io.kestra.plugin.debezium.mongodb;
 import io.debezium.connector.mongodb.MongoDbConnector;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -65,10 +66,10 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
     private Object excludedCollections;
 
     @NotNull
-    private String connectionString;
+    private Property<String> connectionString;
 
     @Builder.Default
-    private MongodbInterface.SnapshotMode snapshotMode = MongodbInterface.SnapshotMode.INITIAL;
+    private Property<MongodbInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
 
     @Override
     protected boolean needDatabaseHistory() {
@@ -81,7 +82,7 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
 
         props.setProperty("connector.class", MongoDbConnector.class.getName());
 
-        props.setProperty("mongodb.connection.string", runContext.render(this.connectionString));
+        props.setProperty("mongodb.connection.string", runContext.render(this.connectionString).as(String.class).orElse(null));
 
         if (this.includedCollections != null) {
             props.setProperty("collection.include.list", joinProperties(runContext, this.includedCollections));
@@ -94,7 +95,7 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
         props.setProperty("capture.mode", "change_streams_update_full_with_pre_image");
 
         if (this.snapshotMode != null) {
-            props.setProperty("snapshot.mode", this.snapshotMode.name().toLowerCase(Locale.ROOT));
+            props.setProperty("snapshot.mode", runContext.render(this.snapshotMode).as(SnapshotMode.class).orElseThrow().name().toLowerCase(Locale.ROOT));
         }
 
         return props;

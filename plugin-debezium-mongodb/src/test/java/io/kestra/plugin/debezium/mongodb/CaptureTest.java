@@ -37,8 +37,8 @@ class CaptureTest {
         Capture task = Capture.builder()
             .id(IdUtils.create())
             .type(Capture.class.getName())
-            .snapshotMode(MongodbInterface.SnapshotMode.INITIAL)
-            .connectionString("mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/?replicaSet=rs0")
+            .snapshotMode(Property.of(MongodbInterface.SnapshotMode.INITIAL))
+            .connectionString(Property.of("mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/?replicaSet=rs0"))
             .maxRecords(Property.of(20))
             .build();
 

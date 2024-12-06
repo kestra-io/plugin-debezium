@@ -100,7 +100,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     protected Property<Boolean> ignoreDdl = Property.of(true);
 
     @NotNull
-    private String connectionString;
+    private Property<String> connectionString;
 
     @Builder.Default
     protected Property<String> hostname = Property.of("");
@@ -141,7 +141,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     private Property<Duration> maxWait = Property.of(Duration.ofSeconds(10));
 
     @Builder.Default
-    private MongodbInterface.SnapshotMode snapshotMode = MongodbInterface.SnapshotMode.INITIAL;
+    private Property<MongodbInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
 
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
