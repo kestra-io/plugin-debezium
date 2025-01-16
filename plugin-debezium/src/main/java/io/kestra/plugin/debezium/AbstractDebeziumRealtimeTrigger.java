@@ -95,9 +95,8 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
             - ON_EACH_BATCH: after each batch of records consumed by this trigger, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
             - ON_STOP: when this trigger is stopped or killed, the offsets will be stored in the KV Store. This avoid any un-necessary writes to the KV Store, but if the trigger is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption."""
     )
-    @PluginProperty
     @Builder.Default
-    private OffsetCommitMode offsetsCommitMode = OffsetCommitMode.ON_EACH_BATCH;
+    private Property<OffsetCommitMode> offsetsCommitMode = Property.of(OffsetCommitMode.ON_EACH_BATCH);
 
     @Builder.Default
     @Getter(AccessLevel.NONE)
@@ -131,13 +130,14 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                     ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), null, ZonedDateTime.now());
 
                     // start
+                    var offsetMode = runContext.render(offsetsCommitMode).as(OffsetCommitMode.class).orElseThrow();
                     var engineBuilder = DebeziumEngine.create(Connect.class)
                         .using(this.getClass().getClassLoader())
                         .using(props)
                         .notifying(
                             (list, recordCommitter) -> {
                                 changeConsumer.handleBatch(list, recordCommitter, sink);
-                                if (offsetsCommitMode == OffsetCommitMode.ON_EACH_BATCH) {
+                                if (OffsetCommitMode.ON_EACH_BATCH.equals(offsetMode)) {
                                     try {
                                         saveOffsets(task, runContext, offsetFile, historyFile);
                                     } catch (IOException e) {
@@ -157,7 +157,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                         engine.run();
                     }
 
-                    if (offsetsCommitMode == OffsetCommitMode.ON_STOP) {
+                    if (OffsetCommitMode.ON_STOP.equals(offsetMode)) {
                         saveOffsets(task, runContext, offsetFile, historyFile);
                     }
                 } catch (Exception e) {
