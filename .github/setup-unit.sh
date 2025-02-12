@@ -19,9 +19,7 @@
 # cp certs/client/* plugin-debezium-postgres/src/test/resources/ssl/
 # cp certs/ca.crt plugin-debezium-postgres/src/test/resources/ssl/
 
-docker compose -f docker-compose-ci.yml up -d mysql
-docker compose -f docker-compose-ci.yml up -d
-sleep 10
+docker compose -f docker-compose-ci.yml up --quiet-pull -d --wait
 docker compose -f docker-compose-ci.yml exec mysql sh -c "mysql -u root -pmysql_passwd < /tmp/docker/mysql.sql"
 docker compose -f docker-compose-ci.yml exec postgres  sh -c "export PGPASSWORD=pg_passwd && psql -d postgres -U postgres -f /tmp/docker/postgres.sql > /dev/null"
 docker run -v ${PWD}/data:/tmp/docker --network=plugin-debezium_default mcr.microsoft.com/mssql-tools sh -c  "/opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P Sqls3rv3r_Pa55word! -i /tmp/docker/sqlserver.sql"
