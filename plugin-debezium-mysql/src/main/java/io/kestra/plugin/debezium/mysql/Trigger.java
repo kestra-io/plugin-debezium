@@ -83,9 +83,10 @@ public class Trigger extends AbstractDebeziumTrigger implements MysqlInterface, 
             .build();
         AbstractDebeziumTask.Output run = task.run(runContext);
 
-        if (logger.isDebugEnabled()) {
+        //TODO remove
+        //if (logger.isDebugEnabled()) {
             logger.debug("Found '{}' messages", run.getSize());
-        }
+        //}
 
         if (run.getSize() == 0) {
             return Optional.empty();
