@@ -245,8 +245,10 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     @Getter
     public static class StreamOutput implements io.kestra.core.models.tasks.Output {
 
+        @Schema(title = "Stream.", description = "Stream source")
         private String stream;
 
+        @Schema(title = "Data.", description = "Data extracted.")
         private Map<String, Object> data;
 
     }
