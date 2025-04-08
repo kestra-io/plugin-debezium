@@ -29,7 +29,7 @@ import java.util.Optional;
 @Plugin(
     examples = {
         @Example(
-            title = "Consume messages from Oracle db.",
+            title = "Consume messages from Oracle DB periodically.",
             full = true,
             code = """
                 id: oracle_trigger

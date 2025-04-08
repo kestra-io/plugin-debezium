@@ -32,7 +32,7 @@ import java.util.Optional;
 @Plugin(
     examples = {
         @Example(
-            title = "Sharded connection",
+            title = "Sharded connection.",
             full = true,
             code = """
                 id: debezium_mongodb
@@ -51,7 +51,7 @@ import java.util.Optional;
                 """
         ),
         @Example(
-            title = "Replica set connection",
+            title = "Replica set connection.",
             full = true,
             code = """
                 id: debezium_mongodb

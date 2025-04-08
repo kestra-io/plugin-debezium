@@ -29,7 +29,7 @@ import reactor.core.publisher.Flux;
 @Plugin(
     examples = {
         @Example(
-            title = "Sharded connection",
+            title = "Sharded connection.",
             full = true,
             code = """
                 id: debezium_mongodb
@@ -48,7 +48,7 @@ import reactor.core.publisher.Flux;
                 """
         ),
         @Example(
-            title = "Replica set connection",
+            title = "Replica set connection.",
             full = true,
             code = """
                 id: debezium_mongodb

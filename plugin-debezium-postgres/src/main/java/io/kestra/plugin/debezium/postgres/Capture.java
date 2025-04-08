@@ -24,7 +24,7 @@ import java.util.Properties;
 @Plugin(
     examples = {
         @Example(
-            title = "Capture data from PostgreSQL server",
+            title = "Capture data from PostgreSQL server.",
             full = true,
             code = """
                id: pg_capture

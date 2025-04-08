@@ -25,7 +25,7 @@ import java.util.Properties;
 @Plugin(
     examples = {
         @Example(
-            title = "Capture data from Db2 server."
+            title = "Capture data from Db2 server.",
             full = true,
             code = """
                 id: db2_capture

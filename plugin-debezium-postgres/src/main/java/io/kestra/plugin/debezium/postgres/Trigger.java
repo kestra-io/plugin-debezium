@@ -30,7 +30,7 @@ import java.util.Optional;
     examples = {
         @Example(
             full = true,
-            title = "",
+            title = "Consume a message from a PostgreSQL database via change data capture periodically.",
             code = """"
                 id: pg_trigger
                 namespace: company.team

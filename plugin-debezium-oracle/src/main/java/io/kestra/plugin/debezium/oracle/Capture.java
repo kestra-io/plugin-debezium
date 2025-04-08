@@ -25,7 +25,7 @@ import java.util.Properties;
 @Plugin(
     examples = {
         @Example(
-            title = "Non-container database (non-CDB)",
+            title = "Non-container database (non-CDB).",
             full = true,
             code = """
                 id: non_container_db
@@ -44,7 +44,7 @@ import java.util.Properties;
             """
         ),
         @Example(
-            title = "Container database (CDB)",
+            title = "Container database (CDB).",
             full = true,
             code = """
                 id: container_db

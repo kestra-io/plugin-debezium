@@ -26,14 +26,14 @@ import java.util.Properties;
 @Plugin(
     examples = {
         @Example(
-            title = "Replica set connection",
+            title = "Replica set connection.",
             full = true,
             code = """
                 id: mongo_replica_connection
                 namespace: company.team
 
                 tasks:
-                    - id: capture
+                  - id: capture
                     type: io.kestra.plugin.debezium.mongodb.Capture
                     snapshotMode: INITIAL
                     connectionString: "mongodb://mongo_user:{{secret('MONGO_PASSWORD')}}@mongodb0.example.com:27017/?replicaSet=rs0"
@@ -41,7 +41,7 @@ import java.util.Properties;
             """
         ),
         @Example(
-            title = "Sharded connection",
+            title = "Sharded connection.",
             full = true,
             code = """
                 id: mongo_sharded_connection
@@ -56,7 +56,7 @@ import java.util.Properties;
             """
         ),
         @Example(
-            title = "Replica set SRV connection",
+            title = "Replica set SRV connection.",
             full = true,
             code = """
                 id: mongo_replica_srv
@@ -71,7 +71,7 @@ import java.util.Properties;
             """
         ),
         @Example(
-            title = "Sharded SRV connection",
+            title = "Sharded SRV connection.",
             full = true,
             code = """
                 id: mongo
