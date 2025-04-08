@@ -30,7 +30,7 @@ import reactor.core.publisher.Flux;
             title = "Consume a message from a SQL Server database via change data capture in real-time.",
             full = true,
             code = """
-                id: debezium-sqlserver
+                id: debezium_sqlserver
                 namespace: company.team
 
                 tasks:
@@ -42,10 +42,11 @@ import reactor.core.publisher.Flux;
                   - id: realtime
                     type: io.kestra.plugin.debezium.sqlserver.RealtimeTrigger
                     hostname: 127.0.0.1
-                    port: 61433
-                    username: sa
-                    password: password
-                    database: deb"""
+                    port: "1433"
+                    username: "{{ secret('MYSQL_USERNAME') }}"
+                    password: "{{ secret('MYSQL_PASSWORD') }}"
+                    database: deb
+                """
         )
     }
 )

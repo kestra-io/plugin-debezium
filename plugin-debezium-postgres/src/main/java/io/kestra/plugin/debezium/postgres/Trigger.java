@@ -29,16 +29,29 @@ import java.util.Optional;
 @Plugin(
     examples = {
         @Example(
-            code = {
-                "hostname: 127.0.0.1",
-                "port: \"5432\"",
-                "username: posgres",
-                "password: psql_passwd",
-                "maxRecords: 100",
-                "database: my_database",
-                "pluginName: PGOUTPUT",
-                "snapshotMode: ALWAYS"
-            }
+            full = true,
+            title = "",
+            code = """"
+                id: pg_trigger
+                namespace: company.team
+
+                tasks:
+                  - id: log
+                    type: io.kestra.plugin.core.log.Log
+                    message: "{{ trigger.uris }}"
+
+                triggers:
+                  - id: trigger
+                    type: io.kestra.plugin.debezium.postgres.Trigger
+                    hostname: 127.0.0.1
+                    port: "5432"
+                    username: "{{ secret('PG_USERNAME') }}"
+                    password: "{{ secret('PG_PASSWORD') }}"
+                    maxRecords: 100
+                    database: my_database
+                    pluginName: PGOUTPUT
+                    snapshotMode: ALWAYS
+            """
         )
     }
 )

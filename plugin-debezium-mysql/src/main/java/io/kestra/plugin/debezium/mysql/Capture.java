@@ -26,14 +26,22 @@ import java.util.Properties;
 @Plugin(
     examples = {
         @Example(
-            code = {
-                "snapshotMode: NEVER",
-                "hostname: 127.0.0.1",
-                "port: \"3306\"",
-                "username: mysql_user",
-                "password: mysql_passwd",
-                "maxRecords: 100",
-            }
+            title = "Capture data on MySQL server.",
+            full = true,
+            code = """
+                id: mysql_capture
+                namespace: company.team
+
+                tasks:
+                  - id: capture
+                    type: io.kestra.plugin.debezium.mysql.Capture
+                    snapshotMode: NEVER
+                    hostname: 127.0.0.1
+                    port: "3306"
+                    username: "{{ secret('MYSQL_USERNAME') }}"
+                    password: "{{ secret('MYSQL_PASSWORD') }}"
+                    maxRecords: 100
+            """
         )
     }
 )

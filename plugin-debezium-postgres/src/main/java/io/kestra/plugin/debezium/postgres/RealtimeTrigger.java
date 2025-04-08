@@ -42,9 +42,10 @@ import reactor.core.publisher.Flux;
                     type: io.kestra.plugin.debezium.postgres.RealtimeTrigger
                     database: postgres
                     hostname: 127.0.0.1
-                    port: 65432
-                    username: postgres
-                    password: pg_passwd"""
+                    port: "5432"
+                    username: "{{ secret('PG_USERNAME') }}"
+                    password: "{{ secret('PG_PASSWORD') }}"
+                """
         )
     }
 )

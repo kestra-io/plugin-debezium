@@ -35,38 +35,38 @@ import java.util.Optional;
             title = "Sharded connection",
             full = true,
             code = """
-                id: debezium-mongodb
+                id: debezium_mongodb
                 namespace: company.team
 
                 tasks:
                   - id: send_data
                     type: io.kestra.plugin.core.log.Log
-                    message: "{{ trigger.data }}"
+                    message: "{{ trigger.uris }}"
 
                 triggers:
                   - id: trigger
                     type: io.kestra.plugin.debezium.mongodb.Trigger
                     snapshotMode: INITIAL
-                    connectionString: mongodb://mongo_user:mongo_passwd@mongos0.example.com:27017,mongos1.example.com:27017/
+                    connectionString: "mongodb://mongo_user:{{secret('MONGO_PASSWORD')}}@mongos0.example.com:27017,mongos1.example.com:27017/"
                 """
         ),
         @Example(
             title = "Replica set connection",
             full = true,
             code = """
-                id: debezium-mongodb
+                id: debezium_mongodb
                 namespace: company.team
 
                 tasks:
                   - id: send_data
                     type: io.kestra.plugin.core.log.Log
-                    message: "{{ trigger.data }}"
+                    message: "{{ trigger.uris }}"
 
                 triggers:
                   - id: trigger
                     type: io.kestra.plugin.debezium.mongodb.Trigger
                     snapshotMode: INITIAL
-                    connectionString: mongodb://mongo_user:mongo_passwd@mongodb0.example.com:27017/?replicaSet=rs0
+                    connectionString: "mongodb://mongo_user:{{secret('MONGO_PASSWORD')}}@mongodb0.example.com:27017/?replicaSet=rs0"
                 """
         )
     }

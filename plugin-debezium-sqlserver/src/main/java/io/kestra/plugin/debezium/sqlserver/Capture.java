@@ -25,14 +25,22 @@ import java.util.Properties;
 @Plugin(
     examples = {
         @Example(
-            code = {
-                "snapshotMode: INITIAL",
-                "hostname: 127.0.0.1",
-                "port: \"1433\"",
-                "username: sqlserver_user",
-                "password: sqlserver_passwd",
-                "maxRecords: 100",
-            }
+            title = "Wait for change data capture event on Microsoft SQL Server.",
+            full = true,
+            code = """
+                id: mysql_capture
+                namespace: company.team
+
+                tasks:
+                  - id: capture
+                    type: io.kestra.plugin.debezium.mysql.Capture
+                    snapshotMode: NEVER
+                    hostname: 127.0.0.1
+                    port: "3306"
+                    username: "{{ secret('MYSQL_USERNAME') }}"
+                    password: "{{ secret('MYSQL_PASSWORD') }}"
+                    maxRecords: 100
+            """
         )
     }
 )

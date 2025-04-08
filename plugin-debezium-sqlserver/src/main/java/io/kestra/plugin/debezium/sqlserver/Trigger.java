@@ -34,15 +34,28 @@ import java.util.Optional;
 @Plugin(
     examples = {
         @Example(
-            code = {
-                "snapshotMode: INITIAL",
-                "hostname: 127.0.0.1",
-                "port: \"1433\"",
-                "username: sqlserver_user",
-                "password: sqlserver_passwd",
-                "database: deb",
-                "maxRecords: 100",
-            }
+            title = "Consume a message from a SQL Server database via change data capture periodically",
+            full = true,
+            code = """
+                id: debezium_sqlserver
+                namespace: company.team
+
+                tasks:
+                  - id: send_data
+                    type: io.kestra.plugin.core.log.Log
+                    message: "{{ trigger.uris }}"
+
+                triggers:
+                  - id: trigger
+                    type: io.kestra.plugin.debezium.sqlserver.Trigger
+                    snapshotMode: INITIAL
+                    hostname: 127.0.0.1
+                    port: "1433"
+                    username: "{{ secret('MYSQL_USERNAME') }}"
+                    password: "{{ secret('MYSQL_PASSWORD') }}"
+                    database: deb
+                    maxRecords: 100
+                """
         )
     }
 )

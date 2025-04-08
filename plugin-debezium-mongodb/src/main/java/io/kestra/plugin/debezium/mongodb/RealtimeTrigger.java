@@ -32,7 +32,7 @@ import reactor.core.publisher.Flux;
             title = "Sharded connection",
             full = true,
             code = """
-                id: debezium-mongodb
+                id: debezium_mongodb
                 namespace: company.team
 
                 tasks:
@@ -44,14 +44,14 @@ import reactor.core.publisher.Flux;
                   - id: realtime
                     type: io.kestra.plugin.debezium.mongodb.RealtimeTrigger
                     snapshotMode: INITIAL
-                    connectionString: mongodb://mongo_user:mongo_passwd@mongos0.example.com:27017,mongos1.example.com:27017/
+                    connectionString: "mongodb://mongo_user:{{secret('MONGO_PASSWORD')}}@mongos0.example.com:27017,mongos1.example.com:27017/"
                 """
         ),
         @Example(
             title = "Replica set connection",
             full = true,
             code = """
-                id: debezium-mongodb
+                id: debezium_mongodb
                 namespace: company.team
 
                 tasks:
@@ -63,7 +63,7 @@ import reactor.core.publisher.Flux;
                   - id: realtime
                     type: io.kestra.plugin.debezium.mongodb.RealtimeTrigger
                     snapshotMode: INITIAL
-                    connectionString: mongodb://mongo_user:mongo_passwd@mongodb0.example.com:27017/?replicaSet=rs0
+                    connectionString: "mongodb://mongo_user:{{secret('MONGO_PASSWORD')}}@mongodb0.example.com:27017/?replicaSet=rs0"
                 """
         )
     }

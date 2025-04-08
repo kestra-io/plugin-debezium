@@ -27,35 +27,63 @@ import java.util.Properties;
     examples = {
         @Example(
             title = "Replica set connection",
-            code = {
-                "snapshotMode: INITIAL",
-                "connectionString: mongodb://mongo_user:mongo_passwd@mongodb0.example.com:27017/?replicaSet=rs0",
-                "maxRecords: 100"
-            }
+            full = true,
+            code = """
+                id: mongo_replica_connection
+                namespace: company.team
+
+                tasks:
+                    - id: capture
+                    type: io.kestra.plugin.debezium.mongodb.Capture
+                    snapshotMode: INITIAL
+                    connectionString: "mongodb://mongo_user:{{secret('MONGO_PASSWORD')}}@mongodb0.example.com:27017/?replicaSet=rs0"
+                    maxRecords: 100
+            """
         ),
         @Example(
             title = "Sharded connection",
-            code = {
-                "snapshotMode: INITIAL",
-                "connectionString: mongodb://mongo_user:mongo_passwd@mongos0.example.com:27017,mongos1.example.com:27017/",
-                "maxRecords: 100"
-            }
+            full = true,
+            code = """
+                id: mongo_sharded_connection
+                namespace: company.team
+
+                tasks:
+                  - id: capture
+                    type: io.kestra.plugin.debezium.mongodb.Capture
+                    snapshotMode: INITIAL
+                    connectionString: "mongodb://mongo_user:{{secret('MONGO_PASSWORD')}}@mongos0.example.com:27017,mongos1.example.com:27017/"
+                    maxRecords: 100
+            """
         ),
         @Example(
             title = "Replica set SRV connection",
-            code = {
-                "snapshotMode: INITIAL",
-                "connectionString: mongodb+srv://mongo_user:mongo_passwd@mongos0.example.com/?replicaSet=rs0",
-                "maxRecords: 100"
-            }
+            full = true,
+            code = """
+                id: mongo_replica_srv
+                namespace: company.team
+
+                tasks:
+                  - id: capture
+                    type: io.kestra.plugin.debezium.mongodb.Capture
+                    snapshotMode: INITIAL
+                    connectionString: "mongodb+srv://mongo_user:{{secret('MONGO_PASSWORD')}}@mongos0.example.com/?replicaSet=rs0"
+                    maxRecords: 100
+            """
         ),
         @Example(
             title = "Sharded SRV connection",
-            code = {
-                "snapshotMode: INITIAL",
-                "connectionString: mongodb+srv://mongo_user:mongo_passwd@mongos0.example.com/",
-                "maxRecords: 100"
-            }
+            full = true,
+            code = """
+                id: mongo
+                namespace: company.team
+
+                tasks:
+                  - id: capture
+                    type: io.kestra.plugin.debezium.mongodb.Capture
+                    snapshotMode: INITIAL
+                    connectionString: "mongodb+srv://mongo_user:{{secret('MONGO_PASSWORD')}}@mongos0.example.com/"
+                    maxRecords: 100
+            """
         )
     }
 )

@@ -29,7 +29,7 @@ import reactor.core.publisher.Flux;
             title = "Consume a message from a Oracle database via change data capture in real-time.",
             full = true,
             code = """
-                id: debezium-oracle
+                id: debezium_oracle
                 namespace: company.team
 
                 tasks:
@@ -41,9 +41,9 @@ import reactor.core.publisher.Flux;
                   - id: realtime
                     type: io.kestra.plugin.debezium.oracle.RealtimeTrigger
                     hostname: 127.0.0.1
-                    port: 1521
-                    username: c##dbzuser
-                    password: dbz
+                    port: "1521"
+                    username: "{{ secret('ORACLE_USERNAME') }}"
+                    password: "{{ secret('ORACLE_PASSWORD') }}"
                     sid: ORCLCDB
                 """
         )

@@ -29,15 +29,28 @@ import java.util.Optional;
 @Plugin(
     examples = {
         @Example(
-            code = {
-                "snapshotMode: INITIAL_ONLY",
-                "hostname: 127.0.0.1",
-                "port: \"1521\"",
-                "username: c##dbzuser",
-                "password: dbz",
-                "sid: ORCLCDB",
-                "maxRecords: 100",
-            }
+            title = "Consume messages from Oracle db.",
+            full = true,
+            code = """
+                id: oracle_trigger
+                namespace: company.team
+
+                tasks:
+                  - id: send_data
+                    type: io.kestra.plugin.core.log.Log
+                    message: "{{ trigger.uris }}"
+
+                triggers:
+                  - id: trigger
+                    type: io.kestra.plugin.debezium.oracle.Trigger
+                    snapshotMode: INITIAL_ONLY
+                    hostname: 127.0.0.1
+                    port: "1521"
+                    username: "{{ secret('ORACLE_USERNAME') }}"
+                    password: "{{ secret('ORACLE_PASSWORD') }}"
+                    sid: ORCLCDB
+                    maxRecords: 100
+            """
         )
     }
 )

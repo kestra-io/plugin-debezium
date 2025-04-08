@@ -29,14 +29,26 @@ import java.util.Optional;
 @Plugin(
     examples = {
         @Example(
-            code = {
-                "snapshotMode: NEVER",
-                "hostname: 127.0.0.1",
-                "port: \"3306\"",
-                "username: mysql_user",
-                "password: mysql_passwd",
-                "maxRecords: 100",
-            }
+            title = "Consume a message from a MySQL database via change data capture periodically.",
+            full = true,
+            code = """
+                id: debezium_mysql
+                namespace: company.team
+
+                tasks:
+                  - id: send_data
+                    type: io.kestra.plugin.core.log.Log
+                    message: "{{ trigger.uris }}"
+
+                triggers:
+                  - id: trigger
+                    type: io.kestra.plugin.debezium.mysql.RealtimeTrigger
+                    snapshotMode: NEVER
+                    hostname: 127.0.0.1
+                    port: "3306"
+                    username: "{{ secret('MYSQL_USERNAME') }}"
+                    password: "{{ secret('MYSQL_PASSWORD') }}"
+            """
         )
     }
 )

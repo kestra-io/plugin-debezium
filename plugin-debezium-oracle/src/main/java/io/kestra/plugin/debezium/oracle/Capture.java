@@ -26,28 +26,42 @@ import java.util.Properties;
     examples = {
         @Example(
             title = "Non-container database (non-CDB)",
-            code = {
-                "snapshotMode: INITIAL",
-                "hostname: 127.0.0.1",
-                "port: \"1521\"",
-                "username: c##dbzuser",
-                "password: dbz",
-                "sid: ORCLCDB",
-                "maxRecords: 100",
-            }
+            full = true,
+            code = """
+                id: non_container_db
+                namespace: company.team
+
+                tasks:
+                  - id: capture
+                    type: io.kestra.plugin.debezium.oracle.Capture
+                    snapshotMode: INITIAL
+                    hostname: 127.0.0.1
+                    port: "1521"
+                    username: "{{ secret('ORACLE_USERNAME') }}"
+                    password: "{{ secret('ORACLE_PASSWORD') }}"
+                    sid: ORCLCDB
+                    maxRecords: 100
+            """
         ),
         @Example(
             title = "Container database (CDB)",
-            code = {
-                "snapshotMode: INITIAL",
-                "hostname: 127.0.0.1",
-                "port: \"1521\"",
-                "username: c##dbzuser",
-                "password: dbz",
-                "sid: ORCLCDB",
-                "pluggableDatabase: ORCLPDB1",
-                "maxRecords: 100",
-            }
+            full = true,
+            code = """
+                id: container_db
+                namespace: company.team
+
+                tasks:
+                  - id: capture
+                    type: io.kestra.plugin.debezium.oracle.Capture
+                    snapshotMode: INITIAL
+                    hostname: 127.0.0.1
+                    port: "1521"
+                    username: "{{ secret('ORACLE_USERNAME') }}"
+                    password: "{{ secret('ORACLE_PASSWORD') }}"
+                    sid: ORCLCDB
+                    pluggableDatabase: ORCLPDB1
+                    maxRecords: 100 
+            """
         )
     }
 )

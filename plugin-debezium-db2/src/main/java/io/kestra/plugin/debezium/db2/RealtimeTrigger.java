@@ -29,7 +29,7 @@ import reactor.core.publisher.Flux;
             title = "Consume a message from a DB2 database via change data capture in real-time.",
             full = true,
             code = """
-                id: debezium-db2
+                id: debezium_db2
                 namespace: company.team
 
                 tasks:
@@ -41,9 +41,9 @@ import reactor.core.publisher.Flux;
                   - id: realtime
                     type: io.kestra.plugin.debezium.db2.RealtimeTrigger
                     hostname: 127.0.0.1
-                    port: 50000
-                    username: db2inst1
-                    password: my_password
+                    port: "50000"
+                    username: "{{ secret('DB2_USERNAME') }}"
+                    password: "{{ secret('DB2_PASSWORD') }}"
                     database: my_database
                 """
         )

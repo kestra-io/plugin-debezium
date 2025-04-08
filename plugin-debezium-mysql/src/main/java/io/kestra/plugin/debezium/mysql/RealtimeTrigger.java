@@ -29,7 +29,7 @@ import reactor.core.publisher.Flux;
             title = "Consume a message from a MySQL database via change data capture in real-time.",
             full = true,
             code = """
-                id: debezium-mysql
+                id: debezium_mysql
                 namespace: company.team
 
                 tasks:
@@ -40,11 +40,12 @@ import reactor.core.publisher.Flux;
                 triggers:
                   - id: realtime
                     type: io.kestra.plugin.debezium.mysql.RealtimeTrigger
-                    serverId: 123456789
+                    serverId: "123456789"
                     hostname: 127.0.0.1
-                    port: 63306
-                    username: mysql_user
-                    password: mysql_passwd"""
+                    port: "3306"
+                    username: "{{ secret('MYSQL_USERNAME') }}"
+                    password: "{{ secret('MYSQL_PASSWORD') }}"
+                """
         )
     }
 )

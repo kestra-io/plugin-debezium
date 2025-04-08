@@ -25,15 +25,23 @@ import java.util.Properties;
 @Plugin(
     examples = {
         @Example(
-            code = {
-                "snapshotMode: INITIAL",
-                "hostname: 127.0.0.1",
-                "port: \"50000\"",
-                "username: db2inst1",
-                "password: my_password",
-                "database: my_database",
-                "maxRecords: 100",
-            }
+            title = "Capture data from Db2 server."
+            full = true,
+            code = """
+                id: db2_capture
+                namespace: company.team
+
+                tasks:
+                  - id: capture
+                    type: io.kestra.plugin.debezium.db2.Capture
+                    snapshotMode: INITIAL
+                    hostname: 127.0.0.1
+                    port: "50000"
+                    username: "{{ secret('DB2_USERNAME') }}"
+                    password: "{{ secret('DB2_PASSWORD') }}"
+                    database: my_database
+                    maxRecords: 100
+            """
         )
     }
 )
