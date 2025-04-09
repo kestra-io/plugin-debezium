@@ -114,7 +114,7 @@ subprojects {
         testImplementation "org.hamcrest:hamcrest"
         testImplementation "org.hamcrest:hamcrest-library"
 
-        testImplementation group: 'com.h2database', name: 'h2', version: '2.2.224'
+        testImplementation group: 'com.h2database', name: 'h2', version: '2.3.232'
     }
 }
 
