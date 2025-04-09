@@ -8,7 +8,7 @@ import io.kestra.plugin.debezium.CustomParameterDeserializer;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 import java.time.Instant;
 import java.util.Map;
 
