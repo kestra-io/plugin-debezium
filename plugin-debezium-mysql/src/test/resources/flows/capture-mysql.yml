@@ -1,0 +1,22 @@
+id: capture-mysql
+namespace: io.kestra.tests
+
+inputs:
+  - id: url
+    type: STRING
+
+  - id: password
+    type: STRING
+
+tasks:
+  - id: capture-mysql
+    type: io.kestra.plugin.debezium.mysql.Capture
+    serverId: 123456789
+    snapshotMode: NEVER
+    hostname: 127.0.0.1
+    port: 63306
+    username: "{{ inputs.username }}"
+    password: "{{ inputs.password }}"
+    maxRecords: 5
+    includedTables:
+      - kestra.events
