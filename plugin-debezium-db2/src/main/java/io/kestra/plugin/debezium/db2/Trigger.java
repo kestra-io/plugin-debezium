@@ -23,7 +23,7 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Consume messages periodically from a DB2 database via change data capture and create one execution per batch.",
+    title = "Trigger a flow on periodic message consumption from a DB2 database via change data capture and create one execution per batch.",
     description = "If you would like to consume each message from change data capture in real-time and create one execution per message, you can use the [io.kestra.plugin.debezium.db2.RealtimeTrigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.db2.realtimetrigger) instead."
 )
 @Plugin(

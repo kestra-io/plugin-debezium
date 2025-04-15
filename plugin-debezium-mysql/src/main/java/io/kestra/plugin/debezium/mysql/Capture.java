@@ -21,7 +21,7 @@ import java.util.Properties;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for change data capture event on MySQL server."
+    title = "Wait for a change data capture event on MySQL server and capture the event as an internal storage file."
 )
 @Plugin(
     examples = {
