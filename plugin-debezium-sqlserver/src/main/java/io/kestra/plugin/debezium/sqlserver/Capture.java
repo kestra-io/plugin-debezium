@@ -20,7 +20,7 @@ import java.util.Properties;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for change data capture event on Microsoft SQL Server."
+    title = "Wait for change data capture event on Microsoft SQL Server and capture the event as an internal storage file."
 )
 @Plugin(
     examples = {

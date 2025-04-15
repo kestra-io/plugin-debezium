@@ -20,7 +20,7 @@ import reactor.core.publisher.Flux;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Consume a message in real-time from a MySQL database via change data capture and create one execution per row.",
+    title = "Trigger a flow via a MySQL change data capture event in real-time and create one execution per row.",
     description = "If you would like to consume multiple messages processed within a given time frame and process them in batch, you can use the [io.kestra.plugin.debezium.mysql.Trigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.mysql.trigger) instead."
 )
 @Plugin(

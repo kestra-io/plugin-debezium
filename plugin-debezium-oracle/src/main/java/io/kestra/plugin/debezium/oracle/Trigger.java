@@ -23,7 +23,7 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Consume messages periodically from a Oracle database via change data capture and create one execution per batch.",
+    title = "Trigger a flow via an Oracle change data capture event periodically and create one execution per row.",
     description = "If you would like to consume each message from change data capture in real-time and create one execution per message, you can use the [io.kestra.plugin.debezium.oracle.RealtimeTrigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.oracle.realtimetrigger) instead."
 )
 @Plugin(
