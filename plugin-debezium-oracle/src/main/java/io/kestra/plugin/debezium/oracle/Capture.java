@@ -41,7 +41,7 @@ import java.util.Properties;
                     password: "{{ secret('ORACLE_PASSWORD') }}"
                     sid: ORCLCDB
                     maxRecords: 100
-            """
+                """
         ),
         @Example(
             title = "Container database (CDB).",
@@ -61,7 +61,7 @@ import java.util.Properties;
                     sid: ORCLCDB
                     pluggableDatabase: ORCLPDB1
                     maxRecords: 100 
-            """
+                """
         )
     }
 )

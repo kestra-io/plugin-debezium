@@ -41,7 +41,7 @@ import java.util.Properties;
                     database: my_database
                     pluginName: PGOUTPUT
                     snapshotMode: ALWAYS
-            """
+                """
         )
     }
 )

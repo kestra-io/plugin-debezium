@@ -40,7 +40,7 @@ import java.util.Properties;
                     username: "{{ secret('MYSQL_USERNAME') }}"
                     password: "{{ secret('MYSQL_PASSWORD') }}"
                     maxRecords: 100
-            """
+                """
         )
     }
 )

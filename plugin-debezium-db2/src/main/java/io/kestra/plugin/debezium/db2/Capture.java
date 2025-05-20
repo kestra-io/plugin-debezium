@@ -41,7 +41,7 @@ import java.util.Properties;
                     password: "{{ secret('DB2_PASSWORD') }}"
                     database: my_database
                     maxRecords: 100
-            """
+                """
         )
     }
 )
