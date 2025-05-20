@@ -4,6 +4,7 @@ import com.google.common.base.Charsets;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
@@ -48,16 +49,16 @@ class CaptureTest {
         assertThat(runOutput.getSize(), is(20));
 
         List<Map<String, Object>> employee = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, null, runOutput.getUris().get("second.employeeTerritory")))), r -> employee.add((Map<String, Object>) r));
+        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("second.employeeTerritory")))), r -> employee.add((Map<String, Object>) r));
 
         List<Map<String, Object>> types = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, null, runOutput.getUris().get("kestra.mongo_types")))), r -> types.add((Map<String, Object>) r));
+        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("kestra.mongo_types")))), r -> types.add((Map<String, Object>) r));
 
-        IOUtils.toString(storageInterface.get(null, null, runOutput.getUris().get("kestra.mongo_types")), Charsets.UTF_8);
+        IOUtils.toString(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("kestra.mongo_types")), Charsets.UTF_8);
         assertThat(employee.size(), is(14));
         assertThat(employee.stream().filter(o -> !((Boolean) o.get("deleted"))).count(), is(7L));
 
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, null, runOutput.getUris().get("second.employeeTerritory")))), r -> employee.add((Map<String, Object>) r));
+        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("second.employeeTerritory")))), r -> employee.add((Map<String, Object>) r));
         assertThat(types.size(), is(6));
         assertThat(types.stream().filter(o -> !((Boolean) o.get("deleted"))).count(), is(4L));
 
