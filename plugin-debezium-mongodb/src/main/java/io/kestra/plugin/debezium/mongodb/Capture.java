@@ -38,7 +38,7 @@ import java.util.Properties;
                     snapshotMode: INITIAL
                     connectionString: "mongodb://mongo_user:{{secret('MONGO_PASSWORD')}}@mongodb0.example.com:27017/?replicaSet=rs0"
                     maxRecords: 100
-            """
+                """
         ),
         @Example(
             title = "Sharded connection.",
@@ -53,7 +53,7 @@ import java.util.Properties;
                     snapshotMode: INITIAL
                     connectionString: "mongodb://mongo_user:{{secret('MONGO_PASSWORD')}}@mongos0.example.com:27017,mongos1.example.com:27017/"
                     maxRecords: 100
-            """
+                """
         ),
         @Example(
             title = "Replica set SRV connection.",
@@ -68,7 +68,7 @@ import java.util.Properties;
                     snapshotMode: INITIAL
                     connectionString: "mongodb+srv://mongo_user:{{secret('MONGO_PASSWORD')}}@mongos0.example.com/?replicaSet=rs0"
                     maxRecords: 100
-            """
+                """
         ),
         @Example(
             title = "Sharded SRV connection.",
@@ -83,7 +83,7 @@ import java.util.Properties;
                     snapshotMode: INITIAL
                     connectionString: "mongodb+srv://mongo_user:{{secret('MONGO_PASSWORD')}}@mongos0.example.com/"
                     maxRecords: 100
-            """
+                """
         )
     }
 )

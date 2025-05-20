@@ -48,7 +48,7 @@ import java.util.Optional;
                     port: "3306"
                     username: "{{ secret('MYSQL_USERNAME') }}"
                     password: "{{ secret('MYSQL_PASSWORD') }}"
-            """
+                """
         )
     }
 )

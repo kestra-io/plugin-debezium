@@ -50,7 +50,7 @@ import java.util.Optional;
                     password: "{{ secret('ORACLE_PASSWORD') }}"
                     sid: ORCLCDB
                     maxRecords: 100
-            """
+                """
         )
     }
 )
