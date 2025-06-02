@@ -50,7 +50,7 @@ public class Capture extends AbstractDebeziumTask implements Db2Interface {
     protected Property<String> database;
 
     @Builder.Default
-    private Property<Db2Interface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
+    private Property<Db2Interface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     @Override
     protected boolean needDatabaseHistory() {

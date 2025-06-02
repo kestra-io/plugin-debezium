@@ -45,28 +45,28 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @NoArgsConstructor
 public abstract class AbstractDebeziumTask extends Task implements RunnableTask<AbstractDebeziumTask.Output>, AbstractDebeziumInterface {
     @Builder.Default
-    protected Property<Format> format = Property.of(Format.INLINE);
+    protected Property<Format> format = Property.ofValue(Format.INLINE);
 
     @Builder.Default
-    protected Property<Deleted> deleted = Property.of(Deleted.ADD_FIELD);
+    protected Property<Deleted> deleted = Property.ofValue(Deleted.ADD_FIELD);
 
     @Builder.Default
-    protected Property<String> deletedFieldName = Property.of("deleted");
+    protected Property<String> deletedFieldName = Property.ofValue("deleted");
 
     @Builder.Default
-    protected Property<Key> key = Property.of(Key.ADD_FIELD);
+    protected Property<Key> key = Property.ofValue(Key.ADD_FIELD);
 
     @Builder.Default
-    protected Property<Metadata> metadata = Property.of(Metadata.ADD_FIELD);
+    protected Property<Metadata> metadata = Property.ofValue(Metadata.ADD_FIELD);
 
     @Builder.Default
-    protected Property<String> metadataFieldName = Property.of("metadata");
+    protected Property<String> metadataFieldName = Property.ofValue("metadata");
 
     @Builder.Default
-    protected Property<SplitTable> splitTable = Property.of(SplitTable.TABLE);
+    protected Property<SplitTable> splitTable = Property.ofValue(SplitTable.TABLE);
 
     @Builder.Default
-    protected Property<Boolean> ignoreDdl = Property.of(true);
+    protected Property<Boolean> ignoreDdl = Property.ofValue(true);
 
     protected Property<String> hostname;
 
@@ -91,7 +91,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     private Property<Map<String, String>> properties;
 
     @Builder.Default
-    protected Property<String> stateName = Property.of("debezium-state");
+    protected Property<String> stateName = Property.ofValue("debezium-state");
 
     @Schema(
         title = "The maximum number of rows to fetch before stopping.",
@@ -112,14 +112,14 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     )
     @PluginProperty
     @Builder.Default
-    private Property<Duration> maxWait = Property.of(Duration.ofSeconds(10));
+    private Property<Duration> maxWait = Property.ofValue(Duration.ofSeconds(10));
 
     @Schema(
         title = "The maximum duration waiting for the snapshot to ends.",
         description = "It's not an hard limit and is evaluated every second.\n The properties 'maxRecord', 'maxDuration' and 'maxWait' are evaluated only after the snapshot is done."
     )
     @Builder.Default
-    private Property<Duration> maxSnapshotDuration = Property.of(Duration.ofHours(1));
+    private Property<Duration> maxSnapshotDuration = Property.ofValue(Duration.ofHours(1));
 
     protected abstract boolean needDatabaseHistory();
 

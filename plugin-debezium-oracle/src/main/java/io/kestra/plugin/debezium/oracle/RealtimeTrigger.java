@@ -51,7 +51,7 @@ import reactor.core.publisher.Flux;
 )
 public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements OracleInterface, AbstractDebeziumInterface {
     @Builder.Default
-    private Property<SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
+    private Property<SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     private Property<String> sid;
 

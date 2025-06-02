@@ -48,7 +48,7 @@ public class Capture extends AbstractDebeziumTask implements SqlServerInterface 
     protected Property<String> database;
 
     @Builder.Default
-    private Property<SqlServerInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
+    private Property<SqlServerInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     @Override
     protected boolean needDatabaseHistory() {

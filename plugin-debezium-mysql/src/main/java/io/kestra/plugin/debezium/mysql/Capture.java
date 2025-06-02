@@ -47,7 +47,7 @@ import java.util.Properties;
 )
 public class Capture extends AbstractDebeziumTask implements MysqlInterface {
     @Builder.Default
-    private Property<MysqlInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
+    private Property<MysqlInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     @NotNull
     private Property<String> serverId;

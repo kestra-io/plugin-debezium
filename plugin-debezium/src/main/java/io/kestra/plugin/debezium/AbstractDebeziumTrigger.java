@@ -22,28 +22,28 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
     protected final Duration interval = Duration.ofSeconds(60);
 
     @Builder.Default
-    protected Property<AbstractDebeziumTask.Format> format = Property.of(AbstractDebeziumTask.Format.INLINE);
+    protected Property<AbstractDebeziumTask.Format> format = Property.ofValue(AbstractDebeziumTask.Format.INLINE);
 
     @Builder.Default
-    protected Property<AbstractDebeziumTask.Deleted> deleted = Property.of(AbstractDebeziumTask.Deleted.ADD_FIELD);
+    protected Property<AbstractDebeziumTask.Deleted> deleted = Property.ofValue(AbstractDebeziumTask.Deleted.ADD_FIELD);
 
     @Builder.Default
-    protected Property<String> deletedFieldName = Property.of("deleted");
+    protected Property<String> deletedFieldName = Property.ofValue("deleted");
 
     @Builder.Default
-    protected Property<AbstractDebeziumTask.Key> key = Property.of(AbstractDebeziumTask.Key.ADD_FIELD);
+    protected Property<AbstractDebeziumTask.Key> key = Property.ofValue(AbstractDebeziumTask.Key.ADD_FIELD);
 
     @Builder.Default
-    protected Property<AbstractDebeziumTask.Metadata> metadata = Property.of(AbstractDebeziumTask.Metadata.ADD_FIELD);
+    protected Property<AbstractDebeziumTask.Metadata> metadata = Property.ofValue(AbstractDebeziumTask.Metadata.ADD_FIELD);
 
     @Builder.Default
-    protected Property<String> metadataFieldName = Property.of("metadata");
+    protected Property<String> metadataFieldName = Property.ofValue("metadata");
 
     @Builder.Default
-    protected Property<AbstractDebeziumTask.SplitTable> splitTable = Property.of(AbstractDebeziumTask.SplitTable.TABLE);
+    protected Property<AbstractDebeziumTask.SplitTable> splitTable = Property.ofValue(AbstractDebeziumTask.SplitTable.TABLE);
 
     @Builder.Default
-    protected Property<Boolean> ignoreDdl = Property.of(true);
+    protected Property<Boolean> ignoreDdl = Property.ofValue(true);
 
     protected Property<String> hostname;
 
@@ -68,7 +68,7 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
     protected Property<Map<String, String>> properties;
 
     @Builder.Default
-    protected Property<String> stateName = Property.of("debezium-state");
+    protected Property<String> stateName = Property.ofValue("debezium-state");
 
     @Schema(
         title = "The maximum number of rows to fetch before stopping.",
@@ -87,12 +87,12 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
         description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
     @Builder.Default
-    protected Property<Duration> maxWait = Property.of(Duration.ofSeconds(10));
+    protected Property<Duration> maxWait = Property.ofValue(Duration.ofSeconds(10));
 
     @Schema(
         title = "The maximum duration waiting for the snapshot to ends.",
         description = "It's not an hard limit and is evaluated every second.\n The properties 'maxRecord', 'maxDuration' and 'maxWait' are evaluated only after the snapshot is done."
     )
     @Builder.Default
-    protected Property<Duration> maxSnapshotDuration = Property.of(Duration.ofHours(1));
+    protected Property<Duration> maxSnapshotDuration = Property.ofValue(Duration.ofHours(1));
 }

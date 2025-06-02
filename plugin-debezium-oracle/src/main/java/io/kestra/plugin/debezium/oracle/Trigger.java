@@ -56,7 +56,7 @@ import java.util.Optional;
 )
 public class Trigger extends AbstractDebeziumTrigger implements OracleInterface, AbstractDebeziumInterface {
     @Builder.Default
-    private Property<OracleInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
+    private Property<OracleInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     private Property<String> sid;
 
