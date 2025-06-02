@@ -59,16 +59,16 @@ public class Trigger extends AbstractDebeziumTrigger implements PostgresInterfac
     protected Property<String> database;
 
     @Builder.Default
-    protected Property<PluginName> pluginName = Property.of(PluginName.PGOUTPUT);
+    protected Property<PluginName> pluginName = Property.ofValue(PluginName.PGOUTPUT);
 
     @Builder.Default
-    protected Property<String> slotName = Property.of("kestra");
+    protected Property<String> slotName = Property.ofValue("kestra");
 
     @Builder.Default
-    protected Property<String> publicationName = Property.of("kestra_publication");
+    protected Property<String> publicationName = Property.ofValue("kestra_publication");
 
     @Builder.Default
-    protected Property<PostgresInterface.SslMode> sslMode = Property.of(SslMode.DISABLE);
+    protected Property<PostgresInterface.SslMode> sslMode = Property.ofValue(SslMode.DISABLE);
 
     protected Property<String> sslRootCert;
 
@@ -79,7 +79,7 @@ public class Trigger extends AbstractDebeziumTrigger implements PostgresInterfac
     protected Property<String> sslKeyPassword;
 
     @Builder.Default
-    private Property<Capture.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
+    private Property<Capture.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
