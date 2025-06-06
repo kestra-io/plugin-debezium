@@ -97,7 +97,7 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
     private Property<String> connectionString;
 
     @Builder.Default
-    private Property<MongodbInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
+    private Property<MongodbInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     @Override
     protected boolean needDatabaseHistory() {

@@ -40,28 +40,28 @@ import java.util.concurrent.atomic.AtomicReference;
 @NoArgsConstructor
 public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger implements RealtimeTriggerInterface, TriggerOutput<AbstractDebeziumRealtimeTrigger.StreamOutput> {
     @Builder.Default
-    protected Property<AbstractDebeziumTask.Format> format = Property.of(AbstractDebeziumTask.Format.INLINE);
+    protected Property<AbstractDebeziumTask.Format> format = Property.ofValue(AbstractDebeziumTask.Format.INLINE);
 
     @Builder.Default
-    protected Property<AbstractDebeziumTask.Deleted> deleted = Property.of(AbstractDebeziumTask.Deleted.ADD_FIELD);
+    protected Property<AbstractDebeziumTask.Deleted> deleted = Property.ofValue(AbstractDebeziumTask.Deleted.ADD_FIELD);
 
     @Builder.Default
-    protected Property<String> deletedFieldName = Property.of("deleted");
+    protected Property<String> deletedFieldName = Property.ofValue("deleted");
 
     @Builder.Default
-    protected Property<AbstractDebeziumTask.Key> key = Property.of(AbstractDebeziumTask.Key.ADD_FIELD);
+    protected Property<AbstractDebeziumTask.Key> key = Property.ofValue(AbstractDebeziumTask.Key.ADD_FIELD);
 
     @Builder.Default
-    protected Property<AbstractDebeziumTask.Metadata> metadata = Property.of(AbstractDebeziumTask.Metadata.ADD_FIELD);
+    protected Property<AbstractDebeziumTask.Metadata> metadata = Property.ofValue(AbstractDebeziumTask.Metadata.ADD_FIELD);
 
     @Builder.Default
-    protected Property<String> metadataFieldName = Property.of("metadata");
+    protected Property<String> metadataFieldName = Property.ofValue("metadata");
 
     @Builder.Default
-    protected Property<AbstractDebeziumTask.SplitTable> splitTable = Property.of(AbstractDebeziumTask.SplitTable.TABLE);
+    protected Property<AbstractDebeziumTask.SplitTable> splitTable = Property.ofValue(AbstractDebeziumTask.SplitTable.TABLE);
 
     @Builder.Default
-    protected Property<Boolean> ignoreDdl = Property.of(true);
+    protected Property<Boolean> ignoreDdl = Property.ofValue(true);
 
     protected Property<String> hostname;
 
@@ -86,7 +86,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     protected Property<Map<String, String>> properties;
 
     @Builder.Default
-    protected Property<String> stateName = Property.of("debezium-state");
+    protected Property<String> stateName = Property.ofValue("debezium-state");
 
     @Schema(
         title = "How to commit the offsets to the KV Store.",
@@ -96,7 +96,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
             - ON_STOP: when this trigger is stopped or killed, the offsets will be stored in the KV Store. This avoid any un-necessary writes to the KV Store, but if the trigger is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption."""
     )
     @Builder.Default
-    private Property<OffsetCommitMode> offsetsCommitMode = Property.of(OffsetCommitMode.ON_EACH_BATCH);
+    private Property<OffsetCommitMode> offsetsCommitMode = Property.ofValue(OffsetCommitMode.ON_EACH_BATCH);
 
     @Builder.Default
     @Getter(AccessLevel.NONE)

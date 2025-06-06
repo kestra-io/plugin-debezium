@@ -67,7 +67,7 @@ import java.util.Properties;
 )
 public class Capture extends AbstractDebeziumTask implements OracleInterface {
     @Builder.Default
-    private Property<SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
+    private Property<SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     private Property<String> sid;
 

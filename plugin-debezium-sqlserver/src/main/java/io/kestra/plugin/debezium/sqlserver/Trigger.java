@@ -63,7 +63,7 @@ public class Trigger extends AbstractDebeziumTrigger implements SqlServerInterfa
     protected Property<String> database;
 
     @Builder.Default
-    private Property<SqlServerInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
+    private Property<SqlServerInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     private String serverId;
 

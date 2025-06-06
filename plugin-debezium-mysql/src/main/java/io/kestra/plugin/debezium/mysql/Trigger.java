@@ -54,7 +54,7 @@ import java.util.Optional;
 )
 public class Trigger extends AbstractDebeziumTrigger implements MysqlInterface, AbstractDebeziumInterface {
     @Builder.Default
-    private Property<SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
+    private Property<SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     private Property<String> serverId;
 

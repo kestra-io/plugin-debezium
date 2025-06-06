@@ -70,7 +70,7 @@ import reactor.core.publisher.Flux;
 )
 public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements MongodbInterface, AbstractDebeziumInterface {
     @Builder.Default
-    private Property<MongodbInterface.SnapshotMode> snapshotMode = Property.of(SnapshotMode.INITIAL);
+    private Property<MongodbInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     private Object includedCollections;
 
