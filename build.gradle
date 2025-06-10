@@ -30,7 +30,6 @@ allprojects {
         }
     }
 }
-
 subprojects {
     group "io.kestra.plugin"
     sourceCompatibility = 21
@@ -38,6 +37,13 @@ subprojects {
 
     apply plugin: "java-library"
     apply plugin: "idea"
+
+    configurations.all {
+        resolutionStrategy {
+            // Debezium is still using Kafka 3.9.x
+            force  group: 'org.apache.kafka', name: 'kafka-clients', version: "3.9.1"
+        }
+    }
 
     dependencies {
         // Platform
