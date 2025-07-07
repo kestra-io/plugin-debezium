@@ -177,40 +177,44 @@ subprojects { Project subproject ->
     apply plugin: "com.adarshr.test-logger"
     apply plugin: "com.github.johnrengelman.shadow"
     apply plugin: "signing"
+    apply plugin: "com.vanniktech.maven.publish"
+
+    if (subproject != rootProject) {
+        return
+    }
 
     if (subproject.path != ":plugin-debezium") {
         shadowJar {
             dependsOn(":plugin-debezium:shadowJar")
         }
+    }
 
-        apply plugin: "com.vanniktech.maven.publish"
-        mavenPublishing {
-            publishToMavenCentral(true)
-            signAllPublications()
-            coordinates("${project.group}", "${project.name}", "${project.version}")
+    mavenPublishing {
+        publishToMavenCentral(true)
+        signAllPublications()
+        coordinates("${project.group}", "${project.name}", "${project.version}")
 
-            pom {
-                name        = project.name
-                description = "${project.group}:${project.name}:${rootProject.version}"
-                url         = "https://github.com/kestra-io/${rootProject.name}"
+        pom {
+            name        = project.name
+            description = "${project.group}:${project.name}:${rootProject.version}"
+            url         = "https://github.com/kestra-io/${rootProject.name}"
 
-                licenses {
-                    license {
-                        name = "The Apache License, Version 2.0"
-                        url  = "http://www.apache.org/licenses/LICENSE-2.0.txt"
-                    }
+            licenses {
+                license {
+                    name = "The Apache License, Version 2.0"
+                    url  = "http://www.apache.org/licenses/LICENSE-2.0.txt"
                 }
-                developers {
-                    developer {
-                        id    = "tchiotludo"
-                        name  = "Ludovic Dehon"
-                        email = "ldehon@kestra.io"
-                    }
+            }
+            developers {
+                developer {
+                    id    = "tchiotludo"
+                    name  = "Ludovic Dehon"
+                    email = "ldehon@kestra.io"
                 }
-                scm {
-                    connection = 'scm:git:'
-                    url = "https://github.com/kestra-io/${rootProject.name}"
-                }
+            }
+            scm {
+                connection = 'scm:git:'
+                url = "https://github.com/kestra-io/${rootProject.name}"
             }
         }
     }
