@@ -178,7 +178,7 @@ subprojects { Project subproject ->
     apply plugin: "com.github.johnrengelman.shadow"
     apply plugin: "signing"
 
-    if (subproject != rootProject) {
+    if (subproject.path != ":plugin-debezium") {
         shadowJar {
             dependsOn(":plugin-debezium:shadowJar")
         }
