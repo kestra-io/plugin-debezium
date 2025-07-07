@@ -179,7 +179,7 @@ subprojects { Project subproject ->
     apply plugin: "signing"
     apply plugin: "com.vanniktech.maven.publish"
 
-    if (subproject != rootProject) {
+    if (subproject == rootProject) {
         return
     }
 
