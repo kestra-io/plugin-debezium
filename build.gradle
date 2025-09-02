@@ -3,7 +3,7 @@ plugins {
     id "idea"
     id 'jacoco-report-aggregation'
     id "com.adarshr.test-logger" version "4.0.0" apply(false)
-    id "com.github.johnrengelman.shadow" version "8.1.1" apply(false)
+    id "com.gradleup.shadow" version "9.1.0" apply(false)
     id 'signing'
     id "com.github.ben-manes.versions" version "0.52.0"
     id 'net.researchgate.release' version '3.1.0'
@@ -176,18 +176,18 @@ tasks.named('check') {
  **********************************************************************************************************************/
 subprojects { Project subproject ->
     apply plugin: "com.adarshr.test-logger"
-    apply plugin: "com.github.johnrengelman.shadow"
     apply plugin: "signing"
     apply plugin: "com.vanniktech.maven.publish"
     apply plugin: "io.kestra.gradle.inject-bom-versions"
 
-    if (subproject == rootProject) {
-        return
-    }
-
     if (subproject.path != ":plugin-debezium") {
+        apply plugin: "com.gradleup.shadow"
+
         shadowJar {
-            dependsOn(":plugin-debezium:shadowJar")
+            dependsOn(":plugin-debezium:jar")
+
+            archiveClassifier.set(null)
+            mergeServiceFiles()
         }
     }
 
@@ -218,14 +218,6 @@ subprojects { Project subproject ->
                 connection = 'scm:git:'
                 url = "https://github.com/kestra-io/${rootProject.name}"
             }
-        }
-    }
-
-    shadowJar {
-        archiveClassifier.set(null)
-        mergeServiceFiles()
-        if (subproject.name != "plugin-debezium") {
-            dependsOn(project(":plugin-debezium").tasks.named("shadowJar"))
         }
     }
 
