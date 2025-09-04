@@ -11,7 +11,7 @@ triggers:
     username: root
     password: mysql_passwd
     includedTables:
-      - kestra.events
+      - kestra.realtime_events
 
 tasks:
   - id: end

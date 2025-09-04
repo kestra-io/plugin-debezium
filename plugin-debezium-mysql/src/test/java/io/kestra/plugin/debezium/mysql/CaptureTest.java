@@ -19,6 +19,7 @@ import jakarta.inject.Inject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +67,8 @@ class CaptureTest extends AbstractDebeziumTest {
             .username(Property.ofValue(getUsername()))
             .password(Property.ofValue(getPassword()))
             .maxRecords(Property.ofValue(5))
-            .includedTables(List.of("kestra.events"))
+            .maxWait(Property.ofValue(Duration.ofSeconds(30)))
+            .includedTables(List.of("kestra.capture_events"))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
@@ -75,9 +77,8 @@ class CaptureTest extends AbstractDebeziumTest {
         assertThat(runOutput.getSize(), is(5));
 
         List<Map<String, Object>> events = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("kestra.events")))), r -> events.add((Map<String, Object>) r));
+        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("kestra.capture_events")))), r -> events.add((Map<String, Object>) r));
 
-        IOUtils.toString(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("kestra.events")), Charsets.UTF_8);
         assertThat(events.size(), is(5));
         assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Machine Head")));
         assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Dropkick Murphys")));

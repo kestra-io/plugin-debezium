@@ -11,8 +11,9 @@ triggers:
     username: root
     password: mysql_passwd
     maxRecords: 5
+    maxWait: 30
     includedTables:
-      - kestra.events
+      - kestra.trigger_events
 
 tasks:
   - id: end
