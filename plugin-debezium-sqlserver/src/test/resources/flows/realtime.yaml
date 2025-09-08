@@ -12,6 +12,8 @@ triggers:
     snapshotMode: INITIAL_ONLY
     properties:
       database.encrypt: false
+      offset.storage: org.apache.kafka.connect.storage.MemoryOffsetBackingStore
+      database.history: io.debezium.relational.history.MemoryDatabaseHistory
     includedTables:
       - dbo.events
 
