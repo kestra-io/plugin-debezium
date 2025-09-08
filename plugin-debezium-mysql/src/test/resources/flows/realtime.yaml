@@ -12,6 +12,8 @@ triggers:
     password: mysql_passwd
     includedTables:
       - kestra.realtime_events
+    properties:
+      offset.storage: org.apache.kafka.connect.storage.MemoryOffsetBackingStore
 
 tasks:
   - id: end
