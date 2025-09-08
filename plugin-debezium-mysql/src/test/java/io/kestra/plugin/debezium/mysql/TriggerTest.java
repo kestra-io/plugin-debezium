@@ -5,12 +5,12 @@ import io.kestra.core.queues.QueueFactoryInterface;
 import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.LocalFlowRepositoryLoader;
 import io.kestra.core.runners.FlowListeners;
-import io.kestra.core.runners.Worker;
 import io.kestra.scheduler.AbstractScheduler;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.jdbc.runner.JdbcScheduler;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
+import io.kestra.worker.DefaultWorker;
 import io.micronaut.context.ApplicationContext;
 import io.kestra.core.junit.annotations.KestraTest;
 import jakarta.inject.Inject;
@@ -70,7 +70,7 @@ class TriggerTest extends AbstractDebeziumTest {
                 this.applicationContext,
                 this.flowListenersService
             );
-            Worker worker = applicationContext.createBean(Worker.class, IdUtils.create(), 8, null);
+            DefaultWorker worker = applicationContext.createBean(DefaultWorker.class, IdUtils.create(), 8, null);
         ) {
             // wait for execution
             Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
