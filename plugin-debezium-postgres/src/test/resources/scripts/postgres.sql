@@ -1,3 +1,11 @@
+DO $$
+BEGIN
+   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'my_repl_user') THEN
+CREATE ROLE my_repl_user WITH REPLICATION LOGIN PASSWORD 'my_repl_password';
+END IF;
+END
+$$;
+
 DROP TABLE IF EXISTS events;
 
 CREATE TABLE events (
