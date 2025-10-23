@@ -6,6 +6,8 @@ import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.exceptions.ResourceExpiredException;
+import io.kestra.core.models.annotations.Metric;
+import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
@@ -43,6 +45,16 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
+@Plugin(
+    metrics = {
+        @Metric(
+            name = "records",
+            type = Counter.TYPE,
+            unit = "records",
+            description = "The total number of change events processed."
+        )
+    }
+)    
 public abstract class AbstractDebeziumTask extends Task implements RunnableTask<AbstractDebeziumTask.Output>, AbstractDebeziumInterface {
     @Builder.Default
     protected Property<Format> format = Property.ofValue(Format.INLINE);
