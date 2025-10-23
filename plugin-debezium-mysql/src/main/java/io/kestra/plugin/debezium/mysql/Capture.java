@@ -6,6 +6,7 @@ import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
+import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -41,6 +42,7 @@ import java.util.Properties;
                     username: "{{ secret('MYSQL_USERNAME') }}"
                     password: "{{ secret('MYSQL_PASSWORD') }}"
                     maxRecords: 100
+                    offsetsCommitMode: ON_EACH_BATCH
                 """
         )
     }
@@ -52,9 +54,27 @@ public class Capture extends AbstractDebeziumTask implements MysqlInterface {
     @NotNull
     private Property<String> serverId;
 
+    @Schema(
+        title = "How to commit the offsets to the KV Store.",
+        description = """
+            - ON_EACH_BATCH: after each batch of records consumed by this task, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
+            - ON_STOP: when this task is stopped or killed, the offsets will be stored in the KV Store. This avoid any un-necessary writes to the KV Store, but if the task is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption."""
+    )
+    @Builder.Default
+    private Property<AbstractDebeziumRealtimeTrigger.OffsetCommitMode> offsetsCommitMode = Property.ofValue(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_EACH_BATCH);
+
     @Override
     protected boolean needDatabaseHistory() {
         return true;
+    }
+
+    @Override
+    public AbstractDebeziumTask.Output run(RunContext runContext) throws Exception {
+        AbstractDebeziumRealtimeTrigger.OffsetCommitMode mode = null;
+        if (this.offsetsCommitMode != null) {
+            mode = runContext.render(this.offsetsCommitMode).as(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.class).orElse(null);
+        }
+        return super.run(runContext, mode);
     }
 
     @Override
