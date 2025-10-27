@@ -42,7 +42,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @ToString
 @EqualsAndHashCode
 @Getter
-@NoArgsConstructor  
+@NoArgsConstructor
 public abstract class AbstractDebeziumTask extends Task implements RunnableTask<AbstractDebeziumTask.Output>, AbstractDebeziumInterface {
     @Builder.Default
     protected Property<Format> format = Property.ofValue(Format.INLINE);
