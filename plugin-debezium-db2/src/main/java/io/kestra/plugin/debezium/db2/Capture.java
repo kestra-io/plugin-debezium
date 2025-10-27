@@ -50,8 +50,7 @@ import java.util.Properties;
         @Metric(
             name = "records",
             type = Counter.TYPE,
-            description = "The number of records processed, tagged by source.",
-            tags = {"source"}
+            description = "The number of records processed, tagged by source."
         )
     }
 )
