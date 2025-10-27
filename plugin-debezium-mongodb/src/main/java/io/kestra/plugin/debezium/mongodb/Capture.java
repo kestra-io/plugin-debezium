@@ -2,7 +2,9 @@ package io.kestra.plugin.debezium.mongodb;
 
 import io.debezium.connector.mongodb.MongoDbConnector;
 import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
@@ -84,6 +86,13 @@ import java.util.Properties;
                     connectionString: "mongodb+srv://mongo_user:{{secret('MONGO_PASSWORD')}}@mongos0.example.com/"
                     maxRecords: 100
                 """
+        )
+    },
+    metrics = {
+        @Metric(
+            name = "records",
+            type = Counter.TYPE,
+            description = "The number of records processed, tagged by source."
         )
     }
 )
