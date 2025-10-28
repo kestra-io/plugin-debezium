@@ -72,15 +72,12 @@ public abstract class PostgresService {
     private static synchronized void addProvider() {
         Provider bc = Security.getProvider("BC");
         if (bc == null) {
-            System.out.println("Added BC provider");
             Security.addProvider(new BouncyCastleProvider());
         }
     }
 
     private static String convertPrivateKey(RunContext runContext, String vars, String password) throws IOException, IllegalVariableEvaluationException, OperatorCreationException, PKCSException {
         PostgresService.addProvider();
-
-        System.out.println("Providers: " + Arrays.toString(Security.getProviders()));
 
         Object pemObject = readPem(runContext, vars);
 
