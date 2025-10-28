@@ -19,5 +19,4 @@ dependencies {
     api group: 'io.debezium', name: 'debezium-connector-postgres', version: debeziumVersion
     api 'org.bouncycastle:bcprov-jdk18on'
     api 'org.bouncycastle:bcpkix-jdk18on'
-    api 'name.neuhalfen.projects.crypto.bouncycastle.openpgp:bouncy-gpg:2.3.0'
 }

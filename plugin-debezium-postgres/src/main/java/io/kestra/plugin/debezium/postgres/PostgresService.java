@@ -2,8 +2,8 @@ package io.kestra.plugin.debezium.postgres;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.runners.RunContext;
-import name.neuhalfen.projects.crypto.bouncycastle.openpgp.BouncyGPG;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.PEMDecryptorProvider;
 import org.bouncycastle.openssl.PEMEncryptedKeyPair;
 import org.bouncycastle.openssl.PEMKeyPair;
@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 import java.security.Provider;
 import java.security.Security;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Properties;
 
@@ -71,12 +72,15 @@ public abstract class PostgresService {
     private static synchronized void addProvider() {
         Provider bc = Security.getProvider("BC");
         if (bc == null) {
-            BouncyGPG.registerProvider();
+            System.out.println("Added BC provider");
+            Security.addProvider(new BouncyCastleProvider());
         }
     }
 
     private static String convertPrivateKey(RunContext runContext, String vars, String password) throws IOException, IllegalVariableEvaluationException, OperatorCreationException, PKCSException {
         PostgresService.addProvider();
+
+        System.out.println("Providers: " + Arrays.toString(Security.getProviders()));
 
         Object pemObject = readPem(runContext, vars);
 
