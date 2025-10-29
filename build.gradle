@@ -44,8 +44,8 @@ subprojects {
 
     configurations.all {
         resolutionStrategy {
-            // Debezium is still using Kafka 3.9.x
-            force  group: 'org.apache.kafka', name: 'kafka-clients', version: "3.9.1"
+            // Debezium is using Kafka 4.1.x
+            force  group: 'org.apache.kafka', name: 'kafka-clients', version: "4.1.0"
         }
     }
 
