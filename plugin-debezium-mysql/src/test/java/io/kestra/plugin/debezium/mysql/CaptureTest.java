@@ -9,6 +9,7 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
+import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.kestra.core.junit.annotations.KestraTest;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
@@ -89,5 +90,42 @@ class CaptureTest extends AbstractDebeziumTest {
         // rerun state will prevent new records
         runOutput = task.run(runContext);
         assertThat(runOutput.getSize(), is(0));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void runWithOffsetCommitMode() throws Exception {
+        // init database
+        executeSqlScript("scripts/mysql.sql");
+
+        Capture task = Capture.builder()
+            .id(IdUtils.create())
+            .type(Capture.class.getName())
+            .serverId(Property.ofValue("123456789"))
+            .snapshotMode(Property.ofValue(MysqlInterface.SnapshotMode.NEVER))
+            .hostname(Property.ofValue("127.0.0.1"))
+            .port(Property.ofValue("63306"))
+            .username(Property.ofValue(getUsername()))
+            .password(Property.ofValue(getPassword()))
+            .maxRecords(Property.ofValue(5))
+            .maxWait(Property.ofValue(Duration.ofSeconds(30)))
+            .offsetsCommitMode(Property.ofValue(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_STOP))
+            .includedTables(List.of("kestra.capture_events"))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+        AbstractDebeziumTask.Output runOutput = task.run(runContext);
+
+        assertThat(runOutput.getSize(), is(5));
+
+        List<Map<String, Object>> events = new ArrayList<>();
+        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("kestra.capture_events")))), r -> events.add((Map<String, Object>) r));
+
+        assertThat(events.size(), is(5));
+        assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Machine Head")));
+        assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Dropkick Murphys")));
+        assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Pink Floyd")));
+        assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("TV show")));
+        assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Nothing")));
     }
 }

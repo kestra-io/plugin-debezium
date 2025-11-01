@@ -91,4 +91,76 @@ class TriggerTest extends AbstractDebeziumTest {
             assertThat(trigger, greaterThanOrEqualTo(5));
         }
     }
+
+    @Test
+    void flowWithOffsetCommitModeOnEachBatch() throws Exception {
+        // init database
+        executeSqlScript("scripts/mysql.sql");
+
+        // mock flow listeners
+        CountDownLatch queueCount = new CountDownLatch(1);
+
+        // scheduler
+        try (
+            AbstractScheduler scheduler = new JdbcScheduler(
+                this.applicationContext,
+                this.flowListenersService
+            );
+            DefaultWorker worker = applicationContext.createBean(DefaultWorker.class, IdUtils.create(), 8, null);
+        ) {
+            // wait for execution
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
+                queueCount.countDown();
+                assertThat(execution.getLeft().getFlowId(), is("trigger-offset-commit"));
+            });
+
+            worker.run();
+            scheduler.run();
+
+            repositoryLoader.load(Objects.requireNonNull(TriggerTest.class.getClassLoader().getResource("flows/trigger-offset-commit.yaml")));
+
+            boolean await = queueCount.await(15, TimeUnit.SECONDS);
+            assertThat(await, is(true));
+
+            Integer trigger = (Integer) receive.blockLast().getTrigger().getVariables().get("size");
+
+            assertThat(trigger, greaterThanOrEqualTo(5));
+        }
+    }
+
+    @Test
+    void flowWithOffsetCommitModeOnStop() throws Exception {
+        // init database
+        executeSqlScript("scripts/mysql.sql");
+
+        // mock flow listeners
+        CountDownLatch queueCount = new CountDownLatch(1);
+
+        // scheduler
+        try (
+            AbstractScheduler scheduler = new JdbcScheduler(
+                this.applicationContext,
+                this.flowListenersService
+            );
+            DefaultWorker worker = applicationContext.createBean(DefaultWorker.class, IdUtils.create(), 8, null);
+        ) {
+            // wait for execution
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
+                queueCount.countDown();
+                assertThat(execution.getLeft().getFlowId(), is("trigger-offset-commit-on-stop"));
+            });
+
+            worker.run();
+            scheduler.run();
+
+            repositoryLoader.load(Objects.requireNonNull(TriggerTest.class.getClassLoader().getResource("flows/trigger-offset-commit-on-stop.yaml")));
+
+            boolean await = queueCount.await(15, TimeUnit.SECONDS);
+            assertThat(await, is(true));
+
+            Integer trigger = (Integer) receive.blockLast().getTrigger().getVariables().get("size");
+
+            assertThat(trigger, greaterThanOrEqualTo(5));
+        }
+    }
 }

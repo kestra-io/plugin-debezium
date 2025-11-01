@@ -142,6 +142,10 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     @Override
     public AbstractDebeziumTask.Output run(RunContext runContext) throws Exception {
+        return run(runContext, null);
+    }
+
+    public AbstractDebeziumTask.Output run(RunContext runContext, AbstractDebeziumRealtimeTrigger.OffsetCommitMode offsetsCommitMode) throws Exception {
         ExecutorService executorService = ((DefaultRunContext)runContext).getApplicationContext()
             .getBean(ExecutorsUtils.class)
             .singleThreadExecutor(this.getClass().getSimpleName());
@@ -167,14 +171,31 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
         ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord);
 
+        // Handle offset commit mode
+        final AbstractDebeziumRealtimeTrigger.OffsetCommitMode finalOffsetMode = offsetsCommitMode != null ? 
+            offsetsCommitMode : AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_EACH_BATCH;
+
         // start
-        try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
+        DebeziumEngine.Builder<ChangeEvent<SourceRecord, SourceRecord>> engineBuilder = DebeziumEngine.create(Connect.class)
             .using(this.getClass().getClassLoader())
             .using(props)
-            .notifying(changeConsumer)
-            .using(completionCallback)
-            .build()
-        ) {
+            .using(completionCallback);
+
+        // Configure notifying based on offset commit mode
+        if (AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_EACH_BATCH.equals(finalOffsetMode)) {
+            engineBuilder.notifying((list, recordCommitter) -> {
+                changeConsumer.handleBatch(list, recordCommitter);
+                try {
+                    saveOffsets(runContext, offsetFile, historyFile);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        } else {
+            engineBuilder.notifying(changeConsumer);
+        }
+
+        try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = engineBuilder.build()) {
             executorService.execute(engine);
 
             ZonedDateTime snapshotStarted = ZonedDateTime.now();
@@ -198,6 +219,11 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         if (completionCallback.getError() != null) {
             throw new Exception(completionCallback.getError());
+        }
+
+        // Handle ON_STOP offset commit mode
+        if (AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_STOP.equals(finalOffsetMode)) {
+            saveOffsets(runContext, offsetFile, historyFile);
         }
 
         Output.OutputBuilder outputBuilder = Output.builder();
@@ -387,6 +413,34 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         } catch (IllegalVariableEvaluationException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private void saveOffsets(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
+        if (offsetFile.toFile().exists()) {
+            try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
+                runContext.stateStore().putState(
+                    runContext.render(this.stateName).as(String.class).orElseThrow(),
+                    offsetFile.getFileName().toFile().toString(),
+                    runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
+                    fis.readAllBytes()
+                );
+            } catch (IllegalVariableEvaluationException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        if (this.needDatabaseHistory() && historyFile.toFile().exists()) {
+            try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
+                runContext.stateStore().putState(
+                    runContext.render(this.stateName).as(String.class).orElseThrow(),
+                    historyFile.getFileName().toFile().toString(),
+                    runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
+                    fis.readAllBytes()
+                );
+            } catch (IllegalVariableEvaluationException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 

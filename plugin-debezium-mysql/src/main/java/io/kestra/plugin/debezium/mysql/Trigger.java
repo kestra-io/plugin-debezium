@@ -10,6 +10,7 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.kestra.plugin.debezium.AbstractDebeziumTrigger;
+import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -42,12 +43,14 @@ import java.util.Optional;
 
                 triggers:
                   - id: trigger
-                    type: io.kestra.plugin.debezium.mysql.RealtimeTrigger
+                    type: io.kestra.plugin.debezium.mysql.Trigger
+                    serverId: "123456789"
                     snapshotMode: NEVER
                     hostname: 127.0.0.1
                     port: "3306"
                     username: "{{ secret('MYSQL_USERNAME') }}"
                     password: "{{ secret('MYSQL_PASSWORD') }}"
+                    offsetsCommitMode: ON_EACH_BATCH
                 """
         )
     }
@@ -57,6 +60,15 @@ public class Trigger extends AbstractDebeziumTrigger implements MysqlInterface, 
     private Property<SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     private Property<String> serverId;
+
+    @Schema(
+        title = "How to commit the offsets to the KV Store.",
+        description = """
+            - ON_EACH_BATCH: after each batch of records consumed by this trigger, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
+            - ON_STOP: when this trigger is stopped or killed, the offsets will be stored in the KV Store. This avoid any un-necessary writes to the KV Store, but if the trigger is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption."""
+    )
+    @Builder.Default
+    private Property<AbstractDebeziumRealtimeTrigger.OffsetCommitMode> offsetsCommitMode = Property.ofValue(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_EACH_BATCH);
 
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
@@ -92,6 +104,7 @@ public class Trigger extends AbstractDebeziumTrigger implements MysqlInterface, 
             .maxSnapshotDuration(this.maxSnapshotDuration)
             .snapshotMode(this.snapshotMode)
             .serverId(this.serverId)
+            .offsetsCommitMode(this.offsetsCommitMode)
             .build();
         AbstractDebeziumTask.Output run = task.run(runContext);
 

@@ -1,0 +1,24 @@
+id: trigger-offset-commit-on-stop
+namespace: io.kestra.tests
+
+triggers:
+  - id: watch
+    type: io.kestra.plugin.debezium.mysql.Trigger
+    serverId: 123456789
+    snapshotMode: NEVER
+    hostname: 127.0.0.1
+    port: 63306
+    username: root
+    password: mysql_passwd
+    maxRecords: 5
+    maxWait: 30
+    offsetsCommitMode: ON_STOP
+    includedTables:
+      - kestra.trigger_events
+    properties:
+      offset.storage: org.apache.kafka.connect.storage.MemoryOffsetBackingStore
+
+tasks:
+  - id: end
+    type: io.kestra.core.tasks.debugs.Return
+    format: "{{task.id}} > {{taskrun.startDate}}"
