@@ -4,7 +4,6 @@ import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.models.triggers.RealtimeTriggerInterface;
@@ -26,9 +25,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -218,24 +214,21 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         }
 
         Optional.ofNullable(engineReference.get()).ifPresent(engine -> {
-            try(ExecutorService executorService = Executors.newSingleThreadExecutor()) {
-                executorService.execute(() -> {
+            Thread shutdownThread = Thread.ofVirtual()
+                .name("debezium-stop-" + this.getClass().getSimpleName())
+                .start(() -> {
                     try {
                         engine.close();
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
                 });
-                executorService.shutdown();
 
-                if (wait) {
-                    try {
-                        if (!executorService.awaitTermination(1, TimeUnit.MINUTES)) {
-                            executorService.shutdownNow();
-                        }
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
+            if (wait) {
+                try {
+                    shutdownThread.join();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
             }
         });
