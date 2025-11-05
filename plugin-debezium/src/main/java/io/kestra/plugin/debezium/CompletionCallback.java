@@ -4,19 +4,14 @@ import io.debezium.engine.DebeziumEngine;
 import io.kestra.core.runners.RunContext;
 import lombok.Getter;
 
-import java.util.concurrent.ExecutorService;
-
 public class CompletionCallback implements DebeziumEngine.CompletionCallback {
     private final RunContext runContext;
-
-    private final ExecutorService executorService;
 
     @Getter
     private Throwable error;
 
-    public CompletionCallback(RunContext runContext, ExecutorService executorService) {
+    public CompletionCallback(RunContext runContext) {
         this.runContext = runContext;
-        this.executorService = executorService;
     }
 
     @Override
@@ -28,6 +23,5 @@ public class CompletionCallback implements DebeziumEngine.CompletionCallback {
         }
 
         this.error = error;
-        this.executorService.shutdown();
     }
 }
