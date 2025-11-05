@@ -212,7 +212,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
                 String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
                 String fileName = offsetFile.getFileName().toString();
-                String kvKey = computeKvStoreKey(runContext, taskRunValue, fileName, stateName);
+                String kvKey = computeKvStoreKey(runContext, stateName, fileName, taskRunValue);
 
                 KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
 
@@ -228,7 +228,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
                 String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
                 String fileName = historyFile.getFileName().toString();
-                String kvKey = computeKvStoreKey(runContext, taskRunValue, fileName, stateName);
+                String kvKey = computeKvStoreKey(runContext, stateName, fileName, taskRunValue);
 
                 KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
 
@@ -402,17 +402,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             Optional<KVValue> kvValue = kvStore.getValue(kvKey);
 
             if (kvValue.isPresent() && kvValue.get().value() != null) {
-                Object value = kvValue.get().value();
-                byte[] stateData;
-
-                if (value instanceof byte[]) {
-                    stateData = (byte[]) value;
-                } else if (value instanceof String) {
-                    stateData = ((String) value).getBytes();
-                } else {
-                    throw new IOException("Unexpected value type in KV store: " + value.getClass());
-                }
-
+                byte[] stateData = (byte[]) kvValue.get().value();
                 FileUtils.copyInputStreamToFile(
                     new ByteArrayInputStream(stateData),
                     path.toFile()

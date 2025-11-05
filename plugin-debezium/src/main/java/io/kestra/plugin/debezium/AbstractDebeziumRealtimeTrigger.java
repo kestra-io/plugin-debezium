@@ -181,22 +181,13 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
             String stateName = runContext.render(task.stateName).as(String.class).orElseThrow();
 
-            String kvKey = computeKvStoreKey(runContext,taskRunValue, stateName, filename);
+            String kvKey = computeKvStoreKey(runContext, stateName, filename, taskRunValue);
 
             KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
             Optional<KVValue> kvValue = kvStore.getValue(kvKey);
 
             if (kvValue.isPresent() && kvValue.get().value() != null) {
-                Object value = kvValue.get().value();
-                byte[] stateData;
-
-                if (value instanceof byte[]) {
-                    stateData = (byte[]) value;
-                } else if (value instanceof String) {
-                    stateData = ((String) value).getBytes();
-                } else {
-                    throw new IOException("Unexpected value type in KV store: " + value.getClass());
-                }
+                byte[] stateData = (byte[]) kvValue.get().value();
                 Files.write(targetFile, stateData);
             }
 
@@ -249,12 +240,12 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     static String computeKvStoreKey(RunContext runContext, String stateName, String filename, String taskRunValue) throws IllegalVariableEvaluationException{
 
         String separator = "_";
-        boolean flowScoped = true;
-        boolean hashTaskRunValue = true;
+        boolean hashTaskRunValue = taskRunValue != null;
 
         String flowId = runContext.flowInfo().id();
 
-        String flowIdPrefix = (!flowScoped || flowId == null) ? "" : (Slugify.of(flowId) + separator);
+        // KV is always flow-scoped as it's bound to a single task, not shared by multiple tasks inside a namespace
+        String flowIdPrefix = (flowId == null) ? "" : (Slugify.of(flowId) + separator);
         String prefix = flowIdPrefix + "states" + separator + stateName;
 
         if (taskRunValue != null) {
