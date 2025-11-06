@@ -20,6 +20,7 @@ import reactor.core.publisher.Flux;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -224,12 +225,13 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                     }
                 });
 
-            if (wait) {
-                try {
-                    shutdownThread.join();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+            try {
+                shutdownThread.join(Duration.ofMinutes(1));
+                if (shutdownThread.isAlive()) {
+                    shutdownThread.interrupt();
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         });
     }

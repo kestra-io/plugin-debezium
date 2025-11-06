@@ -19,6 +19,7 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
@@ -192,7 +193,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 // if we are still snapshotting, allow waiting for more time until snapshot wait duration is reached
             } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(runContext.render(this.maxSnapshotDuration).as(Duration.class).orElseThrow())));
 
-            engineThread.join();
+            this.shutdown(runContext.logger(), engineThread);
         }
 
 
@@ -385,6 +386,21 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             throw new RuntimeException(e);
         }
     }
+
+    private void shutdown(Logger logger, Thread thread) {
+        try {
+            while (thread.isAlive()) {
+                thread.join(Duration.ofSeconds(5));
+                if (thread.isAlive()) {
+                    logger.trace("Waiting another 5 seconds for the embedded engine to shut down");
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+
 
     @Builder
     @Getter
