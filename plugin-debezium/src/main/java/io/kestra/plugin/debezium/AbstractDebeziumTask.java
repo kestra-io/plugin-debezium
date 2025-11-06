@@ -402,7 +402,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             Thread.currentThread().interrupt();
         }
     }
-    
+
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
