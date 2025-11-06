@@ -225,13 +225,15 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                     }
                 });
 
-            try {
-                shutdownThread.join(Duration.ofMinutes(1));
-                if (shutdownThread.isAlive()) {
-                    shutdownThread.interrupt();
+            if (wait) {
+                try {
+                    shutdownThread.join(Duration.ofMinutes(1));
+                    if (shutdownThread.isAlive()) {
+                        shutdownThread.interrupt();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
             }
         });
     }

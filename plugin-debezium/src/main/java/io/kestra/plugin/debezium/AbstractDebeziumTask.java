@@ -159,6 +159,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         CompletionCallback completionCallback = new CompletionCallback(runContext);
         ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord);
 
+        Thread engineThread = null;
         // start
         try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
             .using(this.getClass().getClassLoader())
@@ -167,7 +168,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             .using(completionCallback)
             .build()
         ) {
-            Thread engineThread = Thread.ofVirtual()
+            engineThread = Thread.ofVirtual()
                 .name("debezium-engine-" + this.getClass().getSimpleName())
                 .start(() -> {
                     try {
@@ -192,10 +193,11 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 consumes = count.get() > previousCount;
                 // if we are still snapshotting, allow waiting for more time until snapshot wait duration is reached
             } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(runContext.render(this.maxSnapshotDuration).as(Duration.class).orElseThrow())));
-
-            this.shutdown(runContext.logger(), engineThread);
+        } finally {
+            if (engineThread != null) {
+                this.shutdown(runContext.logger(), engineThread);
+            }
         }
-
 
         if (completionCallback.getError() != null) {
             throw new Exception(completionCallback.getError());
@@ -393,6 +395,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 thread.join(Duration.ofSeconds(5));
                 if (thread.isAlive()) {
                     logger.trace("Waiting another 5 seconds for the embedded engine to shut down");
+                    thread.interrupt();
                 }
             }
         } catch (InterruptedException e) {
