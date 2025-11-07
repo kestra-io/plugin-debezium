@@ -13,6 +13,9 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.storages.StorageContext;
+import io.kestra.core.storages.kv.KVStore;
+import io.kestra.core.storages.kv.KVValue;
+import io.kestra.core.storages.kv.KVValueAndMetadata;
 import io.kestra.core.utils.Await;
 import io.kestra.core.utils.ExecutorsUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -37,6 +40,7 @@ import java.util.stream.Collectors;
 
 import io.kestra.core.runners.DefaultRunContext;
 import static io.kestra.core.utils.Rethrow.throwFunction;
+import static io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger.computeKvStoreKey;
 
 @SuperBuilder
 @ToString
@@ -205,23 +209,32 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         // outputs state
         if (offsetFile.toFile().exists()) {
             try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
-                outputBuilder.stateOffsetKey(runContext.stateStore().putState(
-                    runContext.render(this.stateName).as(String.class).orElseThrow(),
-                    offsetFile.getFileName().toFile().toString(),
-                    runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
-                    fis.readAllBytes()
-                ));
+                String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
+                String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
+                String fileName = offsetFile.getFileName().toString();
+                String kvKey = computeKvStoreKey(runContext, stateName, fileName, taskRunValue);
+
+                KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+
+                kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
+
+                outputBuilder.stateOffsetKey(kvKey);
+
             }
         }
 
         if (this.needDatabaseHistory()) {
             try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
-                outputBuilder.stateHistoryKey(runContext.stateStore().putState(
-                    runContext.render(this.stateName).as(String.class).orElseThrow(),
-                    historyFile.getFileName().toFile().toString(),
-                    runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
-                    fis.readAllBytes()
-                ));
+                String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
+                String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
+                String fileName = historyFile.getFileName().toString();
+                String kvKey = computeKvStoreKey(runContext, stateName, fileName, taskRunValue);
+
+                KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+
+                kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
+
+                outputBuilder.stateHistoryKey(kvKey);
             }
         }
 
@@ -377,12 +390,24 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     protected void restoreState(RunContext runContext, Path path) throws IOException {
         try {
-            InputStream taskStateFile = runContext.stateStore().getState(
-                runContext.render(this.stateName).as(String.class).orElseThrow(),
-                path.getFileName().toString(),
-                runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null)
-            );
-            FileUtils.copyInputStreamToFile(taskStateFile, path.toFile());
+            String taskRunValue = runContext.storage().getTaskStorageContext()
+                .map(StorageContext.Task::getTaskRunValue)
+                .orElse(null);
+            String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
+            String filename = path.getFileName().toString();
+
+            String kvKey = computeKvStoreKey(runContext, stateName, filename, taskRunValue);
+
+            KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+            Optional<KVValue> kvValue = kvStore.getValue(kvKey);
+
+            if (kvValue.isPresent() && kvValue.get().value() != null) {
+                byte[] stateData = (byte[]) kvValue.get().value();
+                FileUtils.copyInputStreamToFile(
+                    new ByteArrayInputStream(stateData),
+                    path.toFile()
+                );
+            };
         } catch (FileNotFoundException | ResourceExpiredException ignored) {
 
         } catch (IllegalVariableEvaluationException e) {
