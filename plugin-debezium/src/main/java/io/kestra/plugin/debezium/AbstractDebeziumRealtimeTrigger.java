@@ -4,12 +4,19 @@ import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.exceptions.ResourceExpiredException;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.models.triggers.RealtimeTriggerInterface;
 import io.kestra.core.models.triggers.TriggerOutput;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.storages.StorageContext;
+import io.kestra.core.storages.kv.KVStore;
+import io.kestra.core.storages.kv.KVValue;
+import io.kestra.core.storages.kv.KVValueAndMetadata;
+import io.kestra.core.utils.Hashing;
+import io.kestra.core.utils.Slugify;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -19,6 +26,7 @@ import reactor.core.publisher.Flux;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -112,12 +120,12 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                 try {
                     // restore state
                     Path offsetFile = runContext.workingDir().path().resolve("offsets.dat");
-                    task.restoreState(runContext, offsetFile);
+                    restoreStateFromKv(runContext, task, offsetFile, "offsets.dat");
 
                     // database history
                     Path historyFile = runContext.workingDir().path().resolve("dbhistory.dat");
                     if (task.needDatabaseHistory()) {
-                        task.restoreState(runContext, historyFile);
+                        restoreStateFromKv(runContext, task, historyFile, "dbhistory.dat");
                     }
 
                     // props
@@ -165,15 +173,45 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
             });
     }
 
+    private static void restoreStateFromKv(RunContext runContext, AbstractDebeziumTask task, Path targetFile, String filename) throws IOException{
+        try {
+            String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
+
+            String stateName = runContext.render(task.stateName).as(String.class).orElseThrow();
+
+            String kvKey = computeKvStoreKey(runContext, stateName, filename, taskRunValue);
+
+            KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+            Optional<KVValue> kvValue = kvStore.getValue(kvKey);
+
+            if (kvValue.isPresent() && kvValue.get().value() != null) {
+                byte[] stateData = (byte[]) kvValue.get().value();
+                Files.write(targetFile, stateData);
+            }
+
+        } catch (IllegalVariableEvaluationException | ResourceExpiredException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
     private static void saveOffsets(AbstractDebeziumTask task, RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
+        String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
+
+        KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+
         if (offsetFile.toFile().exists()) {
             try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
-                runContext.stateStore().putState(
-                    runContext.render(task.stateName).as(String.class).orElseThrow(),
-                    offsetFile.getFileName().toFile().toString(),
-                    runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
-                    fis.readAllBytes()
-                );
+               String stateName = runContext.render(task.stateName).as(String.class).orElseThrow();
+
+               String kvKey = computeKvStoreKey(
+                   runContext,
+                   stateName,
+                   offsetFile.getFileName().toString(),
+                   taskRunValue
+               );
+
+               kvStore.put(kvKey,new KVValueAndMetadata(null, fis.readAllBytes()));
             } catch (IllegalVariableEvaluationException e) {
                 throw new RuntimeException(e);
             }
@@ -181,16 +219,40 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
         if (task.needDatabaseHistory() && historyFile.toFile().exists()) {
             try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
-                runContext.stateStore().putState(
-                    runContext.render(task.stateName).as(String.class).orElseThrow(),
-                    historyFile.getFileName().toFile().toString(),
-                    runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null),
-                    fis.readAllBytes()
+                String stateName = runContext.render(task.stateName).as(String.class).orElseThrow();
+
+                String kvKey = computeKvStoreKey(
+                    runContext,
+                    stateName,
+                    historyFile.getFileName().toString(),
+                    taskRunValue
                 );
+
+                kvStore.put(kvKey,new KVValueAndMetadata(null, fis.readAllBytes()));;
             } catch (IllegalVariableEvaluationException e) {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    static String computeKvStoreKey(RunContext runContext, String stateName, String filename, String taskRunValue) throws IllegalVariableEvaluationException{
+
+        String separator = "_";
+        boolean hashTaskRunValue = taskRunValue != null;
+
+        String flowId = runContext.flowInfo().id();
+
+        // KV is always flow-scoped as it's bound to a single task, not shared by multiple tasks inside a namespace
+        String flowIdPrefix = (flowId == null) ? "" : (Slugify.of(flowId) + separator);
+        String prefix = flowIdPrefix + "states" + separator + stateName;
+
+        if (taskRunValue != null) {
+            String taskRunSuffix = hashTaskRunValue ? Hashing.hashToString(taskRunValue) : taskRunValue;
+            prefix = prefix + separator + taskRunSuffix;
+        }
+
+        // Append filename
+        return prefix + separator + filename;
     }
 
     /**
