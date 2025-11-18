@@ -90,6 +90,7 @@ public class Trigger extends AbstractDebeziumTrigger implements MysqlInterface, 
             .maxDuration(this.maxDuration)
             .maxWait(this.maxWait)
             .maxSnapshotDuration(this.maxSnapshotDuration)
+            .offsetsCommitMode(this.offsetsCommitMode)
             .snapshotMode(this.snapshotMode)
             .serverId(this.serverId)
             .build();

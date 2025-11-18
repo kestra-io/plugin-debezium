@@ -36,18 +36,23 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
     @SuppressWarnings("unused")
     private ZonedDateTime lastRecord;
 
+    private final Path offsetFile;
+    private final Path historyFile;
+
     @Getter
     private final Map<String, Pair<File, OutputStream>> records = new HashMap<>();
 
     @Getter
     private final Map<String, AtomicInteger> recordsCount =  new ConcurrentHashMap<>();
 
-    public ChangeConsumer(AbstractDebeziumTask abstractDebeziumTask, RunContext runContext, AtomicInteger count, AtomicBoolean snapshot, ZonedDateTime lastRecord) {
+    public ChangeConsumer(AbstractDebeziumTask abstractDebeziumTask, RunContext runContext, AtomicInteger count, AtomicBoolean snapshot, ZonedDateTime lastRecord, Path offsetFile, Path historyFile) {
         this.abstractDebeziumTask = abstractDebeziumTask;
         this.runContext = runContext;
         this.count = count;
         this.snapshot = snapshot;
         this.lastRecord = lastRecord;
+        this.offsetFile = offsetFile;
+        this.historyFile = historyFile;
     }
 
     @SneakyThrows
@@ -75,6 +80,12 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         }
 
         committer.markBatchFinished();
+
+        // Save offsets after batch if configured
+        var offsetMode = runContext.render(abstractDebeziumTask.getOffsetsCommitMode()).as(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.class).orElseThrow();
+        if (AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_EACH_BATCH.equals(offsetMode)) {
+            abstractDebeziumTask.saveOffsetsForTask(runContext, offsetFile, historyFile);
+        }
     }
 
     public void handleBatch(
@@ -100,6 +111,12 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
             }
 
             committer.markBatchFinished();
+
+            // Save offsets after batch if configured
+            var offsetMode = runContext.render(abstractDebeziumTask.getOffsetsCommitMode()).as(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.class).orElseThrow();
+            if (AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_EACH_BATCH.equals(offsetMode)) {
+                abstractDebeziumTask.saveOffsetsForTask(runContext, offsetFile, historyFile);
+            }
         } catch (Exception exception) {
             sink.error(exception);
         }

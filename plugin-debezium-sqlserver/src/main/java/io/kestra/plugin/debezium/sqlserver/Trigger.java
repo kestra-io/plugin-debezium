@@ -99,6 +99,7 @@ public class Trigger extends AbstractDebeziumTrigger implements SqlServerInterfa
             .maxDuration(this.maxDuration)
             .maxWait(this.maxWait)
             .maxSnapshotDuration(this.maxSnapshotDuration)
+            .offsetsCommitMode(this.offsetsCommitMode)
             .snapshotMode(this.snapshotMode)
             .database(this.database)
             .build();
