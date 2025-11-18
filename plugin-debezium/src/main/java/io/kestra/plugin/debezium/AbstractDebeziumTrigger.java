@@ -1,6 +1,5 @@
 package io.kestra.plugin.debezium;
 
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.models.triggers.PollingTriggerInterface;
@@ -11,6 +10,8 @@ import lombok.experimental.SuperBuilder;
 
 import java.time.Duration;
 import java.util.Map;
+
+import static io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger.OffsetCommitMode;
 
 @SuperBuilder
 @ToString
@@ -95,4 +96,14 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
     )
     @Builder.Default
     protected Property<Duration> maxSnapshotDuration = Property.ofValue(Duration.ofHours(1));
+
+    @Schema(
+        title = "When to commit the offsets to the KV Store.",
+        description = """
+            - `ON_EACH_BATCH`: after each batch of records consumed by this trigger, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
+            - `ON_STOP`: when this trigger is stopped or killed, the offsets will be stored in the KV Store. This avoids any un-necessary writes to the KV Store, but if the trigger is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption.
+            """
+    )
+    @Builder.Default
+    protected Property<OffsetCommitMode> offsetsCommitMode = Property.ofValue(OffsetCommitMode.ON_STOP);
 }

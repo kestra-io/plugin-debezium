@@ -5,7 +5,6 @@ import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.exceptions.ResourceExpiredException;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.models.triggers.RealtimeTriggerInterface;
@@ -28,7 +27,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -47,6 +45,11 @@ import java.util.concurrent.atomic.AtomicReference;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger implements RealtimeTriggerInterface, TriggerOutput<AbstractDebeziumRealtimeTrigger.StreamOutput> {
+
+    private static final String OFFSETS_DATA_FILE = "offsets.dat";
+
+    private static final String DBHISTORY_DATA_FILE = "dbhistory.dat";
+
     @Builder.Default
     protected Property<AbstractDebeziumTask.Format> format = Property.ofValue(AbstractDebeziumTask.Format.INLINE);
 
@@ -97,14 +100,14 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     protected Property<String> stateName = Property.ofValue("debezium-state");
 
     @Schema(
-        title = "How to commit the offsets to the KV Store.",
+        title = "When to commit the offsets to the KV Store.",
         description = """
-            Possible values are:
-            - ON_EACH_BATCH: after each batch of records consumed by this trigger, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
-            - ON_STOP: when this trigger is stopped or killed, the offsets will be stored in the KV Store. This avoid any un-necessary writes to the KV Store, but if the trigger is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption."""
+            - `ON_EACH_BATCH`: after each batch of records consumed by this trigger, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
+            - `ON_STOP`: when this trigger is stopped or killed, the offsets will be stored in the KV Store. This avoids any un-necessary writes to the KV Store, but if the trigger is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption.
+            """
     )
     @Builder.Default
-    private Property<OffsetCommitMode> offsetsCommitMode = Property.ofValue(OffsetCommitMode.ON_EACH_BATCH);
+    private Property<OffsetCommitMode> offsetsCommitMode = Property.ofValue(OffsetCommitMode.ON_STOP);
 
     @Builder.Default
     @Getter(AccessLevel.NONE)
@@ -118,65 +121,66 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     @Getter(AccessLevel.NONE)
     private final AtomicReference<DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>>> engineReference = new AtomicReference<>();
 
-    public Publisher<AbstractDebeziumRealtimeTrigger.StreamOutput> publisher(AbstractDebeziumTask task, RunContext runContext) {
+    public Publisher<AbstractDebeziumRealtimeTrigger.StreamOutput> publisher(AbstractDebeziumTask task, RunContext runContext) throws IllegalVariableEvaluationException {
+
+        var rOffsetsCommitMode = runContext.render(offsetsCommitMode).as(OffsetCommitMode.class).orElse(OffsetCommitMode.ON_STOP);
+        var offsetFile = runContext.workingDir().path().resolve(OFFSETS_DATA_FILE);
+        var historyFile = runContext.workingDir().path().resolve(DBHISTORY_DATA_FILE);
+
         return Flux.create(sink -> {
-                try {
-                    // restore state
-                    Path offsetFile = runContext.workingDir().path().resolve("offsets.dat");
-                    restoreStateFromKv(runContext, task, offsetFile, "offsets.dat");
+            try {
+                restoreStateFromKv(runContext, task, offsetFile, OFFSETS_DATA_FILE);
 
-                    // database history
-                    Path historyFile = runContext.workingDir().path().resolve("dbhistory.dat");
-                    if (task.needDatabaseHistory()) {
-                        restoreStateFromKv(runContext, task, historyFile, "dbhistory.dat");
-                    }
+                if (task.needDatabaseHistory()) {
+                    restoreStateFromKv(runContext, task, historyFile, DBHISTORY_DATA_FILE);
+                }
 
-                    // props
-                    final Properties props = task.properties(runContext, offsetFile, historyFile);
+                final Properties props = task.properties(runContext, offsetFile, historyFile);
 
-                    // callback
-                    ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), null, ZonedDateTime.now());
+                ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), null, ZonedDateTime.now(), offsetFile, historyFile);
 
-                    // start
-                    var offsetMode = runContext.render(offsetsCommitMode).as(OffsetCommitMode.class).orElseThrow();
-                    var engineBuilder = DebeziumEngine.create(Connect.class)
-                        .using(this.getClass().getClassLoader())
-                        .using(props)
-                        .notifying(
-                            (list, recordCommitter) -> {
-                                changeConsumer.handleBatch(list, recordCommitter, sink);
-                                if (OffsetCommitMode.ON_EACH_BATCH.equals(offsetMode)) {
-                                    try {
-                                        saveOffsets(task, runContext, offsetFile, historyFile);
-                                    } catch (IOException e) {
-                                        throw new RuntimeException(e);
-                                    }
+                var engineBuilder = DebeziumEngine.create(Connect.class)
+                    .using(this.getClass().getClassLoader())
+                    .using(props)
+                    .notifying(
+                        (list, recordCommitter) -> {
+                            changeConsumer.handleBatch(list, recordCommitter, sink, rOffsetsCommitMode);
+                            if (rOffsetsCommitMode == OffsetCommitMode.ON_EACH_BATCH) {
+                                try {
+                                    saveOffsets(task, runContext, offsetFile, historyFile);
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
                                 }
                             }
-                        )
-                        .using((success, message, error) -> {
-                            if (error != null) {
-                                sink.error(error);
-                            }
-                        });
+                        }
+                    )
+                    .using((success, message, error) -> {
+                        if (error != null) {
+                            sink.error(error);
+                        }
+                    });
 
-                    try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = engineBuilder.build()) {
-                        engineReference.set(engine);
-                        engine.run();
-                    }
-
-                    if (OffsetCommitMode.ON_STOP.equals(offsetMode)) {
-                        saveOffsets(task, runContext, offsetFile, historyFile);
-                    }
-                } catch (Exception e) {
-                    sink.error(e);
-                } finally {
-                    sink.complete();
+                try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = engineBuilder.build()) {
+                    engineReference.set(engine);
+                    engine.run();
                 }
-            });
+            } catch (Exception e) {
+                sink.error(e);
+            } finally {
+                if (rOffsetsCommitMode == OffsetCommitMode.ON_STOP) {
+                    try {
+                        saveOffsets(task, runContext, offsetFile, historyFile);
+                    } catch (IOException e) {
+                        sink.error(new RuntimeException(e));
+                    }
+                }
+
+                sink.complete();
+            }
+        });
     }
 
-    private static void restoreStateFromKv(RunContext runContext, AbstractDebeziumTask task, Path targetFile, String filename) throws IOException{
+    private static void restoreStateFromKv(RunContext runContext, AbstractDebeziumTask task, Path targetFile, String filename) throws IOException {
         try {
             String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
 
@@ -195,7 +199,6 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         } catch (IllegalVariableEvaluationException | ResourceExpiredException e) {
             throw new RuntimeException(e);
         }
-
     }
 
     private static void saveOffsets(AbstractDebeziumTask task, RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
@@ -205,16 +208,16 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
         if (offsetFile.toFile().exists()) {
             try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
-               String stateName = runContext.render(task.stateName).as(String.class).orElseThrow();
+                String stateName = runContext.render(task.stateName).as(String.class).orElseThrow();
 
-               String kvKey = computeKvStoreKey(
-                   runContext,
-                   stateName,
-                   offsetFile.getFileName().toString(),
-                   taskRunValue
-               );
+                String kvKey = computeKvStoreKey(
+                    runContext,
+                    stateName,
+                    offsetFile.getFileName().toString(),
+                    taskRunValue
+                );
 
-               kvStore.put(kvKey,new KVValueAndMetadata(null, fis.readAllBytes()));
+                kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
             } catch (IllegalVariableEvaluationException e) {
                 throw new RuntimeException(e);
             }
@@ -231,14 +234,15 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                     taskRunValue
                 );
 
-                kvStore.put(kvKey,new KVValueAndMetadata(null, fis.readAllBytes()));;
+                kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
+                ;
             } catch (IllegalVariableEvaluationException e) {
                 throw new RuntimeException(e);
             }
         }
     }
 
-    static String computeKvStoreKey(RunContext runContext, String stateName, String filename, String taskRunValue) throws IllegalVariableEvaluationException{
+    static String computeKvStoreKey(RunContext runContext, String stateName, String filename, String taskRunValue) throws IllegalVariableEvaluationException {
 
         String separator = "_";
         boolean hashTaskRunValue = taskRunValue != null;
@@ -311,7 +315,6 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
         @Schema(title = "Data.", description = "Data extracted.")
         private Map<String, Object> data;
-
     }
 
     public enum OffsetCommitMode {

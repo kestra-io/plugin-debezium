@@ -96,6 +96,7 @@ public class Trigger extends AbstractDebeziumTrigger implements OracleInterface,
             .maxDuration(this.maxDuration)
             .maxWait(this.maxWait)
             .maxSnapshotDuration(this.maxSnapshotDuration)
+            .offsetsCommitMode(this.offsetsCommitMode)
             .snapshotMode(this.snapshotMode)
             .build();
         AbstractDebeziumTask.Output run = task.run(runContext);

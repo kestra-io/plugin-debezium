@@ -92,6 +92,7 @@ public class Trigger extends AbstractDebeziumTrigger implements Db2Interface, Ab
             .maxDuration(this.maxDuration)
             .maxWait(this.maxWait)
             .maxSnapshotDuration(this.maxSnapshotDuration)
+            .offsetsCommitMode(this.offsetsCommitMode)
             .snapshotMode(this.snapshotMode)
             .database(this.database)
             .build();

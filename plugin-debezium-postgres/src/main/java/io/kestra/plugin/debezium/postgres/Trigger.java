@@ -113,6 +113,7 @@ public class Trigger extends AbstractDebeziumTrigger implements PostgresInterfac
             .maxDuration(this.maxDuration)
             .maxWait(this.maxWait)
             .maxSnapshotDuration(this.maxSnapshotDuration)
+            .offsetsCommitMode(this.offsetsCommitMode)
             .database(this.database)
             .pluginName(this.pluginName)
             .slotName(this.slotName)

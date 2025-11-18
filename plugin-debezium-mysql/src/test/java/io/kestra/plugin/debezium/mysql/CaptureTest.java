@@ -54,7 +54,8 @@ class CaptureTest extends AbstractDebeziumTest {
     @SuppressWarnings("unchecked")
     @Test
     void run() throws Exception {
-        // init database
+        // init database and wipe binlog state so we only consume freshly inserted rows
+        resetMaster();
         executeSqlScript("scripts/mysql.sql");
 
         Capture task = Capture.builder()
@@ -72,6 +73,10 @@ class CaptureTest extends AbstractDebeziumTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+
+        // Remove any persisted Debezium offsets/history from previous runs so we only consume the freshly seeded data.
+        cleanupState(runContext, task);
+
         AbstractDebeziumTask.Output runOutput = task.run(runContext);
 
         assertThat(runOutput.getSize(), is(5));
@@ -89,5 +94,43 @@ class CaptureTest extends AbstractDebeziumTest {
         // rerun state will prevent new records
         runOutput = task.run(runContext);
         assertThat(runOutput.getSize(), is(0));
+    }
+
+    private void resetMaster() throws Exception {
+        try (var connection = getConnection(); var statement = connection.createStatement()) {
+            statement.execute("RESET MASTER");
+        }
+    }
+
+    private static void cleanupState(RunContext runContext, Capture task) throws Exception {
+        var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+        String taskRunValue = runContext.storage().getTaskStorageContext()
+            .map(io.kestra.core.storages.StorageContext.Task::getTaskRunValue)
+            .orElse(null);
+        String stateName = runContext.render(task.getStateName()).as(String.class).orElse("debezium-state");
+
+        var offsetKey = computeKvStoreKey(runContext, stateName, "offsets.dat", taskRunValue);
+        kvStore.delete(offsetKey);
+
+        if (task.needDatabaseHistory()) {
+            var historyKey = computeKvStoreKey(runContext, stateName, "dbhistory.dat", taskRunValue);
+            kvStore.delete(historyKey);
+        }
+    }
+
+    private static String computeKvStoreKey(RunContext runContext, String stateName, String filename, String taskRunValue) throws Exception {
+        String separator = "_";
+        boolean hashTaskRunValue = taskRunValue != null;
+
+        String flowId = runContext.flowInfo().id();
+        String flowIdPrefix = (flowId == null) ? "" : (io.kestra.core.utils.Slugify.of(flowId) + separator);
+        String prefix = flowIdPrefix + "states" + separator + stateName;
+
+        if (taskRunValue != null) {
+            String taskRunSuffix = hashTaskRunValue ? io.kestra.core.utils.Hashing.hashToString(taskRunValue) : taskRunValue;
+            prefix = prefix + separator + taskRunSuffix;
+        }
+
+        return prefix + separator + filename;
     }
 }
