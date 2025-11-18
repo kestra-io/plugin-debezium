@@ -1,7 +1,6 @@
 package io.kestra.plugin.debezium;
 
 import io.debezium.engine.DebeziumEngine;
-import io.kestra.core.runners.Executor;
 import io.kestra.core.runners.RunContext;
 import lombok.Getter;
 
