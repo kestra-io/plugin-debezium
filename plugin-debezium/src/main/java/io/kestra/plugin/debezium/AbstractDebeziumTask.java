@@ -31,6 +31,9 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -159,37 +162,31 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         // props
         final Properties props = this.properties(runContext, offsetFile, historyFile);
 
+        ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
+
         // callback
-        CompletionCallback completionCallback = new CompletionCallback(runContext);
+        CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
         ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord);
 
         Thread engineThread = null;
         // start
-        try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
-            .using(this.getClass().getClassLoader())
-            .using(props)
-            .notifying(changeConsumer)
-            .using(completionCallback)
-            .build()
-        ) {
-            engineThread = Thread.ofVirtual()
-                .name("debezium-engine-" + this.getClass().getSimpleName())
-                .start(() -> {
-                    try {
-                        engine.run();
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                });
+            try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
+                .using(this.getClass().getClassLoader())
+                .using(props)
+                .notifying(changeConsumer)
+                .using(completionCallback)
+                .build()
+            ) {
+                executorService.execute(engine);
 
-            ZonedDateTime snapshotStarted = ZonedDateTime.now();
+                ZonedDateTime snapshotStarted = ZonedDateTime.now();
             boolean consumes;
             do {
                 int previousCount = count.get();
                 ZonedDateTime captureStarted = ZonedDateTime.now();
                 Await.until(() -> {
                     try {
-                        return this.ended(count, captureStarted, lastRecord, snapshot, runContext);
+                        return this.ended(executorService, count, captureStarted, lastRecord, snapshot, runContext);
                     } catch (IllegalVariableEvaluationException e) {
                         throw new RuntimeException(e);
                     }
@@ -197,15 +194,13 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 consumes = count.get() > previousCount;
                 // if we are still snapshotting, allow waiting for more time until snapshot wait duration is reached
             } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(runContext.render(this.maxSnapshotDuration).as(Duration.class).orElseThrow())));
-        } finally {
-            if (engineThread != null) {
-                this.shutdown(runContext.logger(), engineThread);
-            }
         }
 
         if (completionCallback.getError() != null) {
             throw new Exception(completionCallback.getError());
         }
+
+        this.shutdown(runContext.logger(), executorService);
 
         Output.OutputBuilder outputBuilder = Output.builder();
 
@@ -367,7 +362,11 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     }
 
     @SuppressWarnings("RedundantIfStatement")
-    private boolean ended(AtomicInteger count, ZonedDateTime start, ZonedDateTime lastRecord, AtomicBoolean snapshot, RunContext runContext) throws IllegalVariableEvaluationException {
+    private boolean ended(ExecutorService executorService, AtomicInteger count, ZonedDateTime start, ZonedDateTime lastRecord, AtomicBoolean snapshot, RunContext runContext) throws IllegalVariableEvaluationException {
+        if (executorService.isShutdown()) {
+            return true;
+        }
+
         // when snapshotting, we didn't take into account maxRecords
         var renderedMaxRecords = runContext.render(maxRecords).as(Integer.class);
         if (!snapshot.get() && renderedMaxRecords.isPresent() && count.get() >= renderedMaxRecords.get()) {
@@ -414,14 +413,11 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         }
     }
 
-    private void shutdown(Logger logger, Thread thread) {
+    private void shutdown(Logger logger, ExecutorService executorService) {
         try {
-            while (thread.isAlive()) {
-                thread.join(Duration.ofSeconds(5));
-                if (thread.isAlive()) {
-                    logger.trace("Waiting another 5 seconds for the embedded engine to shut down");
-                    thread.interrupt();
-                }
+            executorService.shutdown();
+            while (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                logger.trace("Waiting another 5 seconds for the embedded engine to shut down");
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

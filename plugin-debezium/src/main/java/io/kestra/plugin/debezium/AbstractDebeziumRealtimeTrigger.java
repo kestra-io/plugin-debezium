@@ -34,6 +34,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -277,9 +280,8 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         }
 
         Optional.ofNullable(engineReference.get()).ifPresent(engine -> {
-            Thread shutdownThread = Thread.ofVirtual()
-                .name("debezium-stop-" + this.getClass().getSimpleName())
-                .start(() -> {
+            try (ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor()) {
+                executorService.execute(() -> {
                     try {
                         engine.close();
                     } catch (IOException e) {
@@ -287,14 +289,14 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                     }
                 });
 
-            if (wait) {
-                try {
-                    shutdownThread.join(Duration.ofMinutes(1));
-                    if (shutdownThread.isAlive()) {
-                        shutdownThread.interrupt();
+                if (wait) {
+                    try {
+                        if (!executorService.awaitTermination(1, TimeUnit.MINUTES)) {
+                            executorService.shutdownNow();
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                     }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
                 }
             }
         });
