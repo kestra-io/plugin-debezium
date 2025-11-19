@@ -98,7 +98,6 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     @Schema(
         title = "How to commit the offsets to the KV Store.",
         description = """
-            Possible values are:
             - ON_EACH_BATCH: after each batch of records consumed by this trigger, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
             - ON_STOP: when this trigger is stopped or killed, the offsets will be stored in the KV Store. This avoid any un-necessary writes to the KV Store, but if the trigger is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption."""
     )
@@ -134,7 +133,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                     final Properties props = task.properties(runContext, offsetFile, historyFile);
 
                     // callback
-                    ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), null, ZonedDateTime.now());
+                    ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), null, ZonedDateTime.now(), offsetFile, historyFile);
 
                     // start
                     var offsetMode = runContext.render(offsetsCommitMode).as(OffsetCommitMode.class).orElseThrow();

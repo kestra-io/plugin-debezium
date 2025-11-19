@@ -125,6 +125,16 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     @Builder.Default
     private Property<Duration> maxSnapshotDuration = Property.ofValue(Duration.ofHours(1));
 
+    @Schema(
+        title = "How to commit the offsets to the KV Store.",
+        description = """
+            Possible values are:
+            - ON_EACH_BATCH: after each batch of records consumed by this task, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
+            - ON_STOP: when this task completes, the offsets will be stored in the KV Store. This avoid any un-necessary writes to the KV Store."""
+    )
+    @Builder.Default
+    private Property<AbstractDebeziumRealtimeTrigger.OffsetCommitMode> offsetsCommitMode = Property.ofValue(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_STOP);
+
     protected abstract boolean needDatabaseHistory();
 
     static {
@@ -169,7 +179,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         // callback
         CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
-        ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord);
+        ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, offsetFile, historyFile);
 
         // start
         try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
@@ -410,6 +420,33 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             };
         } catch (FileNotFoundException | ResourceExpiredException ignored) {
 
+        } catch (IllegalVariableEvaluationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    protected void saveOffsetsForTask(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
+        try {
+            String taskRunValue = runContext.storage().getTaskStorageContext()
+                .map(StorageContext.Task::getTaskRunValue)
+                .orElse(null);
+            String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
+
+            KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+
+            if (offsetFile.toFile().exists()) {
+                try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
+                    String kvKey = computeKvStoreKey(runContext, stateName, offsetFile.getFileName().toString(), taskRunValue);
+                    kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
+                }
+            }
+
+            if (this.needDatabaseHistory() && historyFile.toFile().exists()) {
+                try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
+                    String kvKey = computeKvStoreKey(runContext, stateName, historyFile.getFileName().toString(), taskRunValue);
+                    kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
+                }
+            }
         } catch (IllegalVariableEvaluationException e) {
             throw new RuntimeException(e);
         }
