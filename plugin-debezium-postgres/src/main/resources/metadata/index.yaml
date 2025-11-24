@@ -1,0 +1,8 @@
+group: io.kestra.plugin.debezium.postgres
+name: "debezium-postgres"
+title: "Debezium PostgreSQL"
+description: "This sub-group of plugins contains tasks for using Debezium with PostgreSQL. Debezium is an open source distributed platform for change data capture.,"
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
