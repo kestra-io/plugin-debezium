@@ -17,7 +17,6 @@ import io.kestra.core.storages.kv.KVStore;
 import io.kestra.core.storages.kv.KVValue;
 import io.kestra.core.storages.kv.KVValueAndMetadata;
 import io.kestra.core.utils.Await;
-import io.kestra.core.utils.ExecutorsUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -33,12 +32,12 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-import io.kestra.core.runners.DefaultRunContext;
 import static io.kestra.core.utils.Rethrow.throwFunction;
 import static io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger.computeKvStoreKey;
 
@@ -146,10 +145,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     @Override
     public AbstractDebeziumTask.Output run(RunContext runContext) throws Exception {
-        ExecutorService executorService = ((DefaultRunContext)runContext).getApplicationContext()
-            .getBean(ExecutorsUtils.class)
-            .singleThreadExecutor(this.getClass().getSimpleName());
-
         AtomicInteger count = new AtomicInteger();
         AtomicBoolean snapshot = new AtomicBoolean(false);
         ZonedDateTime lastRecord = ZonedDateTime.now();
@@ -167,21 +162,24 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         // props
         final Properties props = this.properties(runContext, offsetFile, historyFile);
 
+        ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
+
         // callback
         CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
         ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord);
 
+        Thread engineThread = null;
         // start
-        try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
-            .using(this.getClass().getClassLoader())
-            .using(props)
-            .notifying(changeConsumer)
-            .using(completionCallback)
-            .build()
-        ) {
-            executorService.execute(engine);
+            try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
+                .using(this.getClass().getClassLoader())
+                .using(props)
+                .notifying(changeConsumer)
+                .using(completionCallback)
+                .build()
+            ) {
+                executorService.execute(engine);
 
-            ZonedDateTime snapshotStarted = ZonedDateTime.now();
+                ZonedDateTime snapshotStarted = ZonedDateTime.now();
             boolean consumes;
             do {
                 int previousCount = count.get();
@@ -198,11 +196,11 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(runContext.render(this.maxSnapshotDuration).as(Duration.class).orElseThrow())));
         }
 
-        this.shutdown(runContext.logger(), executorService);
-
         if (completionCallback.getError() != null) {
             throw new Exception(completionCallback.getError());
         }
+
+        this.shutdown(runContext.logger(), executorService);
 
         Output.OutputBuilder outputBuilder = Output.builder();
 

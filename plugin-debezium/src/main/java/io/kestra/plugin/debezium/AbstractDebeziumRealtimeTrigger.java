@@ -28,6 +28,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -279,7 +280,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         }
 
         Optional.ofNullable(engineReference.get()).ifPresent(engine -> {
-            try(ExecutorService executorService = Executors.newSingleThreadExecutor()) {
+            try (ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor()) {
                 executorService.execute(() -> {
                     try {
                         engine.close();
@@ -287,7 +288,6 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                         throw new RuntimeException(e);
                     }
                 });
-                executorService.shutdown();
 
                 if (wait) {
                     try {
