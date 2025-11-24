@@ -1,7 +1,7 @@
 group: io.kestra.plugin.debezium.sqlserver
 name: "debezium-sqlserver"
 title: "Debezium Microsoft SQL Server"
-description: "This sub-group of plugins contains tasks for using Debezium with SQL Server. Debezium is an open source distributed platform for change data capture.,"
+description: "This sub-group of plugins contains tasks for using Debezium with SQL Server. Debezium is an open source distributed platform for change data capture."
 body: ""
 videos: []
 createdBy: "Kestra Core Team"
