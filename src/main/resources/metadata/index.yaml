@@ -1,0 +1,8 @@
+group: io.kestra.plugin.debezium
+name: "debezium"
+title: ""
+description: ""
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
