@@ -1,8 +1,8 @@
 group: io.kestra.plugin.debezium.mysql
 name: "debezium-mysql"
 title: "Debezium MySQL"
-description: "This sub-group of plugins contains tasks for using Debezium with MySQL. Debezium is an open source distributed platform for change data capture."
-body: ""
+description: "Tasks that ingest MySQL change data capture streams in Kestra using Debezium."
+body: "Capture, Trigger, and RealtimeTrigger rely on the Debezium MySQL connector to write CDC records to Kestra storage and start flows. Configure hostname/port, credentials, a unique `serverId`, snapshotMode, and any include/exclude filters; use Trigger to batch events with maxRecords/duration controls or RealtimeTrigger for one execution per row."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

@@ -1,8 +1,8 @@
 group: io.kestra.plugin.debezium.mongodb
 name: "debezium-mongodb"
 title: "Debezium MongoDB"
-description: "This sub-group of plugins contains tasks for using Debezium with MongoDB. Debezium is an open source distributed platform for change data capture."
-body: ""
+description: "Tasks that stream MongoDB change events into Kestra through Debezium connectors."
+body: "Includes Capture plus batch and real-time triggers to ingest MongoDB change data into Kestra flows. Provide a replica set or sharded `connectionString` with credentials, choose snapshotMode, and optionally include or exclude collections; use Trigger to poll in batches or RealtimeTrigger to fire one execution per change."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

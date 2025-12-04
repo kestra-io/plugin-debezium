@@ -1,8 +1,8 @@
 group: io.kestra.plugin.debezium.oracle
 name: "debezium-oracle"
 title: "Debezium Oracle"
-description: "This sub-group of plugins contains tasks for using Debezium with Oracle. Debezium is an open source distributed platform for change data capture."
-body: ""
+description: "Tasks that capture Oracle database change events through Debezium for Kestra flows."
+body: "Capture, Trigger, and RealtimeTrigger run the Debezium Oracle connector to stream redo log changes into Kestra. Supply hostname/port, credentials, the database `sid` (and optional `pluggableDatabase` for CDB setups), pick snapshotMode, and apply include/exclude filters; use Trigger to batch records by maxRecords/durations or RealtimeTrigger for per-row executions."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

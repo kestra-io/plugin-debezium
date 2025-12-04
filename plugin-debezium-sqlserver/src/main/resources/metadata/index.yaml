@@ -1,8 +1,8 @@
 group: io.kestra.plugin.debezium.sqlserver
 name: "debezium-sqlserver"
 title: "Debezium Microsoft SQL Server"
-description: "This sub-group of plugins contains tasks for using Debezium with SQL Server. Debezium is an open source distributed platform for change data capture."
-body: ""
+description: "Tasks that stream Microsoft SQL Server change data capture events into Kestra with Debezium."
+body: "Capture plus batch and real-time triggers use the Debezium SQL Server connector to feed CDC rows into Kestra. Provide hostname/port, credentials, target `database`, snapshotMode, and include/exclude filters; Trigger batches results with maxRecords/duration controls, while RealtimeTrigger fires one execution per change."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

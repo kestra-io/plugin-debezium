@@ -1,8 +1,8 @@
 group: io.kestra.plugin.debezium.db2
 name: "debezium-db2"
 title: "Debezium DB2"
-description: "This sub-group of plugins contains tasks for using Debezium with DB2. Debezium is an open source distributed platform for change data capture."
-body: ""
+description: "Tasks that ingest IBM Db2 change data through Debezium connectors in Kestra."
+body: "Includes Capture plus batch and real-time triggers that stream Db2 CDC events into Kestra via Debezium. Configure hostname/port, credentials, target `database`, snapshotMode, and include/exclude filters; Trigger polls and batches records up to maxRecords/duration settings while RealtimeTrigger emits an execution per change."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
