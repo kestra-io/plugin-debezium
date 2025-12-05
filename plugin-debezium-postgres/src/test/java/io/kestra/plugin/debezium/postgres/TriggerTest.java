@@ -1,21 +1,23 @@
 package io.kestra.plugin.debezium.postgres;
 
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.queues.QueueFactoryInterface;
 import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.LocalFlowRepositoryLoader;
 import io.kestra.core.runners.FlowListeners;
 import io.kestra.core.runners.Worker;
-import io.kestra.scheduler.AbstractScheduler;
+import io.kestra.core.services.KVStoreService;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.jdbc.runner.JdbcScheduler;
-import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
+import io.kestra.scheduler.AbstractScheduler;
 import io.kestra.worker.DefaultWorker;
 import io.micronaut.context.ApplicationContext;
-import io.kestra.core.junit.annotations.KestraTest;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
@@ -42,6 +44,9 @@ class TriggerTest extends AbstractDebeziumTest {
     @Inject
     protected LocalFlowRepositoryLoader repositoryLoader;
 
+    @Inject
+    private KVStoreService kvStoreService;
+
     @Override
     protected String getUrl() {
         return "jdbc:postgresql://127.0.0.1:65432/";
@@ -57,11 +62,15 @@ class TriggerTest extends AbstractDebeziumTest {
         return TestUtils.password();
     }
 
+    @BeforeEach
+    void cleanup() throws Exception {
+        PostgresDebeziumTestHelper.dropReplicationArtifacts(this::getConnection, "kestra", "kestra_publication");
+        PostgresDebeziumTestHelper.cleanupFlowState(kvStoreService, "io.kestra.tests", "trigger", "debezium-state");
+        executeSqlScript("scripts/postgres.sql");
+    }
+
     @Test
     void flow() throws Exception {
-        // init database
-        executeSqlScript("scripts/postgres.sql");
-
         // mock flow listeners
         CountDownLatch queueCount = new CountDownLatch(1);
 
