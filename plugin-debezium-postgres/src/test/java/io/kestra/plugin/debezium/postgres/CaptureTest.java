@@ -8,9 +8,10 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
-import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.plugin.debezium.postgres.PostgresDebeziumTestHelper;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
@@ -74,6 +75,13 @@ class CaptureTest extends AbstractDebeziumTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+        PostgresDebeziumTestHelper.dropReplicationArtifacts(
+            this::getConnection,
+            runContext.render(task.getSlotName()).as(String.class).orElse("kestra"),
+            runContext.render(task.getPublicationName()).as(String.class).orElse("kestra_publication")
+        );
+        PostgresDebeziumTestHelper.cleanupTaskState(runContext, task);
+
         AbstractDebeziumTask.Output runOutput = task.run(runContext);
 
         assertThat(runOutput.getSize(), is(5));

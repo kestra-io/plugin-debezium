@@ -8,6 +8,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.*;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
+import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -72,6 +73,7 @@ import java.util.Optional;
     }
 )
 public class Trigger extends AbstractTrigger implements PollingTriggerInterface, TriggerOutput<AbstractDebeziumTask.Output>, MongodbInterface, AbstractDebeziumInterface {
+
     @Builder.Default
     private final Duration interval = Duration.ofSeconds(60);
 
@@ -143,6 +145,16 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @Builder.Default
     private Property<MongodbInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
+    @Schema(
+        title = "When to commit the offsets to the KV Store.",
+        description = """
+            - `ON_EACH_BATCH`: after each batch of records consumed by this trigger, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
+            - `ON_STOP`: when this trigger is stopped or killed, the offsets will be stored in the KV Store. This avoids any un-necessary writes to the KV Store, but if the trigger is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption.
+            """
+    )
+    @Builder.Default
+    protected Property<AbstractDebeziumRealtimeTrigger.OffsetCommitMode> offsetsCommitMode = Property.ofValue(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_STOP);
+
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         RunContext runContext = conditionContext.getRunContext();
@@ -170,6 +182,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             .maxRecords(this.maxRecords)
             .maxDuration(this.maxDuration)
             .maxWait(this.maxWait)
+            .offsetsCommitMode(this.offsetsCommitMode)
             .snapshotMode(this.snapshotMode)
             .connectionString(this.connectionString)
             .build();

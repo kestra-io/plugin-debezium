@@ -36,23 +36,32 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
     @SuppressWarnings("unused")
     private ZonedDateTime lastRecord;
 
+    private final Path offsetFile;
+    private final Path historyFile;
+
     @Getter
     private final Map<String, Pair<File, OutputStream>> records = new HashMap<>();
 
     @Getter
-    private final Map<String, AtomicInteger> recordsCount =  new ConcurrentHashMap<>();
+    private final Map<String, AtomicInteger> recordsCount = new ConcurrentHashMap<>();
 
-    public ChangeConsumer(AbstractDebeziumTask abstractDebeziumTask, RunContext runContext, AtomicInteger count, AtomicBoolean snapshot, ZonedDateTime lastRecord) {
+    public ChangeConsumer(AbstractDebeziumTask abstractDebeziumTask, RunContext runContext, AtomicInteger count, AtomicBoolean snapshot, ZonedDateTime lastRecord, Path offsetFile, Path historyFile) {
         this.abstractDebeziumTask = abstractDebeziumTask;
         this.runContext = runContext;
         this.count = count;
         this.snapshot = snapshot;
         this.lastRecord = lastRecord;
+        this.offsetFile = offsetFile;
+        this.historyFile = historyFile;
     }
 
     @SneakyThrows
     @Override
     public void handleBatch(List<ChangeEvent<SourceRecord, SourceRecord>> records, DebeziumEngine.RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> committer) {
+
+        var rOffsetsCommitMode = runContext.render(abstractDebeziumTask.getOffsetsCommitMode()).as(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.class)
+            .orElse(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_STOP);
+
         lastRecord = ZonedDateTime.now();
 
         for (ChangeEvent<SourceRecord, SourceRecord> r : records) {
@@ -75,12 +84,18 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         }
 
         committer.markBatchFinished();
+
+        // Save offsets after batch if configured
+        if (rOffsetsCommitMode == AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_EACH_BATCH) {
+            abstractDebeziumTask.saveOffsetsForTask(runContext, offsetFile, historyFile);
+        }
     }
 
     public void handleBatch(
         List<ChangeEvent<SourceRecord, SourceRecord>> records,
         DebeziumEngine.RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> committer,
-        FluxSink<AbstractDebeziumRealtimeTrigger.StreamOutput> sink
+        FluxSink<AbstractDebeziumRealtimeTrigger.StreamOutput> sink,
+        AbstractDebeziumRealtimeTrigger.OffsetCommitMode offsetCommitMode
     ) {
         lastRecord = ZonedDateTime.now();
 
@@ -100,6 +115,11 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
             }
 
             committer.markBatchFinished();
+
+            // Save offsets after batch if configured
+            if (offsetCommitMode == AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_EACH_BATCH) {
+                abstractDebeziumTask.saveOffsetsForTask(runContext, offsetFile, historyFile);
+            }
         } catch (Exception exception) {
             sink.error(exception);
         }
@@ -124,9 +144,9 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
 
     private void emit(Map<String, Object> result, Message.Source source, FluxSink<AbstractDebeziumRealtimeTrigger.StreamOutput> sink) throws IllegalVariableEvaluationException {
         String stream = switch (runContext.render(this.abstractDebeziumTask.getSplitTable()).as(AbstractDebeziumTask.SplitTable.class).orElseThrow()) {
-	        case OFF -> "data";
-	        case TABLE -> source.getDb() + "." + source.getTable();
-	        case DATABASE -> source.getDb();
+            case OFF -> "data";
+            case TABLE -> source.getDb() + "." + source.getTable();
+            case DATABASE -> source.getDb();
         };
 
         AbstractDebeziumRealtimeTrigger.StreamOutput output = AbstractDebeziumRealtimeTrigger.StreamOutput.builder()
@@ -222,7 +242,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         return result;
     }
 
-    private Map<String, Object> formatInlineWithoutAdditional(Envelope value ) {
+    private Map<String, Object> formatInlineWithoutAdditional(Envelope value) {
         Map<String, Object> result = new LinkedHashMap<>();
 
         if (value.getOperation() == io.debezium.data.Envelope.Operation.DELETE) {

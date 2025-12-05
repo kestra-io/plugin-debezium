@@ -25,7 +25,10 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -47,6 +50,11 @@ import static io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger.computeK
 @Getter
 @NoArgsConstructor
 public abstract class AbstractDebeziumTask extends Task implements RunnableTask<AbstractDebeziumTask.Output>, AbstractDebeziumInterface {
+
+    private static final String OFFSETS_DATA_FILE = "offsets.dat";
+
+    private static final String DBHISTORY_DATA_FILE = "dbhistory.dat";
+
     @Builder.Default
     protected Property<Format> format = Property.ofValue(Format.INLINE);
 
@@ -124,6 +132,17 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     @Builder.Default
     private Property<Duration> maxSnapshotDuration = Property.ofValue(Duration.ofHours(1));
 
+    @Schema(
+        title = "When to commit the offsets to the KV Store.",
+        description = """
+            Possible values are:
+            - `ON_EACH_BATCH`: after each batch of records consumed by this task, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
+            - `ON_STOP`: when this task completes, the offsets will be stored in the KV Store. This avoids any un-necessary writes to the KV Store.
+            """
+    )
+    @Builder.Default
+    private Property<AbstractDebeziumRealtimeTrigger.OffsetCommitMode> offsetsCommitMode = Property.ofValue(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_STOP);
+
     protected abstract boolean needDatabaseHistory();
 
     static {
@@ -149,37 +168,31 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         AtomicBoolean snapshot = new AtomicBoolean(false);
         ZonedDateTime lastRecord = ZonedDateTime.now();
 
-        // restore state
-        Path offsetFile = runContext.workingDir().path().resolve("offsets.dat");
+        Path offsetFile = runContext.workingDir().path().resolve(OFFSETS_DATA_FILE);
         this.restoreState(runContext, offsetFile);
 
-        // database history
-        Path historyFile = runContext.workingDir().path().resolve("dbhistory.dat");
+        Path historyFile = runContext.workingDir().path().resolve(DBHISTORY_DATA_FILE);
         if (this.needDatabaseHistory()) {
             this.restoreState(runContext, historyFile);
         }
 
-        // props
         final Properties props = this.properties(runContext, offsetFile, historyFile);
 
         ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
-        // callback
         CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
-        ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord);
+        ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, offsetFile, historyFile);
 
-        Thread engineThread = null;
-        // start
-            try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
-                .using(this.getClass().getClassLoader())
-                .using(props)
-                .notifying(changeConsumer)
-                .using(completionCallback)
-                .build()
-            ) {
-                executorService.execute(engine);
+        try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
+            .using(this.getClass().getClassLoader())
+            .using(props)
+            .notifying(changeConsumer)
+            .using(completionCallback)
+            .build()
+        ) {
+            executorService.execute(engine);
 
-                ZonedDateTime snapshotStarted = ZonedDateTime.now();
+            ZonedDateTime snapshotStarted = ZonedDateTime.now();
             boolean consumes;
             do {
                 int previousCount = count.get();
@@ -204,7 +217,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         Output.OutputBuilder outputBuilder = Output.builder();
 
-        // outputs state
         if (offsetFile.toFile().exists()) {
             try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
                 String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
@@ -217,7 +229,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
 
                 outputBuilder.stateOffsetKey(kvKey);
-
             }
         }
 
@@ -236,7 +247,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             }
         }
 
-        // records
         outputBuilder
             .uris(
                 changeConsumer
@@ -256,9 +266,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))
             );
 
-        // metrics & logs
         changeConsumer.getRecordsCount().forEach((s, atomicInteger) -> {
-            runContext.metric(Counter.of("records", atomicInteger.get(), "source" , s));
+            runContext.metric(Counter.of("records", atomicInteger.get(), "source", s));
         });
 
         runContext.logger().info(
@@ -405,9 +414,37 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                     new ByteArrayInputStream(stateData),
                     path.toFile()
                 );
-            };
+            }
+            ;
         } catch (FileNotFoundException | ResourceExpiredException ignored) {
 
+        } catch (IllegalVariableEvaluationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    protected void saveOffsetsForTask(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
+        try {
+            String taskRunValue = runContext.storage().getTaskStorageContext()
+                .map(StorageContext.Task::getTaskRunValue)
+                .orElse(null);
+            String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
+
+            KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+
+            if (offsetFile.toFile().exists()) {
+                try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
+                    String kvKey = computeKvStoreKey(runContext, stateName, offsetFile.getFileName().toString(), taskRunValue);
+                    kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
+                }
+            }
+
+            if (this.needDatabaseHistory() && historyFile.toFile().exists()) {
+                try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
+                    String kvKey = computeKvStoreKey(runContext, stateName, historyFile.getFileName().toString(), taskRunValue);
+                    kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
+                }
+            }
         } catch (IllegalVariableEvaluationException e) {
             throw new RuntimeException(e);
         }

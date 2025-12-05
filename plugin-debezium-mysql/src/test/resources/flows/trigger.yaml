@@ -1,4 +1,4 @@
-id: trigger
+id: trigger-default
 namespace: io.kestra.tests
 
 triggers:
@@ -14,6 +14,7 @@ triggers:
     maxWait: 30
     includedTables:
       - kestra.trigger_events
+    stateName: "debezium-state-default-v2"
     properties:
       offset.storage: org.apache.kafka.connect.storage.MemoryOffsetBackingStore
 
