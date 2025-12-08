@@ -1,4 +1,4 @@
-id: trigger-default
+id: trigger
 namespace: io.kestra.tests
 
 triggers:
