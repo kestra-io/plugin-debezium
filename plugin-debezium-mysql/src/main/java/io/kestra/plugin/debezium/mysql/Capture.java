@@ -75,7 +75,16 @@ public class Capture extends AbstractDebeziumTask implements MysqlInterface {
         props.setProperty("include.schema.changes", "false");
 
         if (this.snapshotMode != null) {
-            props.setProperty("snapshot.mode", runContext.render(this.snapshotMode).as(SnapshotMode.class).orElseThrow().name().toLowerCase(Locale.ROOT));
+            SnapshotMode rSnapshotMode = runContext.render(this.snapshotMode).as(SnapshotMode.class).orElseThrow();
+
+            // we map here for backward compatibility
+            if (rSnapshotMode == SnapshotMode.SCHEMA_ONLY) {
+                rSnapshotMode = SnapshotMode.NO_DATA;
+            } else if (rSnapshotMode == SnapshotMode.SCHEMA_ONLY_RECOVERY) {
+                rSnapshotMode = SnapshotMode.RECOVERY;
+            }
+
+            props.setProperty("snapshot.mode", rSnapshotMode.name().toLowerCase(Locale.ROOT));
         }
 
         return props;
