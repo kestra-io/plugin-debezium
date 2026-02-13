@@ -12,6 +12,7 @@ import io.kestra.core.utils.Slugify;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.concurrent.Callable;
 
 final class PostgresDebeziumTestHelper {
@@ -40,14 +41,14 @@ final class PostgresDebeziumTestHelper {
     }
 
     static void cleanupTaskState(RunContext runContext, AbstractDebeziumTask task) throws Exception {
-        KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
-        String taskRunValue = runContext.storage().getTaskStorageContext()
+        var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+        var taskRunValue = runContext.storage().getTaskStorageContext()
             .map(StorageContext.Task::getTaskRunValue)
             .orElse(null);
-        String stateName = runContext.render(task.getStateName()).as(String.class).orElse("debezium-state");
+        var stateName = runContext.render(task.getStateName()).as(String.class).orElse("debezium-state");
 
-        kvStore.delete(computeKvStoreKey(runContext, stateName, "offsets.dat", taskRunValue));
-        kvStore.delete(computeKvStoreKey(runContext, stateName, "dbhistory.dat", taskRunValue));
+        deleteAllVersions(kvStore, computeKvStoreKey(runContext, stateName, "offsets.dat", taskRunValue));
+        deleteAllVersions(kvStore, computeKvStoreKey(runContext, stateName, "dbhistory.dat", taskRunValue));
     }
 
     static void cleanupFlowState(KVStoreService kvStoreService, String namespace, String flowId, String... stateNames) throws Exception {
@@ -58,14 +59,15 @@ final class PostgresDebeziumTestHelper {
             return;
         }
 
-        String flowPrefix = Slugify.of(flowId) + "_states_";
+        var flowPrefix = Slugify.of(flowId) + "_states_";
+        var keysToDelete = kvStore.listAll().stream()
+            .map(KVEntry::key)
+            .distinct()
+            .filter(key -> Arrays.stream(stateNames).anyMatch(stateName -> key.startsWith(flowPrefix + stateName)))
+            .toList();
 
-        for (KVEntry kvEntry : kvStore.listAll()) {
-            for (String stateName : stateNames) {
-                if (kvEntry.key().startsWith(flowPrefix + stateName)) {
-                    kvStore.delete(kvEntry.key());
-                }
-            }
+        for (var key : keysToDelete) {
+            deleteAllVersions(kvStore, key);
         }
     }
 
@@ -83,5 +85,11 @@ final class PostgresDebeziumTestHelper {
         }
 
         return prefix + separator + filename;
+    }
+
+    private static void deleteAllVersions(KVStore kvStore, String key) throws Exception {
+        while (kvStore.delete(key)) {
+            // Delete all versions to prevent fallback to stale previous entries.
+        }
     }
 }

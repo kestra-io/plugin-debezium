@@ -9,6 +9,7 @@ triggers:
     port: 65432
     username: postgres
     password: pg_passwd
+    stateName: "debezium-state-{{ now() | date('yyyyMMddHHmmssSSS') }}"
     maxRecords: 5
     includedTables:
       - public.events

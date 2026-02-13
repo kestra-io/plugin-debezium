@@ -63,6 +63,7 @@ class CaptureTest extends AbstractDebeziumTest {
             .port(Property.ofValue("65432"))
             .database(Property.ofValue("postgres"))
             .pluginName(Property.ofValue(PostgresInterface.PluginName.PGOUTPUT))
+            .stateName(Property.ofValue("debezium-state-" + IdUtils.create()))
             // SSL is disabled or we cannot test triggers which are very important for Debezium
 //            .sslMode(TestUtils.sslMode())
 //            .sslRootCert(TestUtils.ca())
