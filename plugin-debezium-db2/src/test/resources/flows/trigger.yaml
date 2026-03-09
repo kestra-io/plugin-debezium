@@ -4,6 +4,7 @@ namespace: io.kestra.tests
 triggers:
   - id: watch
     type: io.kestra.plugin.debezium.db2.Trigger
+    stateName: "debezium-state-{{ now() | date('yyyyMMddHHmmssSSS') }}"
     snapshotMode: INITIAL
     hostname: 127.0.0.1
     port: 5023

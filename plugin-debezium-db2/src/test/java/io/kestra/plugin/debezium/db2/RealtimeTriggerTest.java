@@ -9,6 +9,7 @@ import io.kestra.core.runners.Worker;
 import io.kestra.scheduler.AbstractScheduler;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.jdbc.runner.JdbcScheduler;
+import io.kestra.core.services.KVStoreService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
 import io.kestra.worker.DefaultWorker;
@@ -16,6 +17,7 @@ import io.micronaut.context.ApplicationContext;
 import io.kestra.core.junit.annotations.KestraTest;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
@@ -44,6 +46,9 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
     @Inject
     protected LocalFlowRepositoryLoader repositoryLoader;
 
+    @Inject
+    private KVStoreService kvStoreService;
+
     @Override
     protected String getUrl() {
         return "jdbc:db2://localhost:5023/kestra";
@@ -59,10 +64,14 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
         return "password";
     }
 
+    @BeforeEach
+    void cleanup() throws Exception {
+        Db2DebeziumTestHelper.cleanupFlowState(kvStoreService, "io.kestra.tests", "trigger", "debezium-state");
+        executeSqlScript("scripts/db2.sql");
+    }
+
     @Test
     void flow() throws Exception {
-        // init database
-        executeSqlScript("scripts/db2.sql");
 
         // mock flow listeners
         CountDownLatch queueCount = new CountDownLatch(1);

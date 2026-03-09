@@ -2,6 +2,8 @@ package io.kestra.plugin.debezium.db2;
 
 import com.google.common.base.Charsets;
 import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
@@ -13,8 +15,6 @@ import io.kestra.core.junit.annotations.KestraTest;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.runners.RunContextFactory;
 
 import jakarta.inject.Inject;
 
@@ -62,6 +62,7 @@ class CaptureTest extends AbstractDebeziumTest {
             .id(IdUtils.create())
             .type(Capture.class.getName())
             .snapshotMode(Property.ofValue(Db2Interface.SnapshotMode.INITIAL))
+            .stateName(Property.ofValue("debezium-state-" + IdUtils.create()))
             .hostname(Property.ofValue("127.0.0.1"))
             .port(Property.ofValue("5023"))
             .username(Property.ofValue(getUsername()))
