@@ -17,3 +17,5 @@ plugin-debezium/src/test/resources/application-test.yml
 certs/
 plugin-debezium-postgres/src/test/resources/ssl/
 
+.factorypath
+bin/
