@@ -1,28 +1,5 @@
 package io.kestra.plugin.debezium;
 
-import io.debezium.embedded.Connect;
-import io.debezium.engine.ChangeEvent;
-import io.debezium.engine.DebeziumEngine;
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.exceptions.ResourceExpiredException;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.models.triggers.AbstractTrigger;
-import io.kestra.core.models.triggers.RealtimeTriggerInterface;
-import io.kestra.core.models.triggers.TriggerOutput;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.storages.StorageContext;
-import io.kestra.core.storages.kv.KVStore;
-import io.kestra.core.storages.kv.KVValue;
-import io.kestra.core.storages.kv.KVValueAndMetadata;
-import io.kestra.core.utils.Hashing;
-import io.kestra.core.utils.Slugify;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.*;
-import lombok.experimental.SuperBuilder;
-import org.apache.kafka.connect.source.SourceRecord;
-import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
-
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -38,6 +15,31 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+
+import org.apache.kafka.connect.source.SourceRecord;
+import org.reactivestreams.Publisher;
+
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.exceptions.ResourceExpiredException;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.triggers.AbstractTrigger;
+import io.kestra.core.models.triggers.RealtimeTriggerInterface;
+import io.kestra.core.models.triggers.TriggerOutput;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.storages.StorageContext;
+import io.kestra.core.storages.kv.KVStore;
+import io.kestra.core.storages.kv.KVValue;
+import io.kestra.core.storages.kv.KVValueAndMetadata;
+import io.kestra.core.utils.Hashing;
+import io.kestra.core.utils.Slugify;
+
+import io.debezium.embedded.Connect;
+import io.debezium.engine.ChangeEvent;
+import io.debezium.engine.DebeziumEngine;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
+import reactor.core.publisher.Flux;
 
 @SuperBuilder
 @ToString
@@ -127,7 +129,8 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         var offsetFile = runContext.workingDir().path().resolve(OFFSETS_DATA_FILE);
         var historyFile = runContext.workingDir().path().resolve(DBHISTORY_DATA_FILE);
 
-        return Flux.create(sink -> {
+        return Flux.create(sink ->
+        {
             try {
                 restoreStateFromKv(runContext, task, offsetFile, OFFSETS_DATA_FILE);
 
@@ -143,7 +146,8 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                     .using(this.getClass().getClassLoader())
                     .using(props)
                     .notifying(
-                        (list, recordCommitter) -> {
+                        (list, recordCommitter) ->
+                        {
                             changeConsumer.handleBatch(list, recordCommitter, sink, rOffsetsCommitMode);
                             if (rOffsetsCommitMode == OffsetCommitMode.ON_EACH_BATCH) {
                                 try {
@@ -154,7 +158,8 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                             }
                         }
                     )
-                    .using((success, message, error) -> {
+                    .using((success, message, error) ->
+                    {
                         if (error != null) {
                             sink.error(error);
                         }
@@ -283,9 +288,11 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
             return;
         }
 
-        Optional.ofNullable(engineReference.get()).ifPresent(engine -> {
+        Optional.ofNullable(engineReference.get()).ifPresent(engine ->
+        {
             try (ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor()) {
-                executorService.execute(() -> {
+                executorService.execute(() ->
+                {
                     try {
                         engine.close();
                     } catch (IOException e) {

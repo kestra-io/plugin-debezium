@@ -1,14 +1,14 @@
 package io.kestra.plugin.debezium.sqlserver;
 
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.runners.RunContext;
-import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.io.IOException;
 import java.util.Locale;
 import java.util.Properties;
+
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContext;
+
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
 public interface SqlServerInterface {
@@ -21,7 +21,8 @@ public interface SqlServerInterface {
     @Schema(
         title = "Specifies the criteria for running a snapshot when the connector starts.",
         description = " Possible settings are:\n" +
-            "- `INITIAL`: Takes a snapshot of structure and data of captured tables; useful if topics should be populated with a complete representation of the data from the captured tables.\n" +
+            "- `INITIAL`: Takes a snapshot of structure and data of captured tables; useful if topics should be populated with a complete representation of the data from the captured tables.\n"
+            +
             "- `INITIAL_ONLY`: Takes a snapshot of structure and data like initial but instead does not transition into streaming changes once the snapshot has completed.\n" +
             "- `SCHEMA_ONLY`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be propagated to topics.\n"
     )

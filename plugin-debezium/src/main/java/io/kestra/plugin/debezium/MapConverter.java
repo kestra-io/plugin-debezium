@@ -1,22 +1,25 @@
 package io.kestra.plugin.debezium;
 
+import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.time.*;
+import java.util.*;
+
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.kafka.connect.data.*;
+import org.apache.kafka.connect.source.SourceRecord;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.plugin.debezium.models.Envelope;
+import io.kestra.plugin.debezium.models.Message;
+
 import io.debezium.time.*;
 import io.debezium.time.Date;
 import io.debezium.time.Time;
 import io.debezium.time.Timestamp;
 import io.debezium.time.Year;
-import io.kestra.core.serializers.JacksonMapper;
-import io.kestra.plugin.debezium.models.Envelope;
-import io.kestra.plugin.debezium.models.Message;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.kafka.connect.data.*;
-import org.apache.kafka.connect.source.SourceRecord;
-
-import java.math.BigDecimal;
-import java.nio.ByteBuffer;
-import java.time.*;
-import java.util.*;
 
 public class MapConverter {
     private static final ObjectMapper MAPPER = JacksonMapper.ofJson();
@@ -126,7 +129,6 @@ public class MapConverter {
                         }
                         return OffsetTime.parse((String) value);
 
-
                     case ZonedTimestamp.SCHEMA_NAME:
                         if (!(value instanceof String)) {
                             throw new IllegalArgumentException("Invalid type for ZonedTimestamp, expected String but was " + value.getClass() + " for '" + value + "'");
@@ -213,7 +215,7 @@ public class MapConverter {
                         Schema keySchema = schema == null ? null : schema.keySchema();
                         Schema valueSchema = schema == null ? null : schema.valueSchema();
                         Object mapKey = convert(keySchema, entry.getKey());
-                        Object  mapValue = convert(valueSchema, entry.getValue());
+                        Object mapValue = convert(valueSchema, entry.getValue());
 
                         if (objectMode)
                             obj.put((String) mapKey, mapValue);

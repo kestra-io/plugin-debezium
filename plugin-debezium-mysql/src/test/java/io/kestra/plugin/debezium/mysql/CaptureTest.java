@@ -1,5 +1,14 @@
 package io.kestra.plugin.debezium.mysql;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
@@ -11,15 +20,8 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -79,7 +81,10 @@ class CaptureTest extends AbstractDebeziumTest {
         assertThat(runOutput.getSize(), is(5));
 
         List<Map<String, Object>> events = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("kestra.capture_events")))), r -> events.add((Map<String, Object>) r));
+        FileSerde.reader(
+            new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("kestra.capture_events")))),
+            r -> events.add((Map<String, Object>) r)
+        );
 
         assertThat(events.size(), is(5));
         assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Machine Head")));

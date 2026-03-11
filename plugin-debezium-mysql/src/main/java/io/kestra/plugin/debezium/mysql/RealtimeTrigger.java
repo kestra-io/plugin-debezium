@@ -1,5 +1,7 @@
 package io.kestra.plugin.debezium.mysql;
 
+import org.reactivestreams.Publisher;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.conditions.ConditionContext;
@@ -8,10 +10,10 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.*;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
 import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 @SuperBuilder

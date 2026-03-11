@@ -1,7 +1,5 @@
 package io.kestra.plugin.debezium.postgres;
 
-import com.google.common.io.CharStreams;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -9,12 +7,18 @@ import java.io.InputStreamReader;
 import java.net.URISyntaxException;
 import java.util.Objects;
 
+import com.google.common.io.CharStreams;
+
 public abstract class TestUtils {
     public static File resourceToFile(String file) {
         try {
-            return new File(Objects.requireNonNull(TestUtils.class.getClassLoader()
-                    .getResource(file))
-                .toURI());
+            return new File(
+                Objects.requireNonNull(
+                    TestUtils.class.getClassLoader()
+                        .getResource(file)
+                )
+                    .toURI()
+            );
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }

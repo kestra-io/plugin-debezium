@@ -1,23 +1,5 @@
 package io.kestra.plugin.debezium.oracle;
 
-import com.google.common.base.Charsets;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.serializers.FileSerde;
-import io.kestra.core.storages.StorageInterface;
-import io.kestra.core.tenant.TenantService;
-import io.kestra.core.utils.IdUtils;
-import io.kestra.core.utils.TestsUtils;
-import io.kestra.plugin.debezium.AbstractDebeziumTask;
-import io.kestra.plugin.debezium.AbstractDebeziumTest;
-import io.kestra.core.junit.annotations.KestraTest;
-import org.apache.commons.io.IOUtils;
-import org.h2.tools.RunScript;
-import org.junit.jupiter.api.Test;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.runners.RunContextFactory;
-
-import jakarta.inject.Inject;
-
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.InputStreamReader;
@@ -28,6 +10,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import org.apache.commons.io.IOUtils;
+import org.h2.tools.RunScript;
+import org.junit.jupiter.api.Test;
+
+import com.google.common.base.Charsets;
+
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.serializers.FileSerde;
+import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.tenant.TenantService;
+import io.kestra.core.utils.IdUtils;
+import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.debezium.AbstractDebeziumTask;
+import io.kestra.plugin.debezium.AbstractDebeziumTest;
+
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -92,7 +94,9 @@ class CaptureTest extends AbstractDebeziumTest {
         assertThat(runOutput.getSize(), is(5));
 
         List<Map<String, Object>> events = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("XE.EVENTS")))), r -> events.add((Map<String, Object>) r));
+        FileSerde.reader(
+            new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("XE.EVENTS")))), r -> events.add((Map<String, Object>) r)
+        );
 
         IOUtils.toString(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("XE.EVENTS")), Charsets.UTF_8);
         assertThat(events.size(), is(5));
@@ -101,9 +105,9 @@ class CaptureTest extends AbstractDebeziumTest {
         assertTrue(events.stream().anyMatch(map -> map.get("EVENT_TITLE").equals("Pink Floyd")));
         assertTrue(events.stream().anyMatch(map -> map.get("EVENT_TITLE").equals("TV show")));
         assertTrue(events.stream().anyMatch(map -> map.get("EVENT_TITLE").equals("Nothing")));
-//
-//        // rerun state will prevent new records
-//        runOutput = task.run(runContext);
-//        assertThat(runOutput.getSize(), is(0));
+        //
+        //        // rerun state will prevent new records
+        //        runOutput = task.run(runContext);
+        //        assertThat(runOutput.getSize(), is(0));
     }
 }

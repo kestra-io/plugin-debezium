@@ -1,16 +1,17 @@
 package io.kestra.plugin.debezium.models;
 
-import com.fasterxml.jackson.annotation.JsonAnyGetter;
-import com.fasterxml.jackson.annotation.JsonAnySetter;
-import com.fasterxml.jackson.annotation.JsonSetter;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonSetter;
+
 import jakarta.annotation.Nullable;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor
@@ -21,12 +22,12 @@ public class Message {
     Map<String, Object> properties;
 
     @JsonAnyGetter
-    public Map<String, Object> getProperties(){
+    public Map<String, Object> getProperties() {
         return properties != null ? properties : new HashMap<>();
     }
 
     @JsonAnySetter
-    public void addProperties(String property, Object value){
+    public void addProperties(String property, Object value) {
         if (properties == null) {
             properties = new HashMap<>();
         }

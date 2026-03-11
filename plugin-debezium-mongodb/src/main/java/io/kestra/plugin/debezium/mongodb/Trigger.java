@@ -1,5 +1,11 @@
 package io.kestra.plugin.debezium.mongodb;
 
+import java.time.Duration;
+import java.util.Map;
+import java.util.Optional;
+
+import org.slf4j.Logger;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.conditions.ConditionContext;
@@ -10,15 +16,11 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumInterface;
 import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.slf4j.Logger;
-
-import java.time.Duration;
-import java.util.Map;
-import java.util.Optional;
 
 @SuperBuilder
 @ToString

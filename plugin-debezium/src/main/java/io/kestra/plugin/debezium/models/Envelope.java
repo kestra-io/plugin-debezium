@@ -1,16 +1,18 @@
 package io.kestra.plugin.debezium.models;
 
+import java.time.Instant;
+import java.util.Map;
+
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+
 import io.kestra.plugin.debezium.CustomParameterDeserializer;
-import lombok.AllArgsConstructor;
-import lombok.Data;
 
 import jakarta.annotation.Nullable;
-import java.time.Instant;
-import java.util.Map;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
 @Data
 @AllArgsConstructor

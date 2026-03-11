@@ -1,9 +1,8 @@
 package io.kestra.plugin.debezium.postgres;
 
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
-import io.swagger.v3.oas.annotations.media.Schema;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
 public interface PostgresInterface {
@@ -40,7 +39,8 @@ public interface PostgresInterface {
     @Schema(
         title = "The name of the PostgreSQL logical decoding slot that was created for streaming changes from a particular plug-in for a particular database/schema.",
         description = "The server uses this slot to stream events to the Debezium connector that you are configuring.\n" +
-            "Slot names must conform to [PostgreSQL replication slot naming rules](https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION), " +
+            "Slot names must conform to [PostgreSQL replication slot naming rules](https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION), "
+            +
             "which state: \"Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character.\""
     )
     @NotNull
@@ -50,7 +50,8 @@ public interface PostgresInterface {
         title = "Whether to use an encrypted connection to the PostgreSQL server. Options include:\n" +
             "- `DISABLE` uses an unencrypted connection.\n" +
             "- `REQUIRE` uses a secure (encrypted) connection, and fails if one cannot be established.\n" +
-            "- `VERIFY_CA` behaves like require but also verifies the server TLS certificate against the configured Certificate Authority (CA) certificates, or fails if no valid matching CA certificates are found.\n" +
+            "- `VERIFY_CA` behaves like require but also verifies the server TLS certificate against the configured Certificate Authority (CA) certificates, or fails if no valid matching CA certificates are found.\n"
+            +
             "- `VERIFY_FULL` behaves like verify-ca but also verifies that the server certificate matches the host to which the connector is trying to connect.\n\n" +
             "See the [PostgreSQL documentation](https://www.postgresql.org/docs/current/static/libpq-connect.html) for more information."
     )
@@ -84,7 +85,8 @@ public interface PostgresInterface {
         description = " Possible settings are:\n" +
             "- `INITIAL`: The connector performs a snapshot only when no offsets have been recorded for the logical server name.\n" +
             "- `ALWAYS`: The connector performs a snapshot each time the connector starts.\n" +
-            "- `NEVER`: The connector never performs snapshots. When a connector is configured this way, its behavior when it starts is as follows. If there is a previously stored LSN, the connector continues streaming changes from that position. If no LSN has been stored, the connector starts streaming changes from the point in time when the PostgreSQL logical replication slot was created on the server. The never snapshot mode is useful only when you know all data of interest is still reflected in the WAL.\n" +
+            "- `NEVER`: The connector never performs snapshots. When a connector is configured this way, its behavior when it starts is as follows. If there is a previously stored LSN, the connector continues streaming changes from that position. If no LSN has been stored, the connector starts streaming changes from the point in time when the PostgreSQL logical replication slot was created on the server. The never snapshot mode is useful only when you know all data of interest is still reflected in the WAL.\n"
+            +
             "- `INITIAL_ONLY`: The connector performs an initial snapshot and then stops, without processing any subsequent changes.\n"
     )
     @NotNull

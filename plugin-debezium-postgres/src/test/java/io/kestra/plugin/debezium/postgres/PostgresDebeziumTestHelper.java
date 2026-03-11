@@ -1,5 +1,9 @@
 package io.kestra.plugin.debezium.postgres;
 
+import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.concurrent.Callable;
+
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.services.KVStoreService;
 import io.kestra.core.storages.StorageContext;
@@ -10,10 +14,6 @@ import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.Hashing;
 import io.kestra.core.utils.Slugify;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
-
-import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.concurrent.Callable;
 
 final class PostgresDebeziumTestHelper {
     private PostgresDebeziumTestHelper() {

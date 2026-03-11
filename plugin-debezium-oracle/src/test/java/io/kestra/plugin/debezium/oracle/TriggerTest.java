@@ -1,26 +1,5 @@
 package io.kestra.plugin.debezium.oracle;
 
-import io.kestra.core.models.executions.Execution;
-import io.kestra.core.queues.QueueFactoryInterface;
-import io.kestra.core.queues.QueueInterface;
-import io.kestra.core.repositories.LocalFlowRepositoryLoader;
-import io.kestra.core.runners.FlowListeners;
-import io.kestra.core.runners.Worker;
-import io.kestra.scheduler.AbstractScheduler;
-import io.kestra.core.utils.TestsUtils;
-import io.kestra.jdbc.runner.JdbcScheduler;
-import io.kestra.core.utils.IdUtils;
-import io.kestra.plugin.debezium.AbstractDebeziumTest;
-import io.kestra.worker.DefaultWorker;
-import io.micronaut.context.ApplicationContext;
-import io.kestra.core.junit.annotations.KestraTest;
-import jakarta.inject.Inject;
-import jakarta.inject.Named;
-import org.h2.tools.RunScript;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import reactor.core.publisher.Flux;
-
 import java.io.FileNotFoundException;
 import java.io.StringReader;
 import java.net.URISyntaxException;
@@ -28,6 +7,28 @@ import java.sql.SQLException;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+import org.h2.tools.RunScript;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.executions.Execution;
+import io.kestra.core.queues.QueueFactoryInterface;
+import io.kestra.core.queues.QueueInterface;
+import io.kestra.core.repositories.LocalFlowRepositoryLoader;
+import io.kestra.core.runners.FlowListeners;
+import io.kestra.core.utils.IdUtils;
+import io.kestra.core.utils.TestsUtils;
+import io.kestra.jdbc.runner.JdbcScheduler;
+import io.kestra.plugin.debezium.AbstractDebeziumTest;
+import io.kestra.scheduler.AbstractScheduler;
+import io.kestra.worker.DefaultWorker;
+
+import io.micronaut.context.ApplicationContext;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import reactor.core.publisher.Flux;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
@@ -91,7 +92,8 @@ class TriggerTest extends AbstractDebeziumTest {
             DefaultWorker worker = applicationContext.createBean(DefaultWorker.class, IdUtils.create(), 8, null);
         ) {
             // wait for execution
-            Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, execution ->
+            {
                 queueCount.countDown();
                 assertThat(execution.getLeft().getFlowId(), is("trigger"));
             });

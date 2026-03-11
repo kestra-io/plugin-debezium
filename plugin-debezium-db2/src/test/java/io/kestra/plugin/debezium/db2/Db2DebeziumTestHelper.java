@@ -1,13 +1,13 @@
 package io.kestra.plugin.debezium.db2;
 
+import java.util.Arrays;
+
 import io.kestra.core.services.KVStoreService;
 import io.kestra.core.storages.kv.KVEntry;
 import io.kestra.core.storages.kv.KVStore;
 import io.kestra.core.storages.kv.KVStoreException;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.Slugify;
-
-import java.util.Arrays;
 
 final class Db2DebeziumTestHelper {
     private Db2DebeziumTestHelper() {

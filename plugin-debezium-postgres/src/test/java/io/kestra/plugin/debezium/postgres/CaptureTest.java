@@ -1,5 +1,14 @@
 package io.kestra.plugin.debezium.postgres;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
@@ -8,18 +17,10 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
-import io.kestra.plugin.debezium.postgres.PostgresDebeziumTestHelper;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -65,11 +66,11 @@ class CaptureTest extends AbstractDebeziumTest {
             .pluginName(Property.ofValue(PostgresInterface.PluginName.PGOUTPUT))
             .stateName(Property.ofValue("debezium-state-" + IdUtils.create()))
             // SSL is disabled or we cannot test triggers which are very important for Debezium
-//            .sslMode(TestUtils.sslMode())
-//            .sslRootCert(TestUtils.ca())
-//            .sslCert(TestUtils.cert())
-//            .sslKey(TestUtils.key())
-//            .sslKeyPassword(TestUtils.keyPass())
+            //            .sslMode(TestUtils.sslMode())
+            //            .sslRootCert(TestUtils.ca())
+            //            .sslCert(TestUtils.cert())
+            //            .sslKey(TestUtils.key())
+            //            .sslKeyPassword(TestUtils.keyPass())
             .snapshotMode(Property.ofValue(Capture.SnapshotMode.INITIAL))
             .maxRecords(Property.ofValue(5))
             .includedTables(List.of("public.events"))
@@ -88,7 +89,10 @@ class CaptureTest extends AbstractDebeziumTest {
         assertThat(runOutput.getSize(), is(5));
 
         List<Map<String, Object>> events = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("postgres.events")))), r -> events.add((Map<String, Object>) r));
+        FileSerde.reader(
+            new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("postgres.events")))),
+            r -> events.add((Map<String, Object>) r)
+        );
 
         assertThat(events.size(), is(5));
         assertTrue(events.stream().anyMatch(map -> map.get("event_title").equals("Machine Head")));

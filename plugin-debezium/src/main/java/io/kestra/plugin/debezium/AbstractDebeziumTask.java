@@ -1,30 +1,5 @@
 package io.kestra.plugin.debezium;
 
-import ch.qos.logback.classic.LoggerContext;
-import io.debezium.embedded.Connect;
-import io.debezium.engine.ChangeEvent;
-import io.debezium.engine.DebeziumEngine;
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.exceptions.ResourceExpiredException;
-import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.executions.metrics.Counter;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.Task;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.storages.StorageContext;
-import io.kestra.core.storages.kv.KVStore;
-import io.kestra.core.storages.kv.KVValue;
-import io.kestra.core.storages.kv.KVValueAndMetadata;
-import io.kestra.core.utils.Await;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.*;
-import lombok.experimental.SuperBuilder;
-import org.apache.commons.io.FileUtils;
-import org.apache.kafka.connect.source.SourceRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -40,6 +15,33 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.exceptions.ResourceExpiredException;
+import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.models.tasks.Task;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.storages.StorageContext;
+import io.kestra.core.storages.kv.KVStore;
+import io.kestra.core.storages.kv.KVValue;
+import io.kestra.core.storages.kv.KVValueAndMetadata;
+import io.kestra.core.utils.Await;
+
+import ch.qos.logback.classic.LoggerContext;
+import io.debezium.embedded.Connect;
+import io.debezium.engine.ChangeEvent;
+import io.debezium.engine.DebeziumEngine;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import static io.kestra.core.utils.Rethrow.throwFunction;
 import static io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger.computeKvStoreKey;
@@ -154,8 +156,9 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         ((LoggerContext) org.slf4j.LoggerFactory.getILoggerFactory())
             .getLoggerList()
             .stream()
-            .filter(logger -> logger.getName().startsWith("org.apache.kafka.connect") ||
-                logger.getName().startsWith("io.debezium")
+            .filter(
+                logger -> logger.getName().startsWith("org.apache.kafka.connect") ||
+                    logger.getName().startsWith("io.debezium")
             )
             .forEach(
                 logger -> logger.setLevel(ch.qos.logback.classic.Level.ERROR)
@@ -183,12 +186,13 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
         ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, offsetFile, historyFile);
 
-        try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
-            .using(this.getClass().getClassLoader())
-            .using(props)
-            .notifying(changeConsumer)
-            .using(completionCallback)
-            .build()
+        try (
+            DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
+                .using(this.getClass().getClassLoader())
+                .using(props)
+                .notifying(changeConsumer)
+                .using(completionCallback)
+                .build()
         ) {
             executorService.execute(engine);
 
@@ -197,7 +201,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             do {
                 int previousCount = count.get();
                 ZonedDateTime captureStarted = ZonedDateTime.now();
-                Await.until(() -> {
+                Await.until(() ->
+                {
                     try {
                         return this.ended(executorService, count, captureStarted, lastRecord, snapshot, runContext);
                     } catch (IllegalVariableEvaluationException e) {
@@ -253,7 +258,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                     .getRecords()
                     .entrySet()
                     .stream()
-                    .map(throwFunction(e -> {
+                    .map(throwFunction(e ->
+                    {
                         e.getValue().getRight().flush();
                         e.getValue().getRight().close();
 
@@ -266,7 +272,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))
             );
 
-        changeConsumer.getRecordsCount().forEach((s, atomicInteger) -> {
+        changeConsumer.getRecordsCount().forEach((s, atomicInteger) ->
+        {
             runContext.metric(Counter.of("records", atomicInteger.get(), "source", s));
         });
 
@@ -363,7 +370,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     protected static String joinProperties(RunContext runContext, Object raw) {
         List<String> value = raw instanceof Collection ? (List<String>) raw : List.of((String) raw);
 
-
         return value.stream()
             // debezium needs commas escaped to split properly
             .map(x -> x.replaceAll(",", "\\,"))
@@ -371,7 +377,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     }
 
     @SuppressWarnings("RedundantIfStatement")
-    private boolean ended(ExecutorService executorService, AtomicInteger count, ZonedDateTime start, ZonedDateTime lastRecord, AtomicBoolean snapshot, RunContext runContext) throws IllegalVariableEvaluationException {
+    private boolean ended(ExecutorService executorService, AtomicInteger count, ZonedDateTime start, ZonedDateTime lastRecord, AtomicBoolean snapshot, RunContext runContext)
+        throws IllegalVariableEvaluationException {
         if (executorService.isShutdown()) {
             return true;
         }

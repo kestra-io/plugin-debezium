@@ -1,7 +1,14 @@
 package io.kestra.plugin.debezium.postgres;
 
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.runners.RunContext;
+import java.io.IOException;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
+import java.security.PrivateKey;
+import java.security.Provider;
+import java.security.Security;
+import java.util.Locale;
+import java.util.Properties;
+
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.PEMDecryptorProvider;
@@ -16,18 +23,12 @@ import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo;
 import org.bouncycastle.pkcs.PKCSException;
 
-import java.io.IOException;
-import java.io.StringReader;
-import java.nio.charset.StandardCharsets;
-import java.security.PrivateKey;
-import java.security.Provider;
-import java.security.Security;
-import java.util.Arrays;
-import java.util.Locale;
-import java.util.Properties;
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.runners.RunContext;
 
 public abstract class PostgresService {
-    public static void handleProperties(Properties properties, RunContext runContext, PostgresInterface postgres) throws IllegalVariableEvaluationException, IOException, OperatorCreationException, PKCSException {
+    public static void handleProperties(Properties properties, RunContext runContext, PostgresInterface postgres)
+        throws IllegalVariableEvaluationException, IOException, OperatorCreationException, PKCSException {
         properties.put("database.dbname", runContext.render(postgres.getDatabase()).as(String.class).orElseThrow());
         properties.put("plugin.name", runContext.render(postgres.getPluginName()).as(PostgresInterface.PluginName.class).orElseThrow().name().toLowerCase(Locale.ROOT));
         properties.put("snapshot.mode", runContext.render(postgres.getSnapshotMode()).as(PostgresInterface.SnapshotMode.class).orElseThrow().name().toLowerCase(Locale.ROOT));
@@ -42,17 +43,29 @@ public abstract class PostgresService {
         }
 
         if (postgres.getSslRootCert() != null) {
-            properties.put("database.sslrootcert", runContext.workingDir().createTempFile(runContext.render(postgres.getSslRootCert()).as(String.class).orElseThrow().getBytes(StandardCharsets.UTF_8), ".pem").toAbsolutePath().toString());
+            properties.put(
+                "database.sslrootcert",
+                runContext.workingDir().createTempFile(runContext.render(postgres.getSslRootCert()).as(String.class).orElseThrow().getBytes(StandardCharsets.UTF_8), ".pem").toAbsolutePath()
+                    .toString()
+            );
         }
 
         if (postgres.getSslCert() != null) {
-            properties.put("database.sslcert", runContext.workingDir().createTempFile(runContext.render(postgres.getSslCert()).as(String.class).orElseThrow().getBytes(StandardCharsets.UTF_8), ".pem").toAbsolutePath().toString());
+            properties.put(
+                "database.sslcert",
+                runContext.workingDir().createTempFile(runContext.render(postgres.getSslCert()).as(String.class).orElseThrow().getBytes(StandardCharsets.UTF_8), ".pem").toAbsolutePath()
+                    .toString()
+            );
         }
 
         if (postgres.getSslKey() != null) {
-            properties.put("database.sslkey", convertPrivateKey(runContext,
-                runContext.render(postgres.getSslKey()).as(String.class).orElseThrow(),
-                runContext.render(postgres.getSslKeyPassword()).as(String.class).orElseThrow()));
+            properties.put(
+                "database.sslkey", convertPrivateKey(
+                    runContext,
+                    runContext.render(postgres.getSslKey()).as(String.class).orElseThrow(),
+                    runContext.render(postgres.getSslKeyPassword()).as(String.class).orElseThrow()
+                )
+            );
         }
 
         if (postgres.getSslKeyPassword() != null) {
@@ -76,7 +89,8 @@ public abstract class PostgresService {
         }
     }
 
-    private static String convertPrivateKey(RunContext runContext, String vars, String password) throws IOException, IllegalVariableEvaluationException, OperatorCreationException, PKCSException {
+    private static String convertPrivateKey(RunContext runContext, String vars, String password)
+        throws IOException, IllegalVariableEvaluationException, OperatorCreationException, PKCSException {
         PostgresService.addProvider();
 
         Object pemObject = readPem(runContext, vars);

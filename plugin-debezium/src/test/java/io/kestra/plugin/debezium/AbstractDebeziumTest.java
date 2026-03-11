@@ -1,7 +1,5 @@
 package io.kestra.plugin.debezium;
 
-import org.h2.tools.RunScript;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -11,6 +9,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Objects;
+
+import org.h2.tools.RunScript;
 
 public abstract class AbstractDebeziumTest {
 

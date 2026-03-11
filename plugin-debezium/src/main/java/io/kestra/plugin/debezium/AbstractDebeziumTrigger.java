@@ -1,15 +1,16 @@
 package io.kestra.plugin.debezium;
 
+import java.time.Duration;
+import java.util.Map;
+
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.models.triggers.PollingTriggerInterface;
 import io.kestra.core.models.triggers.TriggerOutput;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import java.time.Duration;
-import java.util.Map;
 
 import static io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger.OffsetCommitMode;
 

@@ -1,19 +1,5 @@
 package io.kestra.plugin.debezium;
 
-import io.debezium.engine.ChangeEvent;
-import io.debezium.engine.DebeziumEngine;
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.FileSerde;
-import io.kestra.core.serializers.JacksonMapper;
-import io.kestra.plugin.debezium.models.Envelope;
-import io.kestra.plugin.debezium.models.Message;
-import lombok.Getter;
-import lombok.SneakyThrows;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.kafka.connect.source.SourceRecord;
-import reactor.core.publisher.FluxSink;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -24,6 +10,22 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.kafka.connect.source.SourceRecord;
+
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.FileSerde;
+import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.plugin.debezium.models.Envelope;
+import io.kestra.plugin.debezium.models.Message;
+
+import io.debezium.engine.ChangeEvent;
+import io.debezium.engine.DebeziumEngine;
+import lombok.Getter;
+import lombok.SneakyThrows;
+import reactor.core.publisher.FluxSink;
 
 public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent<SourceRecord, SourceRecord>> {
     private final AbstractDebeziumTask abstractDebeziumTask;
@@ -45,7 +47,8 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
     @Getter
     private final Map<String, AtomicInteger> recordsCount = new ConcurrentHashMap<>();
 
-    public ChangeConsumer(AbstractDebeziumTask abstractDebeziumTask, RunContext runContext, AtomicInteger count, AtomicBoolean snapshot, ZonedDateTime lastRecord, Path offsetFile, Path historyFile) {
+    public ChangeConsumer(AbstractDebeziumTask abstractDebeziumTask, RunContext runContext, AtomicInteger count, AtomicBoolean snapshot, ZonedDateTime lastRecord, Path offsetFile,
+        Path historyFile) {
         this.abstractDebeziumTask = abstractDebeziumTask;
         this.runContext = runContext;
         this.count = count;
@@ -95,8 +98,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         List<ChangeEvent<SourceRecord, SourceRecord>> records,
         DebeziumEngine.RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> committer,
         FluxSink<AbstractDebeziumRealtimeTrigger.StreamOutput> sink,
-        AbstractDebeziumRealtimeTrigger.OffsetCommitMode offsetCommitMode
-    ) {
+        AbstractDebeziumRealtimeTrigger.OffsetCommitMode offsetCommitMode) {
         lastRecord = ZonedDateTime.now();
 
         try {
@@ -200,7 +202,10 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
             return true;
         }
 
-        if (!(message.getValue() instanceof Envelope) && runContext.render(this.abstractDebeziumTask.getFormat()).as(AbstractDebeziumTask.Format.class).orElseThrow() != AbstractDebeziumTask.Format.RAW) {
+        if (
+            !(message.getValue() instanceof Envelope)
+                && runContext.render(this.abstractDebeziumTask.getFormat()).as(AbstractDebeziumTask.Format.class).orElseThrow() != AbstractDebeziumTask.Format.RAW
+        ) {
             return true;
         }
 
@@ -255,10 +260,16 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
     }
 
     private void addDeleted(Map<String, Object> result, Pair<Message, Message> message) throws IllegalVariableEvaluationException {
-        if (runContext.render(this.abstractDebeziumTask.getDeleted()).as(AbstractDebeziumTask.Deleted.class).orElseThrow() == AbstractDebeziumTask.Deleted.ADD_FIELD && message.getValue() instanceof Envelope) {
+        if (
+            runContext.render(this.abstractDebeziumTask.getDeleted()).as(AbstractDebeziumTask.Deleted.class).orElseThrow() == AbstractDebeziumTask.Deleted.ADD_FIELD
+                && message.getValue() instanceof Envelope
+        ) {
             io.debezium.data.Envelope.Operation operation = ((Envelope) message.getValue()).getOperation();
 
-            result.put(runContext.render(this.abstractDebeziumTask.getDeletedFieldName()).as(String.class).orElseThrow(), operation == io.debezium.data.Envelope.Operation.DELETE || operation == io.debezium.data.Envelope.Operation.TRUNCATE);
+            result.put(
+                runContext.render(this.abstractDebeziumTask.getDeletedFieldName()).as(String.class).orElseThrow(),
+                operation == io.debezium.data.Envelope.Operation.DELETE || operation == io.debezium.data.Envelope.Operation.TRUNCATE
+            );
         }
     }
 

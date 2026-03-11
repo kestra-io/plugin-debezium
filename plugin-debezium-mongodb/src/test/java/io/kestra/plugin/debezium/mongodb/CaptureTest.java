@@ -1,24 +1,26 @@
 package io.kestra.plugin.debezium.mongodb;
 
+import java.io.*;
+import java.util.*;
+
+import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+
 import com.google.common.base.Charsets;
+
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
-import io.kestra.core.junit.annotations.KestraTest;
-import org.apache.commons.io.IOUtils;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.runners.RunContextFactory;
 
 import jakarta.inject.Inject;
-
-import java.io.*;
-import java.util.*;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -49,16 +51,25 @@ class CaptureTest {
         assertThat(runOutput.getSize(), is(20));
 
         List<Map<String, Object>> employee = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("second.employeeTerritory")))), r -> employee.add((Map<String, Object>) r));
+        FileSerde.reader(
+            new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("second.employeeTerritory")))),
+            r -> employee.add((Map<String, Object>) r)
+        );
 
         List<Map<String, Object>> types = new ArrayList<>();
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("kestra.mongo_types")))), r -> types.add((Map<String, Object>) r));
+        FileSerde.reader(
+            new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("kestra.mongo_types")))),
+            r -> types.add((Map<String, Object>) r)
+        );
 
         IOUtils.toString(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("kestra.mongo_types")), Charsets.UTF_8);
         assertThat(employee.size(), is(14));
         assertThat(employee.stream().filter(o -> !((Boolean) o.get("deleted"))).count(), is(7L));
 
-        FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("second.employeeTerritory")))), r -> employee.add((Map<String, Object>) r));
+        FileSerde.reader(
+            new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("second.employeeTerritory")))),
+            r -> employee.add((Map<String, Object>) r)
+        );
         assertThat(types.size(), is(6));
         assertThat(types.stream().filter(o -> !((Boolean) o.get("deleted"))).count(), is(4L));
 

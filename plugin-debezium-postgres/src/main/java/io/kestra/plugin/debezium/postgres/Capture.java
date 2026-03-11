@@ -1,6 +1,8 @@
 package io.kestra.plugin.debezium.postgres;
 
-import io.debezium.connector.postgresql.PostgresConnector;
+import java.nio.file.Path;
+import java.util.Properties;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -8,12 +10,11 @@ import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
+
+import io.debezium.connector.postgresql.PostgresConnector;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import java.nio.file.Path;
-import java.util.Properties;
 
 @SuperBuilder
 @ToString
@@ -29,21 +30,21 @@ import java.util.Properties;
             title = "Capture data from PostgreSQL server.",
             full = true,
             code = """
-               id: pg_capture
-                namespace: company.team
+                id: pg_capture
+                 namespace: company.team
 
-                tasks:
-                  - id: capture_data
-                    type: io.kestra.plugin.debezium.postgres.Capture
-                    hostname: 127.0.0.1
-                    port: "5432"
-                    username: "{{ secret('PG_USERNAME') }}"
-                    password: "{{ secret('PG_PASSWORD') }}"
-                    maxRecords: 100
-                    database: my_database
-                    pluginName: PGOUTPUT
-                    snapshotMode: ALWAYS
-                """
+                 tasks:
+                   - id: capture_data
+                     type: io.kestra.plugin.debezium.postgres.Capture
+                     hostname: 127.0.0.1
+                     port: "5432"
+                     username: "{{ secret('PG_USERNAME') }}"
+                     password: "{{ secret('PG_PASSWORD') }}"
+                     maxRecords: 100
+                     database: my_database
+                     pluginName: PGOUTPUT
+                     snapshotMode: ALWAYS
+                 """
         )
     },
     metrics = {

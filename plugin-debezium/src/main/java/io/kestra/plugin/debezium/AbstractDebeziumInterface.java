@@ -1,10 +1,11 @@
 package io.kestra.plugin.debezium;
 
+import java.util.Map;
+
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
-import io.swagger.v3.oas.annotations.media.Schema;
 
-import java.util.Map;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
 public interface AbstractDebeziumInterface {
@@ -124,7 +125,6 @@ public interface AbstractDebeziumInterface {
     )
     @PluginProperty(dynamic = true)
     Object getExcludedTables();
-
 
     @Schema(
         title = "An optional, comma-separated list of regular expressions that match the fully-qualified names of columns to exclude from change event record values.",

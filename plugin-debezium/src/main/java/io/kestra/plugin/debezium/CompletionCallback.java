@@ -1,10 +1,11 @@
 package io.kestra.plugin.debezium;
 
-import io.debezium.engine.DebeziumEngine;
-import io.kestra.core.runners.RunContext;
-import lombok.Getter;
-
 import java.util.concurrent.ExecutorService;
+
+import io.kestra.core.runners.RunContext;
+
+import io.debezium.engine.DebeziumEngine;
+import lombok.Getter;
 
 public class CompletionCallback implements DebeziumEngine.CompletionCallback {
     private final RunContext runContext;
