@@ -251,7 +251,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         Map<String, Object> result = new LinkedHashMap<>();
 
         if (value.getOperation() == io.debezium.data.Envelope.Operation.DELETE) {
-            result.putAll(value.getBefore());
+            result.putAll(Objects.requireNonNullElse(value.getBefore(), Collections.emptyMap()));
         } else {
             result.putAll(Objects.requireNonNullElse(value.getAfter(), Collections.emptyMap()));
         }
