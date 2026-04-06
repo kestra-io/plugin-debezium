@@ -4,12 +4,14 @@ import io.kestra.core.models.property.Property;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import io.kestra.core.models.annotations.PluginProperty;
 
 public interface Db2Interface {
     @Schema(
         title = "The name of the DB2 database from which to stream the changes."
     )
     @NotNull
+    @PluginProperty(group = "main")
     Property<String> getDatabase();
 
     @Schema(
@@ -26,6 +28,7 @@ public interface Db2Interface {
             "- `RECOVERY`: Set this option to restore a database schema history topic that is lost or corrupted. After a restart, the connector runs a snapshot that rebuilds the topic from the source tables."
     )
     @NotNull
+    @PluginProperty(group = "main")
     Property<SnapshotMode> getSnapshotMode();
 
     public enum SnapshotMode {

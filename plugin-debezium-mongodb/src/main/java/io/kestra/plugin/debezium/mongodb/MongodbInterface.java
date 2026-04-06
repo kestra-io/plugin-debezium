@@ -15,6 +15,7 @@ public interface MongodbInterface {
             "mongodb://mongo_user:mongo_passwd@mongos0.example.com:27017,mongos1.example.com:27017/"
         }
     )
+    @PluginProperty(group = "connection")
     Property<String> getConnectionString();
 
     @Schema(
@@ -22,7 +23,7 @@ public interface MongodbInterface {
         description = "A list of regular expressions that match the collection namespaces (for example, <dbName>.<collectionName>) of all collections to be monitored",
         example = "inventory[.]*"
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     Object getIncludedCollections();
 
     @Schema(
@@ -30,7 +31,7 @@ public interface MongodbInterface {
         description = "A list of regular expressions that match the collection namespaces (for example, <dbName>.<collectionName>) of all collections to be excluded",
         example = "inventory[.]*"
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     Object getExcludedCollections();
 
     @Schema(
@@ -44,6 +45,7 @@ public interface MongodbInterface {
             "- `WHEN_NEEDED`: The connector runs a snapshot upon startup whenever it deems it necessary. That is, when no offsets are available, or when a previously recorded offset specifies a binlog location or GTID that is not available in the server."
     )
     @NotNull
+    @PluginProperty(group = "main")
     Property<SnapshotMode> getSnapshotMode();
 
     public enum SnapshotMode {

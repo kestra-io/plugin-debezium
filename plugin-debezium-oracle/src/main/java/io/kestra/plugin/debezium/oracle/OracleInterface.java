@@ -12,12 +12,14 @@ public interface OracleInterface {
         title = "The name of the database to capture changes from."
     )
     @NotNull
+    @PluginProperty(group = "main")
     Property<String> getSid();
 
     @Schema(
         title = "The name of the Oracle pluggable database that the connector captures changes from. Used in container database (CDB) installations only.",
         description = "For non-container database (non-CDB) installation, do not specify the pluggableDatabase property."
     )
+    @PluginProperty(group = "connection")
     Property<String> getPluggableDatabase();
 
     @Schema(
@@ -33,7 +35,7 @@ public interface OracleInterface {
             +
             "- `RECOVERY`: This is a recovery setting for a connector that has already been capturing changes. When you restart the connector, this setting enables recovery of a corrupted or lost database history topic. You might set it periodically to \"clean up\" a database history topic that has been growing unexpectedly. Database history topics require infinite retention."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty(dynamic = false, group = "main")
     @NotNull
     Property<SnapshotMode> getSnapshotMode();
 

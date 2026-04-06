@@ -27,6 +27,7 @@ public interface MysqlInterface {
             "- `RECOVERY`: Restores a database schema history topic that is lost or corrupted by rebuilding it from the source tables.\n"
     )
     @NotNull
+    @PluginProperty(group = "main")
     Property<SnapshotMode> getSnapshotMode();
 
     @Schema(
@@ -36,7 +37,7 @@ public interface MysqlInterface {
             "the binlog. By default, a random number between 5400 and 6400 is generated, though the recommendation " +
             "is to explicitly set a value."
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     Property<String> getServerId();
 
     public enum SnapshotMode {

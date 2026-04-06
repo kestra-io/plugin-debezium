@@ -16,6 +16,7 @@ import io.debezium.connector.db2.Db2Connector;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -57,6 +58,7 @@ import lombok.experimental.SuperBuilder;
 )
 public class Capture extends AbstractDebeziumTask implements Db2Interface {
 
+    @PluginProperty(group = "main")
     protected Property<String> database;
 
     @Builder.Default

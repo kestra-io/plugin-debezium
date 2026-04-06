@@ -15,6 +15,7 @@ import io.debezium.connector.postgresql.PostgresConnector;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -56,26 +57,34 @@ import lombok.experimental.SuperBuilder;
     }
 )
 public class Capture extends AbstractDebeziumTask implements PostgresInterface {
+    @PluginProperty(group = "main")
     protected Property<String> database;
 
     @Builder.Default
+    @PluginProperty(group = "advanced")
     protected Property<PluginName> pluginName = Property.ofValue(PluginName.PGOUTPUT);
 
     @Builder.Default
+    @PluginProperty(group = "advanced")
     protected Property<String> slotName = Property.ofValue("kestra");
 
     @Builder.Default
+    @PluginProperty(group = "advanced")
     protected Property<String> publicationName = Property.ofValue("kestra_publication");
 
     @Builder.Default
     protected Property<PostgresInterface.SslMode> sslMode = Property.ofValue(SslMode.DISABLE);
 
+    @PluginProperty(group = "advanced")
     protected Property<String> sslRootCert;
 
+    @PluginProperty(group = "advanced")
     protected Property<String> sslCert;
 
+    @PluginProperty(group = "connection")
     protected Property<String> sslKey;
 
+    @PluginProperty(group = "connection")
     protected Property<String> sslKeyPassword;
 
     @Builder.Default

@@ -4,12 +4,14 @@ import io.kestra.core.models.property.Property;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import io.kestra.core.models.annotations.PluginProperty;
 
 public interface PostgresInterface {
     @Schema(
         title = "The name of the PostgreSQL database from which to stream the changes."
     )
     @NotNull
+    @PluginProperty(group = "main")
     Property<String> getDatabase();
 
     @Schema(
@@ -21,6 +23,7 @@ public interface PostgresInterface {
             "connector a separate message for each change in a transaction."
     )
     @NotNull
+    @PluginProperty(group = "main")
     Property<PluginName> getPluginName();
 
     @Schema(
@@ -34,6 +37,7 @@ public interface PostgresInterface {
             "uses the publication as it is defined."
     )
     @NotNull
+    @PluginProperty(group = "main")
     Property<String> getPublicationName();
 
     @Schema(
@@ -44,6 +48,7 @@ public interface PostgresInterface {
             "which state: \"Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character.\""
     )
     @NotNull
+    @PluginProperty(group = "main")
     Property<String> getSlotName();
 
     @Schema(
@@ -55,29 +60,34 @@ public interface PostgresInterface {
             "- `VERIFY_FULL` behaves like verify-ca but also verifies that the server certificate matches the host to which the connector is trying to connect.\n\n" +
             "See the [PostgreSQL documentation](https://www.postgresql.org/docs/current/static/libpq-connect.html) for more information."
     )
+    @PluginProperty(group = "connection")
     Property<SslMode> getSslMode();
 
     @Schema(
         title = "The root certificate(s) against which the server is validated.",
         description = "Must be a PEM encoded certificate."
     )
+    @PluginProperty(group = "connection")
     Property<String> getSslRootCert();
 
     @Schema(
         title = "The SSL certificate for the client.",
         description = "Must be a PEM encoded certificate."
     )
+    @PluginProperty(group = "connection")
     Property<String> getSslCert();
 
     @Schema(
         title = "The SSL private key of the client.",
         description = "Must be a PEM encoded key."
     )
+    @PluginProperty(group = "connection")
     Property<String> getSslKey();
 
     @Schema(
         title = "The password to access the client private key `sslKey`."
     )
+    @PluginProperty(group = "connection")
     Property<String> getSslKeyPassword();
 
     @Schema(
@@ -90,6 +100,7 @@ public interface PostgresInterface {
             "- `INITIAL_ONLY`: The connector performs an initial snapshot and then stops, without processing any subsequent changes.\n"
     )
     @NotNull
+    @PluginProperty(group = "main")
     Property<SnapshotMode> getSnapshotMode();
 
     enum SnapshotMode {
