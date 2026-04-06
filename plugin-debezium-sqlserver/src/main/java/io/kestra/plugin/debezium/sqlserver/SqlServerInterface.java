@@ -10,12 +10,14 @@ import io.kestra.core.runners.RunContext;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import io.kestra.core.models.annotations.PluginProperty;
 
 public interface SqlServerInterface {
     @Schema(
         title = "The name of the Microsoft SQL Server database from which to stream the changes."
     )
     @NotNull
+    @PluginProperty(group = "main")
     Property<String> getDatabase();
 
     @Schema(
@@ -27,6 +29,7 @@ public interface SqlServerInterface {
             "- `SCHEMA_ONLY`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be propagated to topics.\n"
     )
     @NotNull
+    @PluginProperty(group = "main")
     Property<SnapshotMode> getSnapshotMode();
 
     static void handleProperties(Properties properties, RunContext runContext, SqlServerInterface sqlServer) throws IllegalVariableEvaluationException, IOException {

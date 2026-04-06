@@ -13,6 +13,7 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import static io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger.OffsetCommitMode;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -76,12 +77,14 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
         title = "The maximum number of rows to fetch before stopping.",
         description = "It's not an hard limit and is evaluated every second."
     )
+    @PluginProperty(group = "execution")
     protected Property<Integer> maxRecords;
 
     @Schema(
         title = "The maximum duration waiting for new rows.",
         description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
+    @PluginProperty(group = "execution")
     protected Property<Duration> maxDuration;
 
     @Schema(
@@ -89,6 +92,7 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
         description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
     @Builder.Default
+    @PluginProperty(group = "execution")
     protected Property<Duration> maxWait = Property.ofValue(Duration.ofSeconds(10));
 
     @Schema(
@@ -96,6 +100,7 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
         description = "It's not an hard limit and is evaluated every second.\n The properties 'maxRecord', 'maxDuration' and 'maxWait' are evaluated only after the snapshot is done."
     )
     @Builder.Default
+    @PluginProperty(group = "execution")
     protected Property<Duration> maxSnapshotDuration = Property.ofValue(Duration.ofHours(1));
 
     @Schema(
@@ -106,5 +111,6 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
             """
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     protected Property<OffsetCommitMode> offsetsCommitMode = Property.ofValue(OffsetCommitMode.ON_STOP);
 }

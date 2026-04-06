@@ -110,20 +110,21 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         title = "The maximum number of rows to fetch before stopping.",
         description = "It's not an hard limit and is evaluated every second."
     )
-    @PluginProperty
+    @PluginProperty(group = "execution")
     private Property<Integer> maxRecords;
 
     @Schema(
         title = "The maximum duration waiting for new rows.",
         description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
+    @PluginProperty(group = "execution")
     private Property<Duration> maxDuration;
 
     @Schema(
         title = "The maximum total processing duration.",
         description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
-    @PluginProperty
+    @PluginProperty(group = "execution")
     @Builder.Default
     private Property<Duration> maxWait = Property.ofValue(Duration.ofSeconds(10));
 
@@ -132,6 +133,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         description = "It's not an hard limit and is evaluated every second.\n The properties 'maxRecord', 'maxDuration' and 'maxWait' are evaluated only after the snapshot is done."
     )
     @Builder.Default
+    @PluginProperty(group = "execution")
     private Property<Duration> maxSnapshotDuration = Property.ofValue(Duration.ofHours(1));
 
     @Schema(

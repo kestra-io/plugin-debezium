@@ -16,6 +16,7 @@ import io.debezium.connector.oracle.OracleConnector;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -77,10 +78,13 @@ import lombok.experimental.SuperBuilder;
 )
 public class Capture extends AbstractDebeziumTask implements OracleInterface {
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
+    @PluginProperty(group = "main")
     private Property<String> sid;
 
+    @PluginProperty(group = "connection")
     private Property<String> pluggableDatabase;
 
     @Override

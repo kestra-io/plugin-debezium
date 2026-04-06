@@ -40,6 +40,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -109,6 +110,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
             """
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<OffsetCommitMode> offsetsCommitMode = Property.ofValue(OffsetCommitMode.ON_STOP);
 
     @Builder.Default
@@ -318,9 +320,11 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     public static class StreamOutput implements io.kestra.core.models.tasks.Output {
 
         @Schema(title = "Stream.", description = "Stream source")
+        @PluginProperty(group = "advanced")
         private String stream;
 
         @Schema(title = "Data.", description = "Data extracted.")
+        @PluginProperty(group = "advanced")
         private Map<String, Object> data;
     }
 
