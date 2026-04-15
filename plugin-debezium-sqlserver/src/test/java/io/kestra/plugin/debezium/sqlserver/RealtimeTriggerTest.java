@@ -13,15 +13,9 @@ import io.kestra.core.models.executions.Execution;
 import io.kestra.core.queues.QueueFactoryInterface;
 import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.LocalFlowRepositoryLoader;
-import io.kestra.core.runners.FlowListeners;
-import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.jdbc.runner.JdbcScheduler;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
-import io.kestra.scheduler.AbstractScheduler;
-import io.kestra.worker.DefaultWorker;
 
-import io.micronaut.context.ApplicationContext;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import reactor.core.publisher.Flux;
@@ -29,15 +23,9 @@ import reactor.core.publisher.Flux;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
-@KestraTest
+@KestraTest(startRunner = true, startScheduler = true)
 @Disabled("This test works but when we added it, the CI will fail on the Trigger test. It may be caused by a database setup ...")
 class RealtimeTriggerTest extends AbstractDebeziumTest {
-    @Inject
-    private ApplicationContext applicationContext;
-
-    @Inject
-    private FlowListeners flowListenersService;
-
     @Inject
     @Named(QueueFactoryInterface.EXECUTION_NAMED)
     private QueueInterface<Execution> executionQueue;
@@ -65,37 +53,20 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
         // init database
         executeSqlScript("scripts/sqlserver.sql");
 
-        // mock flow listeners
         CountDownLatch queueCount = new CountDownLatch(1);
+        Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
+            queueCount.countDown();
+            assertThat(execution.getLeft().getFlowId(), is("trigger"));
+        });
 
-        // scheduler
-        try (
-            AbstractScheduler scheduler = new JdbcScheduler(
-                this.applicationContext,
-                this.flowListenersService
-            );
-            DefaultWorker worker = applicationContext.createBean(DefaultWorker.class, IdUtils.create(), 8, null);
-        ) {
-            // wait for execution
-            Flux<Execution> receive = TestsUtils.receive(executionQueue, execution ->
-            {
-                queueCount.countDown();
-                assertThat(execution.getLeft().getFlowId(), is("trigger"));
-            });
+        repositoryLoader.load(Objects.requireNonNull(RealtimeTriggerTest.class.getClassLoader().getResource("flows/realtime.yaml")));
 
-            worker.run();
-            scheduler.run();
+        boolean await = queueCount.await(15, TimeUnit.SECONDS);
+        assertThat(await, is(true));
 
-            repositoryLoader.load(Objects.requireNonNull(RealtimeTriggerTest.class.getClassLoader().getResource("flows/realtime.yaml")));
+        Map<String, Object> data = (Map<String, Object>) receive.blockLast().getTrigger().getVariables().get("data");
 
-            boolean await = queueCount.await(15, TimeUnit.SECONDS);
-            assertThat(await, is(true));
-
-            Map<String, Object> data = (Map<String, Object>) receive.blockLast().getTrigger().getVariables().get("data");
-
-            assertThat(data, notNullValue());
-
-            assertThat(data.size(), greaterThanOrEqualTo(5));
-        }
+        assertThat(data, notNullValue());
+        assertThat(data.size(), greaterThanOrEqualTo(5));
     }
 }
