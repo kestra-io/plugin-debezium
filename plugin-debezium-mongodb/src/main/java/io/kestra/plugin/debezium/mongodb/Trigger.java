@@ -113,8 +113,10 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @Builder.Default
     protected Property<String> port = Property.ofValue("");
 
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> username;
 
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> password;
 
     private Object includedDatabases;

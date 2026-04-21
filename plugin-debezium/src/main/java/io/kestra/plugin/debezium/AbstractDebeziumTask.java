@@ -85,8 +85,10 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     protected Property<String> port;
 
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> username;
 
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> password;
 
     private Object includedDatabases;

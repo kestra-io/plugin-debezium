@@ -81,8 +81,10 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
     protected Property<String> port;
 
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> username;
 
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> password;
 
     protected Object includedDatabases;
