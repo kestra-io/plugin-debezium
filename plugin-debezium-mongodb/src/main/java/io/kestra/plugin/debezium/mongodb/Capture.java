@@ -107,7 +107,7 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
     private Object excludedCollections;
 
     @NotNull
-    @PluginProperty(group = "main")
+    @PluginProperty(group = "main", secret = true)
     private Property<String> connectionString;
 
     @Builder.Default
