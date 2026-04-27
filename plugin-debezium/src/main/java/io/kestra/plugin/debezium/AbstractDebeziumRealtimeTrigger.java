@@ -144,7 +144,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
                 final Properties props = task.properties(runContext, offsetFile, historyFile);
 
-                ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), null, ZonedDateTime.now(), offsetFile, historyFile);
+                ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), null, new AtomicReference<>(ZonedDateTime.now()), offsetFile, historyFile);
 
                 var engineBuilder = DebeziumEngine.create(Connect.class)
                     .using(this.getClass().getClassLoader())

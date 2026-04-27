@@ -10,6 +10,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -35,8 +36,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
     private final AtomicInteger count;
     private final AtomicBoolean snapshot;
 
-    @SuppressWarnings("unused")
-    private ZonedDateTime lastRecord;
+    private final AtomicReference<ZonedDateTime> lastRecord;
 
     private final Path offsetFile;
     private final Path historyFile;
@@ -47,8 +47,8 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
     @Getter
     private final Map<String, AtomicInteger> recordsCount = new ConcurrentHashMap<>();
 
-    public ChangeConsumer(AbstractDebeziumTask abstractDebeziumTask, RunContext runContext, AtomicInteger count, AtomicBoolean snapshot, ZonedDateTime lastRecord, Path offsetFile,
-        Path historyFile) {
+    public ChangeConsumer(AbstractDebeziumTask abstractDebeziumTask, RunContext runContext, AtomicInteger count, AtomicBoolean snapshot, AtomicReference<ZonedDateTime> lastRecord,
+        Path offsetFile, Path historyFile) {
         this.abstractDebeziumTask = abstractDebeziumTask;
         this.runContext = runContext;
         this.count = count;
@@ -65,7 +65,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         var rOffsetsCommitMode = runContext.render(abstractDebeziumTask.getOffsetsCommitMode()).as(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.class)
             .orElse(AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_STOP);
 
-        lastRecord = ZonedDateTime.now();
+        lastRecord.set(ZonedDateTime.now());
 
         for (ChangeEvent<SourceRecord, SourceRecord> r : records) {
             SourceRecord record = r.value();
@@ -99,7 +99,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         DebeziumEngine.RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> committer,
         FluxSink<AbstractDebeziumRealtimeTrigger.StreamOutput> sink,
         AbstractDebeziumRealtimeTrigger.OffsetCommitMode offsetCommitMode) {
-        lastRecord = ZonedDateTime.now();
+        lastRecord.set(ZonedDateTime.now());
 
         try {
             for (ChangeEvent<SourceRecord, SourceRecord> r : records) {
