@@ -52,8 +52,10 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
 
     protected Property<String> port;
 
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> username;
 
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> password;
 
     protected Object includedDatabases;

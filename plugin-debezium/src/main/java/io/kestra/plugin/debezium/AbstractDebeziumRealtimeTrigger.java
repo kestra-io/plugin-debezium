@@ -81,8 +81,10 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
     protected Property<String> port;
 
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> username;
 
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> password;
 
     protected Object includedDatabases;
@@ -142,7 +144,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
                 final Properties props = task.properties(runContext, offsetFile, historyFile);
 
-                ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), null, ZonedDateTime.now(), offsetFile, historyFile);
+                ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), null, new AtomicReference<>(ZonedDateTime.now()), offsetFile, historyFile);
 
                 var engineBuilder = DebeziumEngine.create(Connect.class)
                     .using(this.getClass().getClassLoader())

@@ -14,6 +14,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
@@ -85,8 +86,10 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     protected Property<String> port;
 
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> username;
 
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> password;
 
     private Object includedDatabases;
@@ -171,7 +174,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     public AbstractDebeziumTask.Output run(RunContext runContext) throws Exception {
         AtomicInteger count = new AtomicInteger();
         AtomicBoolean snapshot = new AtomicBoolean(false);
-        ZonedDateTime lastRecord = ZonedDateTime.now();
+        AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>(ZonedDateTime.now());
 
         Path offsetFile = runContext.workingDir().path().resolve(OFFSETS_DATA_FILE);
         this.restoreState(runContext, offsetFile);
@@ -379,7 +382,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     }
 
     @SuppressWarnings("RedundantIfStatement")
-    private boolean ended(ExecutorService executorService, AtomicInteger count, ZonedDateTime start, ZonedDateTime lastRecord, AtomicBoolean snapshot, RunContext runContext)
+    private boolean ended(ExecutorService executorService, AtomicInteger count, ZonedDateTime start, AtomicReference<ZonedDateTime> lastRecord, AtomicBoolean snapshot, RunContext runContext)
         throws IllegalVariableEvaluationException {
         if (executorService.isShutdown()) {
             return true;
@@ -397,7 +400,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         }
 
         var renderedMaxWait = runContext.render(maxWait).as(Duration.class);
-        if (renderedMaxWait.isPresent() && ZonedDateTime.now().isAfter(lastRecord.plus(renderedMaxWait.get()))) {
+        if (renderedMaxWait.isPresent() && ZonedDateTime.now().isAfter(lastRecord.get().plus(renderedMaxWait.get()))) {
             return true;
         }
 
