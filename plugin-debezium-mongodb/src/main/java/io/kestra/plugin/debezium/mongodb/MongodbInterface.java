@@ -15,7 +15,7 @@ public interface MongodbInterface {
             "mongodb://mongo_user:mongo_passwd@mongos0.example.com:27017,mongos1.example.com:27017/"
         }
     )
-    @PluginProperty(group = "connection")
+    @PluginProperty(group = "connection", secret = true)
     Property<String> getConnectionString();
 
     @Schema(

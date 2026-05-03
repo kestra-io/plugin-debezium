@@ -96,13 +96,13 @@ public interface AbstractDebeziumInterface {
     @Schema(
         title = "Username on the remote server."
     )
-    @PluginProperty(group = "connection")
+    @PluginProperty(group = "connection", secret = true)
     Property<String> getUsername();
 
     @Schema(
         title = "Password on the remote server."
     )
-    @PluginProperty(group = "connection")
+    @PluginProperty(group = "connection", secret = true)
     Property<String> getPassword();
 
     @Schema(

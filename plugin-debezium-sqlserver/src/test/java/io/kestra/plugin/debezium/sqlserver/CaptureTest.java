@@ -2,6 +2,7 @@ package io.kestra.plugin.debezium.sqlserver;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -59,12 +60,14 @@ class CaptureTest extends AbstractDebeziumTest {
             .id(IdUtils.create())
             .type(Capture.class.getName())
             .snapshotMode(Property.ofValue(SqlServerInterface.SnapshotMode.INITIAL_ONLY))
+            .stateName(Property.ofValue(IdUtils.create()))
             .hostname(Property.ofValue("127.0.0.1"))
             .port(Property.ofValue("61433"))
             .username(Property.ofValue(getUsername()))
             .password(Property.ofValue(getPassword()))
             .database(Property.ofValue("deb"))
             .maxRecords(Property.ofValue(5))
+            .maxWait(Property.ofValue(Duration.ofSeconds(30)))
             .properties(Property.ofValue(Map.of("database.encrypt", "false")))
             .includedTables(List.of("dbo.events"))
             .build();

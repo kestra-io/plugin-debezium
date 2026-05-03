@@ -81,13 +81,13 @@ public interface PostgresInterface {
         title = "The SSL private key of the client.",
         description = "Must be a PEM encoded key."
     )
-    @PluginProperty(group = "connection")
+    @PluginProperty(group = "connection", secret = true)
     Property<String> getSslKey();
 
     @Schema(
         title = "The password to access the client private key `sslKey`."
     )
-    @PluginProperty(group = "connection")
+    @PluginProperty(group = "connection", secret = true)
     Property<String> getSslKeyPassword();
 
     @Schema(
