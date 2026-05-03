@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -85,6 +86,7 @@ class CaptureTest extends AbstractDebeziumTest {
             .password(Property.ofValue("dbz"))
             .stateName(Property.ofValue(UUID.randomUUID().toString()))
             .maxRecords(Property.ofValue(5))
+            .maxWait(Property.ofValue(Duration.ofSeconds(30)))
             .includedTables("KESTRA.EVENTS")
             .build();
 
