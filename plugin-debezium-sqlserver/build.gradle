@@ -14,7 +14,7 @@ jar {
 
 dependencies {
     implementation project(':plugin-debezium')
-    testImplementation project(':plugin-debezium').sourceSets.test.output
+    testImplementation project(path: ':plugin-debezium', configuration: 'testOutput')
 
     implementation group: 'io.debezium', name: 'debezium-connector-sqlserver', version: debeziumVersion
 }
