@@ -60,7 +60,7 @@ final class PostgresDebeziumTestHelper {
         }
 
         var flowPrefix = Slugify.of(flowId) + "_states_";
-        var keysToDelete = kvStore.listAll().stream()
+        var keysToDelete = kvStore.list().stream()
             .map(KVEntry::key)
             .distinct()
             .filter(key -> Arrays.stream(stateNames).anyMatch(stateName -> key.startsWith(flowPrefix + stateName)))
