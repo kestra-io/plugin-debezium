@@ -18,7 +18,10 @@ dependencies {
 }
 
 configurations {
-    testOutput
+    testOutput {
+        canBeResolved = false
+        canBeConsumed = true
+    }
 }
 
 task testJar(type: Jar) {
