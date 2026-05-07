@@ -14,7 +14,7 @@ jar {
 
 dependencies {
     implementation project(':plugin-debezium')
-    testImplementation project(':plugin-debezium').sourceSets.test.output
+    testImplementation project(path: ':plugin-debezium', configuration: 'testOutput')
 
     implementation group: 'com.ibm.db2.jcc', name: 'db2jcc', version: 'db2jcc4'
     // Solution to weird bug because of NoClassDefFoundError: com/ibm/db2/jcc/DB2Driver
