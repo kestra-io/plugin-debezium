@@ -167,9 +167,16 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                         }
                     });
 
-                try (DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = engineBuilder.build()) {
-                    engineReference.set(engine);
+                DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = engineBuilder.build();
+                engineReference.set(engine);
+                try {
                     engine.run();
+                } finally {
+                    try {
+                        engine.close();
+                    } catch (IllegalStateException alreadyShutDown) {
+                        // engine was already closed by stop(); harmless on the publisher path.
+                    }
                 }
             } catch (Exception e) {
                 sink.error(e);
