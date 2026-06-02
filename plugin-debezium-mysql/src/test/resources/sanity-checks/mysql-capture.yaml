@@ -2,14 +2,33 @@ id: mysql-capture
 namespace: sanitychecks.plugin-debezium-mysql
 
 tasks:
+  - id: start_mysql
+    type: io.kestra.plugin.scripts.shell.Script
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    script: |
+      docker rm -f mysql-sanity 2>/dev/null || true
+      docker run -d --name mysql-sanity \
+        -e MYSQL_ROOT_PASSWORD=mysql_passwd \
+        -e MYSQL_DATABASE=kestra \
+        -p 13306:3306 \
+        mysql:8.0 \
+        --server-id=223344 --log-bin=mysql-bin --binlog-format=ROW --binlog-row-image=FULL \
+        --gtid-mode=ON --enforce-gtid-consistency=ON --binlog-rows-query-log-events=ON \
+        --skip-ssl --default-authentication-plugin=mysql_native_password
+      until docker exec mysql-sanity mysqladmin ping -h 127.0.0.1 -u root -pmysql_passwd --silent 2>/dev/null; do sleep 2; done
+      docker exec mysql-sanity mysql -u root -pmysql_passwd kestra -e "DROP TABLE IF EXISTS capture_events;"
+      docker exec mysql-sanity mysql -u root -pmysql_passwd kestra -e "CREATE TABLE capture_events (events_id BIGINT AUTO_INCREMENT PRIMARY KEY, event_title VARCHAR(256), event_description VARCHAR(256));"
+      docker exec mysql-sanity mysql -u root -pmysql_passwd kestra -e "INSERT INTO capture_events(event_title, event_description) VALUES ('Machine Head','Cool concert'),('Dropkick Murphys','Very cool concert'),('Pink Floyd','Cool'),('TV show','Some TV'),('Nothing','Boring');"
+
   - id: capture
     type: io.kestra.plugin.debezium.mysql.Capture
     serverId: 123456789
     hostname: 127.0.0.1
-    port: "63306"
+    port: "13306"
     username: root
     password: mysql_passwd
-    snapshotMode: NEVER
+    snapshotMode: INITIAL
     maxRecords: 5
     maxWait: PT30S
     includedTables:
@@ -19,3 +38,18 @@ tasks:
     type: io.kestra.plugin.core.execution.Assert
     conditions:
       - "{{ outputs.capture.size >= 5 }}"
+
+  - id: stop_mysql
+    type: io.kestra.plugin.scripts.shell.Script
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    script: |
+      docker rm -f mysql-sanity 2>/dev/null || true
+
+errors:
+  - id: stop_mysql_on_error
+    type: io.kestra.plugin.scripts.shell.Script
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    script: |
+      docker rm -f mysql-sanity 2>/dev/null || true

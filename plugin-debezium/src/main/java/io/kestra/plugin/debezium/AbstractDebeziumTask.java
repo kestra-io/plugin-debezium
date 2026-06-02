@@ -188,14 +188,14 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
         ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, offsetFile, historyFile);
 
-        try (
-            DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
-                .using(this.getClass().getClassLoader())
-                .using(props)
-                .notifying(changeConsumer)
-                .using(completionCallback)
-                .build()
-        ) {
+        DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
+            .using(this.getClass().getClassLoader())
+            .using(props)
+            .notifying(changeConsumer)
+            .using(completionCallback)
+            .build();
+
+        try {
             executorService.execute(engine);
 
             ZonedDateTime snapshotStarted = ZonedDateTime.now();
@@ -214,6 +214,12 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 consumes = count.get() > previousCount;
                 // if we are still snapshotting, allow waiting for more time until snapshot wait duration is reached
             } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(runContext.render(this.maxSnapshotDuration).as(Duration.class).orElseThrow())));
+        } finally {
+            try {
+                engine.close();
+            } catch (IllegalStateException e) {
+                // Engine already shut itself down on error; the real cause is in completionCallback
+            }
         }
 
         if (completionCallback.getError() != null) {

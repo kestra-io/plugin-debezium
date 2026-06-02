@@ -2,10 +2,28 @@ id: postgres-capture
 namespace: sanitychecks.plugin-debezium-postgres
 
 tasks:
+  - id: start_postgres
+    type: io.kestra.plugin.scripts.shell.Script
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    script: |
+      docker rm -f pg-sanity 2>/dev/null || true
+      docker run -d --name pg-sanity \
+        -e POSTGRES_PASSWORD=pg_passwd \
+        -p 15432:5432 \
+        postgres:16 \
+        postgres -c wal_level=logical -c max_replication_slots=10 -c max_wal_senders=10
+      until docker exec pg-sanity pg_isready -U postgres; do sleep 1; done
+      docker exec pg-sanity psql -U postgres -c "CREATE USER my_repl_user WITH REPLICATION PASSWORD 'my_repl_password';"
+      docker exec pg-sanity psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO my_repl_user;"
+      docker exec pg-sanity psql -U postgres -c "DROP TABLE IF EXISTS events;"
+      docker exec pg-sanity psql -U postgres -c "CREATE TABLE events (events_id SERIAL, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id));"
+      docker exec pg-sanity psql -U postgres -c "INSERT INTO events(events_id, event_title, event_description) VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
+
   - id: capture
     type: io.kestra.plugin.debezium.postgres.Capture
     hostname: 127.0.0.1
-    port: "65432"
+    port: "15432"
     username: postgres
     password: pg_passwd
     database: postgres
@@ -19,3 +37,18 @@ tasks:
     type: io.kestra.plugin.core.execution.Assert
     conditions:
       - "{{ outputs.capture.size >= 5 }}"
+
+  - id: stop_postgres
+    type: io.kestra.plugin.scripts.shell.Script
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    script: |
+      docker rm -f pg-sanity 2>/dev/null || true
+
+errors:
+  - id: stop_postgres_on_error
+    type: io.kestra.plugin.scripts.shell.Script
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    script: |
+      docker rm -f pg-sanity 2>/dev/null || true

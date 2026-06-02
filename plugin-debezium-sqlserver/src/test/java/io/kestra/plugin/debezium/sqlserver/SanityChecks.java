@@ -39,7 +39,6 @@ class SanityChecks extends AbstractDebeziumTest {
     @BeforeEach
     void setup() throws Exception {
         cleanupFlowState(kvStoreService, "sanitychecks.plugin-debezium-sqlserver", "sqlserver-capture", "debezium-state");
-        executeSqlScript("scripts/sqlserver.sql");
     }
 
     @Test
