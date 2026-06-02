@@ -38,13 +38,13 @@ tasks:
       - /bin/sh
     commands:
       - -c
-      - |
-        GATEWAY=$(ip route 2>/dev/null | awk '/default/ {print $3; exit}')
-        echo "::set-output name=host::$GATEWAY"
+      - ip route 2>/dev/null | awk '/default/ {printf $3; exit}' > host.txt
+    outputFiles:
+      - host.txt
 
   - id: capture
     type: io.kestra.plugin.debezium.mongodb.Capture
-    connectionString: "mongodb://mongo_user:mongo_passwd@{{ outputs.discover_host.vars.host }}:27018/?replicaSet=rs0&directConnection=true"
+    connectionString: "mongodb://mongo_user:mongo_passwd@{{ read(outputs.discover_host.outputFiles['host.txt']) }}:27018/?replicaSet=rs0&directConnection=true"
     snapshotMode: INITIAL
     maxRecords: 20
     maxWait: PT30S

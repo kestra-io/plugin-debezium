@@ -34,13 +34,13 @@ tasks:
       - /bin/sh
     commands:
       - -c
-      - |
-        GATEWAY=$(ip route 2>/dev/null | awk '/default/ {print $3; exit}')
-        echo "::set-output name=host::$GATEWAY"
+      - ip route 2>/dev/null | awk '/default/ {printf $3; exit}' > host.txt
+    outputFiles:
+      - host.txt
 
   - id: capture
     type: io.kestra.plugin.debezium.sqlserver.Capture
-    hostname: "{{ outputs.discover_host.vars.host }}"
+    hostname: "{{ read(outputs.discover_host.outputFiles['host.txt']) }}"
     port: "11433"
     username: sa
     password: "Sqls3rv3r_Pa55word!"
