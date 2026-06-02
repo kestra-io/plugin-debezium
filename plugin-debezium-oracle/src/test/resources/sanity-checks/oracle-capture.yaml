@@ -5,25 +5,28 @@ tasks:
   - id: start_oracle
     type: io.kestra.plugin.docker.Run
     containerImage: gvenzl/oracle-xe:21-full
+    networkMode: host
     wait: false
     env:
       ORACLE_PASSWORD: passwd
       APP_USER: kestra
       APP_USER_PASSWORD: passwd
+      ORACLE_DATABASE_PORT_NUMBER: "11521"
 
   - id: init_oracle
     type: io.kestra.plugin.docker.Run
     containerImage: gvenzl/oracle-xe:21-full
+    networkMode: host
     entryPoint:
       - /bin/sh
     commands:
       - -c
       - |
-        until echo "EXIT" | sqlplus -L sys/passwd@//{{ outputs.start_oracle.taskRunner.containerId.substring(0,12) }}:1521/XE as sysdba 2>/dev/null | grep -q "Connected to"; do
+        until echo "EXIT" | sqlplus -L sys/passwd@//127.0.0.1:11521/XE as sysdba 2>/dev/null | grep -q "Connected to"; do
           echo "Waiting for Oracle..."
           sleep 15
         done
-        sqlplus -S sys/passwd@//{{ outputs.start_oracle.taskRunner.containerId.substring(0,12) }}:1521/XE as sysdba <<'ENDSQL'
+        sqlplus -S sys/passwd@//127.0.0.1:11521/XE as sysdba <<'ENDSQL'
         ALTER DATABASE ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS;
         ALTER PROFILE DEFAULT LIMIT FAILED_LOGIN_ATTEMPTS UNLIMITED;
         CREATE TABLESPACE LOGMINER_TBS DATAFILE '/opt/oracle/oradata/XE/logminer_tbs.dbf' SIZE 25M REUSE AUTOEXTEND ON MAXSIZE UNLIMITED;
@@ -54,7 +57,7 @@ tasks:
         GRANT SELECT ON V_$TRANSACTION TO c##dbzuser CONTAINER=ALL;
         EXIT;
         ENDSQL
-        sqlplus -S kestra/passwd@//{{ outputs.start_oracle.taskRunner.containerId.substring(0,12) }}:1521/XE <<'ENDSQL'
+        sqlplus -S kestra/passwd@//127.0.0.1:11521/XE <<'ENDSQL'
         DROP TABLE events;
         CREATE TABLE events (events_id NUMBER, event_title VARCHAR2(256), event_description VARCHAR2(256), PRIMARY KEY (events_id));
         INSERT INTO events VALUES (1, 'Machine Head', 'Cool concert');
@@ -68,8 +71,8 @@ tasks:
 
   - id: capture
     type: io.kestra.plugin.debezium.oracle.Capture
-    hostname: "{{ outputs.start_oracle.taskRunner.containerId.substring(0,12) }}"
-    port: "1521"
+    hostname: host.docker.internal
+    port: "11521"
     username: c##dbzuser
     password: dbz
     sid: XE
@@ -86,5 +89,5 @@ tasks:
 finally:
   - id: stop_oracle
     type: io.kestra.plugin.docker.Stop
-    containerId: "{{ outputs.start_oracle.taskRunner.containerId.substring(0,12) }}"
+    containerId: "{{ outputs.start_oracle.taskRunner.containerId }}"
     kill: true

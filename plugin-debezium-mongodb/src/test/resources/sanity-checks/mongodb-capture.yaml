@@ -5,6 +5,7 @@ tasks:
   - id: start_mongodb
     type: io.kestra.plugin.docker.Run
     containerImage: mongo:latest
+    networkMode: host
     wait: false
     env:
       MONGO_INITDB_ROOT_USERNAME: mongo_user
@@ -13,23 +14,26 @@ tasks:
       - --bind_ip_all
       - --replSet
       - rs0
+      - --port
+      - "27018"
 
   - id: init_mongodb
     type: io.kestra.plugin.docker.Run
     containerImage: mongo:latest
+    networkMode: host
     entryPoint:
       - /bin/sh
     commands:
       - -c
       - |
-        until mongosh --host {{ outputs.start_mongodb.taskRunner.containerId.substring(0,12) }} --port 27017 -u mongo_user -p mongo_passwd --quiet --eval "db.adminCommand('ping').ok" 2>/dev/null | grep -q 1; do sleep 2; done
-        mongosh --host {{ outputs.start_mongodb.taskRunner.containerId.substring(0,12) }} --port 27017 -u mongo_user -p mongo_passwd --eval "rs.initiate({_id:'rs0',members:[{_id:0,host:'{{ outputs.start_mongodb.taskRunner.containerId.substring(0,12) }}:27017'}]})"
-        until mongosh --host {{ outputs.start_mongodb.taskRunner.containerId.substring(0,12) }} --port 27017 -u mongo_user -p mongo_passwd --quiet --eval "rs.isMaster().ismaster" 2>/dev/null | grep -q true; do sleep 2; done
-        mongosh --host {{ outputs.start_mongodb.taskRunner.containerId.substring(0,12) }} --port 27017 -u mongo_user -p mongo_passwd kestra --eval "db.events.insertMany([{title:'Event 1',description:'Desc 1'},{title:'Event 2',description:'Desc 2'},{title:'Event 3',description:'Desc 3'},{title:'Event 4',description:'Desc 4'},{title:'Event 5',description:'Desc 5'},{title:'Event 6',description:'Desc 6'},{title:'Event 7',description:'Desc 7'},{title:'Event 8',description:'Desc 8'},{title:'Event 9',description:'Desc 9'},{title:'Event 10',description:'Desc 10'},{title:'Event 11',description:'Desc 11'},{title:'Event 12',description:'Desc 12'},{title:'Event 13',description:'Desc 13'},{title:'Event 14',description:'Desc 14'},{title:'Event 15',description:'Desc 15'},{title:'Event 16',description:'Desc 16'},{title:'Event 17',description:'Desc 17'},{title:'Event 18',description:'Desc 18'},{title:'Event 19',description:'Desc 19'},{title:'Event 20',description:'Desc 20'}])"
+        until mongosh --host 127.0.0.1 --port 27018 -u mongo_user -p mongo_passwd --quiet --eval "db.adminCommand('ping').ok" 2>/dev/null | grep -q 1; do sleep 2; done
+        mongosh --host 127.0.0.1 --port 27018 -u mongo_user -p mongo_passwd --eval "rs.initiate({_id:'rs0',members:[{_id:0,host:'host.docker.internal:27018'}]})"
+        until mongosh --host 127.0.0.1 --port 27018 -u mongo_user -p mongo_passwd --quiet --eval "rs.isMaster().ismaster" 2>/dev/null | grep -q true; do sleep 2; done
+        mongosh --host 127.0.0.1 --port 27018 -u mongo_user -p mongo_passwd kestra --eval "db.events.insertMany([{title:'Event 1',description:'Desc 1'},{title:'Event 2',description:'Desc 2'},{title:'Event 3',description:'Desc 3'},{title:'Event 4',description:'Desc 4'},{title:'Event 5',description:'Desc 5'},{title:'Event 6',description:'Desc 6'},{title:'Event 7',description:'Desc 7'},{title:'Event 8',description:'Desc 8'},{title:'Event 9',description:'Desc 9'},{title:'Event 10',description:'Desc 10'},{title:'Event 11',description:'Desc 11'},{title:'Event 12',description:'Desc 12'},{title:'Event 13',description:'Desc 13'},{title:'Event 14',description:'Desc 14'},{title:'Event 15',description:'Desc 15'},{title:'Event 16',description:'Desc 16'},{title:'Event 17',description:'Desc 17'},{title:'Event 18',description:'Desc 18'},{title:'Event 19',description:'Desc 19'},{title:'Event 20',description:'Desc 20'}])"
 
   - id: capture
     type: io.kestra.plugin.debezium.mongodb.Capture
-    connectionString: "mongodb://mongo_user:mongo_passwd@{{ outputs.start_mongodb.taskRunner.containerId.substring(0,12) }}:27017/?replicaSet=rs0&directConnection=true"
+    connectionString: "mongodb://mongo_user:mongo_passwd@host.docker.internal:27018/?replicaSet=rs0&directConnection=true"
     snapshotMode: INITIAL
     maxRecords: 20
     maxWait: PT30S
@@ -42,5 +46,5 @@ tasks:
 finally:
   - id: stop_mongodb
     type: io.kestra.plugin.docker.Stop
-    containerId: "{{ outputs.start_mongodb.taskRunner.containerId.substring(0,12) }}"
+    containerId: "{{ outputs.start_mongodb.taskRunner.containerId }}"
     kill: true
