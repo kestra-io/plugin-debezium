@@ -16,6 +16,8 @@ tasks:
       MYSQL_ROOT_PASSWORD: mysql_passwd
       MYSQL_DATABASE: kestra
     commands:
+      - mysqld
+      - --user=mysql
       - --server-id=223344
       - --log-bin=mysql-bin
       - --binlog-format=ROW
@@ -26,19 +28,25 @@ tasks:
       - --skip-ssl
       - --default-authentication-plugin=mysql_native_password
 
+  - id: sleep
+    type: io.kestra.plugin.core.flow.Sleep
+    duration: PT30S
+
   - id: init_mysql
-    type: io.kestra.plugin.docker.Run
-    containerImage: mysql:8.0
-    networkMode: host
-    entryPoint:
-      - /bin/sh
-    commands:
-      - -c
-      - |
-        until mysqladmin ping -h localhost -P {{ outputs.port.value }} -u root -pmysql_passwd --silent 2>/dev/null; do sleep 2; done
-        mysql -h localhost -P {{ outputs.port.value }} -u root -pmysql_passwd kestra -e "DROP TABLE IF EXISTS capture_events;"
-        mysql -h localhost -P {{ outputs.port.value }} -u root -pmysql_passwd kestra -e "CREATE TABLE capture_events (events_id BIGINT AUTO_INCREMENT PRIMARY KEY, event_title VARCHAR(256), event_description VARCHAR(256));"
-        mysql -h localhost -P {{ outputs.port.value }} -u root -pmysql_passwd kestra -e "INSERT INTO capture_events(event_title, event_description) VALUES ('Machine Head','Cool concert'),('Dropkick Murphys','Very cool concert'),('Pink Floyd','Cool'),('TV show','Some TV'),('Nothing','Boring');"
+    type: io.kestra.plugin.jdbc.mysql.Queries
+    sql: |
+      DROP TABLE IF EXISTS capture_events;
+      CREATE TABLE capture_events (
+        events_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        event_title VARCHAR(256),
+        event_description VARCHAR(256)
+      );
+      INSERT INTO capture_events(event_title, event_description) VALUES
+        ('Machine Head','Cool concert'),
+        ('Dropkick Murphys','Very cool concert'),
+        ('Pink Floyd','Cool'),
+        ('TV show','Some TV'),
+        ('Nothing','Boring');
 
   - id: capture
     type: io.kestra.plugin.debezium.mysql.Capture
@@ -63,3 +71,10 @@ finally:
     type: io.kestra.plugin.docker.Stop
     containerId: "{{ outputs.start_mysql.taskRunner.containerId }}"
     kill: true
+
+pluginDefaults:
+  - type: io.kestra.plugin.jdbc.mysql
+    values:
+      username: root
+      password: mysql_passwd
+      url: "jdbc:mysql://localhost:{{ outputs.port.value }}/kestra?allowMultiQueries=true&useSSL=false&allowPublicKeyRetrieval=true"

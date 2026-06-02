@@ -17,20 +17,32 @@ tasks:
       MSSQL_SA_PASSWORD: "Sqls3rv3r_Pa55word!"
       MSSQL_PID: "Express"
 
+  - id: sleep
+    type: io.kestra.plugin.core.flow.Sleep
+    duration: PT20S
+
   - id: init_sqlserver
-    type: io.kestra.plugin.docker.Run
-    containerImage: mcr.microsoft.com/mssql/server:2019-latest
-    networkMode: host
-    entryPoint:
-      - /bin/bash
-    commands:
-      - -c
-      - |
-        export PATH="$PATH:/opt/mssql-tools18/bin:/opt/mssql-tools/bin"
-        until sqlcmd -S localhost,{{ outputs.port.value }} -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "SELECT 1" >/dev/null 2>&1; do sleep 3; done
-        sqlcmd -S localhost,{{ outputs.port.value }} -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "CREATE DATABASE deb;"
-        sqlcmd -S localhost,{{ outputs.port.value }} -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "USE deb; EXEC sys.sp_cdc_enable_db;"
-        sqlcmd -S localhost,{{ outputs.port.value }} -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "USE deb; DROP TABLE IF EXISTS dbo.events; CREATE TABLE dbo.events (events_id INT, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id)); INSERT INTO dbo.events VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
+    type: io.kestra.plugin.jdbc.sqlserver.Queries
+    sql: |
+      CREATE DATABASE deb;
+
+  - id: enable_cdc
+    type: io.kestra.plugin.jdbc.sqlserver.Queries
+    sql: |
+      USE deb;
+      EXEC sys.sp_cdc_enable_db;
+      DROP TABLE IF EXISTS dbo.events;
+      CREATE TABLE dbo.events (
+        events_id INT,
+        event_title VARCHAR(256),
+        event_description VARCHAR(256),
+        PRIMARY KEY (events_id)
+      );
+      INSERT INTO dbo.events VALUES (1,'Machine Head','Cool concert');
+      INSERT INTO dbo.events VALUES (2,'Dropkick Murphys','Very cool concert');
+      INSERT INTO dbo.events VALUES (3,'Pink Floyd','Cool');
+      INSERT INTO dbo.events VALUES (4,'TV show','Some TV');
+      INSERT INTO dbo.events VALUES (5,'Nothing','Boring');
 
   - id: capture
     type: io.kestra.plugin.debezium.sqlserver.Capture
@@ -57,3 +69,10 @@ finally:
     type: io.kestra.plugin.docker.Stop
     containerId: "{{ outputs.start_sqlserver.taskRunner.containerId }}"
     kill: true
+
+pluginDefaults:
+  - type: io.kestra.plugin.jdbc.sqlserver
+    values:
+      username: sa
+      password: "Sqls3rv3r_Pa55word!"
+      url: "jdbc:sqlserver://localhost:{{ outputs.port.value }};databaseName=master;encrypt=true;trustServerCertificate=true"

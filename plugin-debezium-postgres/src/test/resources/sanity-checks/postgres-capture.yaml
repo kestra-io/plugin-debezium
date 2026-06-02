@@ -23,21 +23,28 @@ tasks:
       - -c
       - max_wal_senders=10
 
+  - id: sleep
+    type: io.kestra.plugin.core.flow.Sleep
+    duration: PT20S
+
   - id: init_postgres
-    type: io.kestra.plugin.docker.Run
-    containerImage: postgres:16
-    networkMode: host
-    entryPoint:
-      - /bin/sh
-    commands:
-      - -c
-      - |
-        until pg_isready -h localhost -p {{ outputs.port.value }} -U postgres; do sleep 1; done
-        PGPASSWORD=pg_passwd psql -h localhost -p {{ outputs.port.value }} -U postgres -c "CREATE USER my_repl_user WITH REPLICATION PASSWORD 'my_repl_password';"
-        PGPASSWORD=pg_passwd psql -h localhost -p {{ outputs.port.value }} -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO my_repl_user;"
-        PGPASSWORD=pg_passwd psql -h localhost -p {{ outputs.port.value }} -U postgres -c "DROP TABLE IF EXISTS events;"
-        PGPASSWORD=pg_passwd psql -h localhost -p {{ outputs.port.value }} -U postgres -c "CREATE TABLE events (events_id SERIAL, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id));"
-        PGPASSWORD=pg_passwd psql -h localhost -p {{ outputs.port.value }} -U postgres -c "INSERT INTO events(events_id, event_title, event_description) VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+      CREATE USER my_repl_user WITH REPLICATION PASSWORD 'my_repl_password';
+      GRANT ALL PRIVILEGES ON DATABASE postgres TO my_repl_user;
+      DROP TABLE IF EXISTS events;
+      CREATE TABLE events (
+        events_id SERIAL,
+        event_title VARCHAR(256),
+        event_description VARCHAR(256),
+        PRIMARY KEY (events_id)
+      );
+      INSERT INTO events(events_id, event_title, event_description) VALUES
+        (1,'Machine Head','Cool concert'),
+        (2,'Dropkick Murphys','Very cool concert'),
+        (3,'Pink Floyd','Cool'),
+        (4,'TV show','Some TV'),
+        (5,'Nothing','Boring');
 
   - id: capture
     type: io.kestra.plugin.debezium.postgres.Capture
@@ -62,3 +69,10 @@ finally:
     type: io.kestra.plugin.docker.Stop
     containerId: "{{ outputs.start_postgres.taskRunner.containerId }}"
     kill: true
+
+pluginDefaults:
+  - type: io.kestra.plugin.jdbc.postgresql
+    values:
+      username: postgres
+      password: pg_passwd
+      url: "jdbc:postgresql://localhost:{{ outputs.port.value }}/postgres"
