@@ -28,15 +28,15 @@ tasks:
     commands:
       - -c
       - |
-        until mysqladmin ping -h {{ outputs.start_mysql.taskRunner.containerId }} -P 3306 -u root -pmysql_passwd --silent 2>/dev/null; do sleep 2; done
-        mysql -h {{ outputs.start_mysql.taskRunner.containerId }} -P 3306 -u root -pmysql_passwd kestra -e "DROP TABLE IF EXISTS capture_events;"
-        mysql -h {{ outputs.start_mysql.taskRunner.containerId }} -P 3306 -u root -pmysql_passwd kestra -e "CREATE TABLE capture_events (events_id BIGINT AUTO_INCREMENT PRIMARY KEY, event_title VARCHAR(256), event_description VARCHAR(256));"
-        mysql -h {{ outputs.start_mysql.taskRunner.containerId }} -P 3306 -u root -pmysql_passwd kestra -e "INSERT INTO capture_events(event_title, event_description) VALUES ('Machine Head','Cool concert'),('Dropkick Murphys','Very cool concert'),('Pink Floyd','Cool'),('TV show','Some TV'),('Nothing','Boring');"
+        until mysqladmin ping -h {{ outputs.start_mysql.taskRunner.containerId.substring(0,12) }} -P 3306 -u root -pmysql_passwd --silent 2>/dev/null; do sleep 2; done
+        mysql -h {{ outputs.start_mysql.taskRunner.containerId.substring(0,12) }} -P 3306 -u root -pmysql_passwd kestra -e "DROP TABLE IF EXISTS capture_events;"
+        mysql -h {{ outputs.start_mysql.taskRunner.containerId.substring(0,12) }} -P 3306 -u root -pmysql_passwd kestra -e "CREATE TABLE capture_events (events_id BIGINT AUTO_INCREMENT PRIMARY KEY, event_title VARCHAR(256), event_description VARCHAR(256));"
+        mysql -h {{ outputs.start_mysql.taskRunner.containerId.substring(0,12) }} -P 3306 -u root -pmysql_passwd kestra -e "INSERT INTO capture_events(event_title, event_description) VALUES ('Machine Head','Cool concert'),('Dropkick Murphys','Very cool concert'),('Pink Floyd','Cool'),('TV show','Some TV'),('Nothing','Boring');"
 
   - id: capture
     type: io.kestra.plugin.debezium.mysql.Capture
     serverId: 123456789
-    hostname: "{{ outputs.start_mysql.taskRunner.containerId }}"
+    hostname: "{{ outputs.start_mysql.taskRunner.containerId.substring(0,12) }}"
     port: "3306"
     username: root
     password: mysql_passwd
@@ -54,5 +54,5 @@ tasks:
 finally:
   - id: stop_mysql
     type: io.kestra.plugin.docker.Stop
-    containerId: "{{ outputs.start_mysql.taskRunner.containerId }}"
+    containerId: "{{ outputs.start_mysql.taskRunner.containerId.substring(0,12) }}"
     kill: true

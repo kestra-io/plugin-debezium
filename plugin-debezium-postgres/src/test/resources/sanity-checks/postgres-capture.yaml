@@ -25,16 +25,16 @@ tasks:
     commands:
       - -c
       - |
-        until pg_isready -h {{ outputs.start_postgres.taskRunner.containerId }} -p 5432 -U postgres; do sleep 1; done
-        PGPASSWORD=pg_passwd psql -h {{ outputs.start_postgres.taskRunner.containerId }} -p 5432 -U postgres -c "CREATE USER my_repl_user WITH REPLICATION PASSWORD 'my_repl_password';"
-        PGPASSWORD=pg_passwd psql -h {{ outputs.start_postgres.taskRunner.containerId }} -p 5432 -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO my_repl_user;"
-        PGPASSWORD=pg_passwd psql -h {{ outputs.start_postgres.taskRunner.containerId }} -p 5432 -U postgres -c "DROP TABLE IF EXISTS events;"
-        PGPASSWORD=pg_passwd psql -h {{ outputs.start_postgres.taskRunner.containerId }} -p 5432 -U postgres -c "CREATE TABLE events (events_id SERIAL, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id));"
-        PGPASSWORD=pg_passwd psql -h {{ outputs.start_postgres.taskRunner.containerId }} -p 5432 -U postgres -c "INSERT INTO events(events_id, event_title, event_description) VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
+        until pg_isready -h {{ outputs.start_postgres.taskRunner.containerId.substring(0,12) }} -p 5432 -U postgres; do sleep 1; done
+        PGPASSWORD=pg_passwd psql -h {{ outputs.start_postgres.taskRunner.containerId.substring(0,12) }} -p 5432 -U postgres -c "CREATE USER my_repl_user WITH REPLICATION PASSWORD 'my_repl_password';"
+        PGPASSWORD=pg_passwd psql -h {{ outputs.start_postgres.taskRunner.containerId.substring(0,12) }} -p 5432 -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO my_repl_user;"
+        PGPASSWORD=pg_passwd psql -h {{ outputs.start_postgres.taskRunner.containerId.substring(0,12) }} -p 5432 -U postgres -c "DROP TABLE IF EXISTS events;"
+        PGPASSWORD=pg_passwd psql -h {{ outputs.start_postgres.taskRunner.containerId.substring(0,12) }} -p 5432 -U postgres -c "CREATE TABLE events (events_id SERIAL, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id));"
+        PGPASSWORD=pg_passwd psql -h {{ outputs.start_postgres.taskRunner.containerId.substring(0,12) }} -p 5432 -U postgres -c "INSERT INTO events(events_id, event_title, event_description) VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
 
   - id: capture
     type: io.kestra.plugin.debezium.postgres.Capture
-    hostname: "{{ outputs.start_postgres.taskRunner.containerId }}"
+    hostname: "{{ outputs.start_postgres.taskRunner.containerId.substring(0,12) }}"
     port: "5432"
     username: postgres
     password: pg_passwd
@@ -53,5 +53,5 @@ tasks:
 finally:
   - id: stop_postgres
     type: io.kestra.plugin.docker.Stop
-    containerId: "{{ outputs.start_postgres.taskRunner.containerId }}"
+    containerId: "{{ outputs.start_postgres.taskRunner.containerId.substring(0,12) }}"
     kill: true
