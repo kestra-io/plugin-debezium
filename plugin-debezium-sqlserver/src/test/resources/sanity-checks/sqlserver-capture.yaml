@@ -1,36 +1,40 @@
 id: sqlserver-capture
 namespace: sanitychecks.plugin-debezium-sqlserver
 
+# Set dockerNetwork to the Docker network your Kestra service is on.
+# For the official Kestra Docker Compose this is kestra_default.
+variables:
+  dockerNetwork: kestra_default
+
 tasks:
   - id: start_sqlserver
     type: io.kestra.plugin.docker.Run
     containerImage: mcr.microsoft.com/mssql/server:2019-latest
-    networkMode: host
+    networkMode: "{{ vars.dockerNetwork }}"
     wait: false
     env:
       ACCEPT_EULA: "Y"
       SA_PASSWORD: "Sqls3rv3r_Pa55word!"
-      MSSQL_TCP_PORT: "11433"
 
   - id: init_sqlserver
     type: io.kestra.plugin.docker.Run
     containerImage: mcr.microsoft.com/mssql/server:2019-latest
-    networkMode: host
+    networkMode: "{{ vars.dockerNetwork }}"
     entryPoint:
       - /bin/bash
     commands:
       - -c
       - |
         export PATH="$PATH:/opt/mssql-tools18/bin:/opt/mssql-tools/bin"
-        until sqlcmd -S 127.0.0.1,11433 -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "SELECT 1" >/dev/null 2>&1; do sleep 3; done
-        sqlcmd -S 127.0.0.1,11433 -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "CREATE DATABASE deb;"
-        sqlcmd -S 127.0.0.1,11433 -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "USE deb; EXEC sys.sp_cdc_enable_db;"
-        sqlcmd -S 127.0.0.1,11433 -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "USE deb; DROP TABLE IF EXISTS dbo.events; CREATE TABLE dbo.events (events_id INT, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id)); INSERT INTO dbo.events VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
+        until sqlcmd -S {{ outputs.start_sqlserver.taskRunner.containerId }},1433 -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "SELECT 1" >/dev/null 2>&1; do sleep 3; done
+        sqlcmd -S {{ outputs.start_sqlserver.taskRunner.containerId }},1433 -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "CREATE DATABASE deb;"
+        sqlcmd -S {{ outputs.start_sqlserver.taskRunner.containerId }},1433 -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "USE deb; EXEC sys.sp_cdc_enable_db;"
+        sqlcmd -S {{ outputs.start_sqlserver.taskRunner.containerId }},1433 -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "USE deb; DROP TABLE IF EXISTS dbo.events; CREATE TABLE dbo.events (events_id INT, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id)); INSERT INTO dbo.events VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
 
   - id: capture
     type: io.kestra.plugin.debezium.sqlserver.Capture
-    hostname: host.docker.internal
-    port: "11433"
+    hostname: "{{ outputs.start_sqlserver.taskRunner.containerId }}"
+    port: "1433"
     username: sa
     password: "Sqls3rv3r_Pa55word!"
     database: deb
