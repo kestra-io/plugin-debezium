@@ -1,16 +1,10 @@
 id: oracle-capture
 namespace: sanitychecks.plugin-debezium-oracle
 
-# Set dockerNetwork to the Docker network your Kestra service is on.
-# For the official Kestra Docker Compose this is kestra_default.
-variables:
-  dockerNetwork: kestra_default
-
 tasks:
   - id: start_oracle
     type: io.kestra.plugin.docker.Run
     containerImage: gvenzl/oracle-xe:21-full
-    networkMode: "{{ vars.dockerNetwork }}"
     wait: false
     env:
       ORACLE_PASSWORD: passwd
@@ -20,17 +14,17 @@ tasks:
   - id: init_oracle
     type: io.kestra.plugin.docker.Run
     containerImage: gvenzl/oracle-xe:21-full
-    networkMode: "{{ vars.dockerNetwork }}"
+    networkMode: "container:{{ outputs.start_oracle.taskRunner.containerId }}"
     entryPoint:
       - /bin/sh
     commands:
       - -c
       - |
-        until echo "EXIT" | sqlplus -L sys/passwd@//{{ outputs.start_oracle.taskRunner.containerId }}:1521/XE as sysdba 2>/dev/null | grep -q "Connected to"; do
+        until echo "EXIT" | sqlplus -L sys/passwd@//127.0.0.1:1521/XE as sysdba 2>/dev/null | grep -q "Connected to"; do
           echo "Waiting for Oracle..."
           sleep 15
         done
-        sqlplus -S sys/passwd@//{{ outputs.start_oracle.taskRunner.containerId }}:1521/XE as sysdba <<'ENDSQL'
+        sqlplus -S sys/passwd@//127.0.0.1:1521/XE as sysdba <<'ENDSQL'
         ALTER DATABASE ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS;
         ALTER PROFILE DEFAULT LIMIT FAILED_LOGIN_ATTEMPTS UNLIMITED;
         CREATE TABLESPACE LOGMINER_TBS DATAFILE '/opt/oracle/oradata/XE/logminer_tbs.dbf' SIZE 25M REUSE AUTOEXTEND ON MAXSIZE UNLIMITED;
@@ -61,7 +55,7 @@ tasks:
         GRANT SELECT ON V_$TRANSACTION TO c##dbzuser CONTAINER=ALL;
         EXIT;
         ENDSQL
-        sqlplus -S kestra/passwd@//{{ outputs.start_oracle.taskRunner.containerId }}:1521/XE <<'ENDSQL'
+        sqlplus -S kestra/passwd@//127.0.0.1:1521/XE <<'ENDSQL'
         DROP TABLE events;
         CREATE TABLE events (events_id NUMBER, event_title VARCHAR2(256), event_description VARCHAR2(256), PRIMARY KEY (events_id));
         INSERT INTO events VALUES (1, 'Machine Head', 'Cool concert');
@@ -72,10 +66,13 @@ tasks:
         COMMIT;
         EXIT;
         ENDSQL
+        hostname -I | awk '{print $1}' | tr -d '\n' > host.txt
+    outputFiles:
+      - host.txt
 
   - id: capture
     type: io.kestra.plugin.debezium.oracle.Capture
-    hostname: "{{ outputs.start_oracle.taskRunner.containerId }}"
+    hostname: "{{ read(outputs.init_oracle.outputFiles['host.txt']) }}"
     port: "1521"
     username: c##dbzuser
     password: dbz
