@@ -5,14 +5,13 @@ tasks:
   - id: start_postgres
     type: io.kestra.plugin.docker.Run
     containerImage: postgres:16
-    networkMode: host
     wait: false
+    portBindings:
+      - "15432:5432"
     env:
       POSTGRES_PASSWORD: pg_passwd
     commands:
       - postgres
-      - -c
-      - port=15432
       - -c
       - wal_level=logical
       - -c
@@ -23,22 +22,23 @@ tasks:
   - id: init_postgres
     type: io.kestra.plugin.docker.Run
     containerImage: postgres:16
-    networkMode: host
+    extraHosts:
+      - "host.docker.internal:host-gateway"
     entryPoint:
       - /bin/sh
     commands:
       - -c
       - |
-        until pg_isready -h 127.0.0.1 -p 15432 -U postgres; do sleep 1; done
-        PGPASSWORD=pg_passwd psql -h 127.0.0.1 -p 15432 -U postgres -c "CREATE USER my_repl_user WITH REPLICATION PASSWORD 'my_repl_password';"
-        PGPASSWORD=pg_passwd psql -h 127.0.0.1 -p 15432 -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO my_repl_user;"
-        PGPASSWORD=pg_passwd psql -h 127.0.0.1 -p 15432 -U postgres -c "DROP TABLE IF EXISTS events;"
-        PGPASSWORD=pg_passwd psql -h 127.0.0.1 -p 15432 -U postgres -c "CREATE TABLE events (events_id SERIAL, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id));"
-        PGPASSWORD=pg_passwd psql -h 127.0.0.1 -p 15432 -U postgres -c "INSERT INTO events(events_id, event_title, event_description) VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
+        until pg_isready -h host.docker.internal -p 15432 -U postgres; do sleep 1; done
+        PGPASSWORD=pg_passwd psql -h host.docker.internal -p 15432 -U postgres -c "CREATE USER my_repl_user WITH REPLICATION PASSWORD 'my_repl_password';"
+        PGPASSWORD=pg_passwd psql -h host.docker.internal -p 15432 -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO my_repl_user;"
+        PGPASSWORD=pg_passwd psql -h host.docker.internal -p 15432 -U postgres -c "DROP TABLE IF EXISTS events;"
+        PGPASSWORD=pg_passwd psql -h host.docker.internal -p 15432 -U postgres -c "CREATE TABLE events (events_id SERIAL, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id));"
+        PGPASSWORD=pg_passwd psql -h host.docker.internal -p 15432 -U postgres -c "INSERT INTO events(events_id, event_title, event_description) VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
 
   - id: capture
     type: io.kestra.plugin.debezium.postgres.Capture
-    hostname: 127.0.0.1
+    hostname: host.docker.internal
     port: "15432"
     username: postgres
     password: pg_passwd
