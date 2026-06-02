@@ -2,7 +2,7 @@ id: oracle-capture
 namespace: sanitychecks.plugin-debezium-oracle
 
 tasks:
-  - id: port
+  - id: randomPort
     type: io.kestra.plugin.core.debug.Return
     format: "{{ randomPort() }}"
 
@@ -11,7 +11,7 @@ tasks:
     containerImage: gvenzl/oracle-xe:21-full
     wait: false
     portBindings:
-      - "{{ outputs.port.value }}:1521"
+      - "{{ outputs.randomPort.value }}:1521"
     env:
       ORACLE_PASSWORD: passwd
       APP_USER: kestra
@@ -76,7 +76,7 @@ tasks:
   - id: capture
     type: io.kestra.plugin.debezium.oracle.Capture
     hostname: localhost
-    port: "{{ outputs.port.value }}"
+    port: "{{ outputs.randomPort.value }}"
     username: c##dbzuser
     password: dbz
     sid: XE

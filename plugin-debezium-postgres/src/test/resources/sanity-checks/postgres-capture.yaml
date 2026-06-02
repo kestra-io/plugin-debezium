@@ -2,7 +2,7 @@ id: postgres-capture
 namespace: sanitychecks.plugin-debezium-postgres
 
 tasks:
-  - id: port
+  - id: randomPort
     type: io.kestra.plugin.core.debug.Return
     format: "{{ randomPort() }}"
 
@@ -11,7 +11,7 @@ tasks:
     containerImage: postgres:16
     wait: false
     portBindings:
-      - "{{ outputs.port.value }}:5432"
+      - "{{ outputs.randomPort.value }}:5432"
     env:
       POSTGRES_PASSWORD: pg_passwd
     commands:
@@ -49,7 +49,7 @@ tasks:
   - id: capture
     type: io.kestra.plugin.debezium.postgres.Capture
     hostname: localhost
-    port: "{{ outputs.port.value }}"
+    port: "{{ outputs.randomPort.value }}"
     username: postgres
     password: pg_passwd
     database: postgres
@@ -75,4 +75,4 @@ pluginDefaults:
     values:
       username: postgres
       password: pg_passwd
-      url: "jdbc:postgresql://localhost:{{ outputs.port.value }}/postgres"
+      url: "jdbc:postgresql://localhost:{{ outputs.randomPort.value }}/postgres"

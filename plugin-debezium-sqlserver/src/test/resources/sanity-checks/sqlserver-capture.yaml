@@ -2,7 +2,7 @@ id: sqlserver-capture
 namespace: sanitychecks.plugin-debezium-sqlserver
 
 tasks:
-  - id: port
+  - id: randomPort
     type: io.kestra.plugin.core.debug.Return
     format: "{{ randomPort() }}"
 
@@ -11,7 +11,7 @@ tasks:
     containerImage: mcr.microsoft.com/mssql/server:2022-latest
     wait: false
     portBindings:
-      - "{{ outputs.port.value }}:1433"
+      - "{{ outputs.randomPort.value }}:1433"
     env:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "Sqls3rv3r_Pa55word!"
@@ -47,7 +47,7 @@ tasks:
   - id: capture
     type: io.kestra.plugin.debezium.sqlserver.Capture
     hostname: localhost
-    port: "{{ outputs.port.value }}"
+    port: "{{ outputs.randomPort.value }}"
     username: sa
     password: "Sqls3rv3r_Pa55word!"
     database: deb
@@ -75,4 +75,4 @@ pluginDefaults:
     values:
       username: sa
       password: "Sqls3rv3r_Pa55word!"
-      url: "jdbc:sqlserver://localhost:{{ outputs.port.value }};databaseName=master;encrypt=true;trustServerCertificate=true"
+      url: "jdbc:sqlserver://localhost:{{ outputs.randomPort.value }};databaseName=master;encrypt=true;trustServerCertificate=true"

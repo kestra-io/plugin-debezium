@@ -2,7 +2,7 @@ id: mysql-capture
 namespace: sanitychecks.plugin-debezium-mysql
 
 tasks:
-  - id: port
+  - id: randomPort
     type: io.kestra.plugin.core.debug.Return
     format: "{{ randomPort() }}"
 
@@ -11,7 +11,7 @@ tasks:
     containerImage: mysql:8.0
     wait: false
     portBindings:
-      - "{{ outputs.port.value }}:3306"
+      - "{{ outputs.randomPort.value }}:3306"
     env:
       MYSQL_ROOT_PASSWORD: mysql_passwd
       MYSQL_DATABASE: kestra
@@ -52,7 +52,7 @@ tasks:
     type: io.kestra.plugin.debezium.mysql.Capture
     serverId: 123456789
     hostname: localhost
-    port: "{{ outputs.port.value }}"
+    port: "{{ outputs.randomPort.value }}"
     username: root
     password: mysql_passwd
     snapshotMode: INITIAL
@@ -77,4 +77,4 @@ pluginDefaults:
     values:
       username: root
       password: mysql_passwd
-      url: "jdbc:mysql://localhost:{{ outputs.port.value }}/kestra?allowMultiQueries=true&useSSL=false&allowPublicKeyRetrieval=true"
+      url: "jdbc:mysql://localhost:{{ outputs.randomPort.value }}/kestra?allowMultiQueries=true&useSSL=false&allowPublicKeyRetrieval=true"
