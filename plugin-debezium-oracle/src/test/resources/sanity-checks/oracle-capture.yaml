@@ -2,10 +2,16 @@ id: oracle-capture
 namespace: sanitychecks.plugin-debezium-oracle
 
 tasks:
+  - id: port
+    type: io.kestra.plugin.core.debug.Return
+    format: "{{ randomPort() }}"
+
   - id: start_oracle
     type: io.kestra.plugin.docker.Run
     containerImage: gvenzl/oracle-xe:21-full
     wait: false
+    portBindings:
+      - "{{ outputs.port.value }}:1521"
     env:
       ORACLE_PASSWORD: passwd
       APP_USER: kestra
@@ -14,17 +20,17 @@ tasks:
   - id: init_oracle
     type: io.kestra.plugin.docker.Run
     containerImage: gvenzl/oracle-xe:21-full
-    networkMode: "container:{{ outputs.start_oracle.taskRunner.containerId }}"
+    networkMode: host
     entryPoint:
       - /bin/sh
     commands:
       - -c
       - |
-        until echo "EXIT" | sqlplus -L sys/passwd@//127.0.0.1:1521/XE as sysdba 2>/dev/null | grep -q "Connected to"; do
+        until echo "EXIT" | sqlplus -L sys/passwd@//localhost:{{ outputs.port.value }}/XE as sysdba 2>/dev/null | grep -q "Connected to"; do
           echo "Waiting for Oracle..."
           sleep 15
         done
-        sqlplus -S sys/passwd@//127.0.0.1:1521/XE as sysdba <<'ENDSQL'
+        sqlplus -S sys/passwd@//localhost:{{ outputs.port.value }}/XE as sysdba <<'ENDSQL'
         ALTER DATABASE ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS;
         ALTER PROFILE DEFAULT LIMIT FAILED_LOGIN_ATTEMPTS UNLIMITED;
         CREATE TABLESPACE LOGMINER_TBS DATAFILE '/opt/oracle/oradata/XE/logminer_tbs.dbf' SIZE 25M REUSE AUTOEXTEND ON MAXSIZE UNLIMITED;
@@ -55,7 +61,7 @@ tasks:
         GRANT SELECT ON V_$TRANSACTION TO c##dbzuser CONTAINER=ALL;
         EXIT;
         ENDSQL
-        sqlplus -S kestra/passwd@//127.0.0.1:1521/XE <<'ENDSQL'
+        sqlplus -S kestra/passwd@//localhost:{{ outputs.port.value }}/XE <<'ENDSQL'
         DROP TABLE events;
         CREATE TABLE events (events_id NUMBER, event_title VARCHAR2(256), event_description VARCHAR2(256), PRIMARY KEY (events_id));
         INSERT INTO events VALUES (1, 'Machine Head', 'Cool concert');
@@ -66,14 +72,11 @@ tasks:
         COMMIT;
         EXIT;
         ENDSQL
-        hostname -I | awk '{print $1}' | tr -d '\n' > host.txt
-    outputFiles:
-      - host.txt
 
   - id: capture
     type: io.kestra.plugin.debezium.oracle.Capture
-    hostname: "{{ read(outputs.init_oracle.outputFiles['host.txt']) }}"
-    port: "1521"
+    hostname: localhost
+    port: "{{ outputs.port.value }}"
     username: c##dbzuser
     password: dbz
     sid: XE

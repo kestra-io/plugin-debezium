@@ -2,36 +2,40 @@ id: sqlserver-capture
 namespace: sanitychecks.plugin-debezium-sqlserver
 
 tasks:
+  - id: port
+    type: io.kestra.plugin.core.debug.Return
+    format: "{{ randomPort() }}"
+
   - id: start_sqlserver
     type: io.kestra.plugin.docker.Run
-    containerImage: mcr.microsoft.com/mssql/server:2019-latest
+    containerImage: mcr.microsoft.com/mssql/server:2022-latest
     wait: false
+    portBindings:
+      - "{{ outputs.port.value }}:1433"
     env:
       ACCEPT_EULA: "Y"
-      SA_PASSWORD: "Sqls3rv3r_Pa55word!"
+      MSSQL_SA_PASSWORD: "Sqls3rv3r_Pa55word!"
+      MSSQL_PID: "Express"
 
   - id: init_sqlserver
     type: io.kestra.plugin.docker.Run
     containerImage: mcr.microsoft.com/mssql/server:2019-latest
-    networkMode: "container:{{ outputs.start_sqlserver.taskRunner.containerId }}"
+    networkMode: host
     entryPoint:
       - /bin/bash
     commands:
       - -c
       - |
         export PATH="$PATH:/opt/mssql-tools18/bin:/opt/mssql-tools/bin"
-        until sqlcmd -S 127.0.0.1,1433 -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "SELECT 1" >/dev/null 2>&1; do sleep 3; done
-        sqlcmd -S 127.0.0.1,1433 -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "CREATE DATABASE deb;"
-        sqlcmd -S 127.0.0.1,1433 -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "USE deb; EXEC sys.sp_cdc_enable_db;"
-        sqlcmd -S 127.0.0.1,1433 -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "USE deb; DROP TABLE IF EXISTS dbo.events; CREATE TABLE dbo.events (events_id INT, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id)); INSERT INTO dbo.events VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
-        hostname -I | awk '{print $1}' | tr -d '\n' > host.txt
-    outputFiles:
-      - host.txt
+        until sqlcmd -S localhost,{{ outputs.port.value }} -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "SELECT 1" >/dev/null 2>&1; do sleep 3; done
+        sqlcmd -S localhost,{{ outputs.port.value }} -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "CREATE DATABASE deb;"
+        sqlcmd -S localhost,{{ outputs.port.value }} -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "USE deb; EXEC sys.sp_cdc_enable_db;"
+        sqlcmd -S localhost,{{ outputs.port.value }} -U sa -P "Sqls3rv3r_Pa55word!" -No -Q "USE deb; DROP TABLE IF EXISTS dbo.events; CREATE TABLE dbo.events (events_id INT, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id)); INSERT INTO dbo.events VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
 
   - id: capture
     type: io.kestra.plugin.debezium.sqlserver.Capture
-    hostname: "{{ read(outputs.init_sqlserver.outputFiles['host.txt']) }}"
-    port: "1433"
+    hostname: localhost
+    port: "{{ outputs.port.value }}"
     username: sa
     password: "Sqls3rv3r_Pa55word!"
     database: deb

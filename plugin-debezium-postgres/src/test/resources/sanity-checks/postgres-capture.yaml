@@ -2,10 +2,16 @@ id: postgres-capture
 namespace: sanitychecks.plugin-debezium-postgres
 
 tasks:
+  - id: port
+    type: io.kestra.plugin.core.debug.Return
+    format: "{{ randomPort() }}"
+
   - id: start_postgres
     type: io.kestra.plugin.docker.Run
     containerImage: postgres:16
     wait: false
+    portBindings:
+      - "{{ outputs.port.value }}:5432"
     env:
       POSTGRES_PASSWORD: pg_passwd
     commands:
@@ -20,26 +26,23 @@ tasks:
   - id: init_postgres
     type: io.kestra.plugin.docker.Run
     containerImage: postgres:16
-    networkMode: "container:{{ outputs.start_postgres.taskRunner.containerId }}"
+    networkMode: host
     entryPoint:
       - /bin/sh
     commands:
       - -c
       - |
-        until pg_isready -h 127.0.0.1 -p 5432 -U postgres; do sleep 1; done
-        PGPASSWORD=pg_passwd psql -h 127.0.0.1 -p 5432 -U postgres -c "CREATE USER my_repl_user WITH REPLICATION PASSWORD 'my_repl_password';"
-        PGPASSWORD=pg_passwd psql -h 127.0.0.1 -p 5432 -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO my_repl_user;"
-        PGPASSWORD=pg_passwd psql -h 127.0.0.1 -p 5432 -U postgres -c "DROP TABLE IF EXISTS events;"
-        PGPASSWORD=pg_passwd psql -h 127.0.0.1 -p 5432 -U postgres -c "CREATE TABLE events (events_id SERIAL, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id));"
-        PGPASSWORD=pg_passwd psql -h 127.0.0.1 -p 5432 -U postgres -c "INSERT INTO events(events_id, event_title, event_description) VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
-        hostname -I | awk '{print $1}' | tr -d '\n' > host.txt
-    outputFiles:
-      - host.txt
+        until pg_isready -h localhost -p {{ outputs.port.value }} -U postgres; do sleep 1; done
+        PGPASSWORD=pg_passwd psql -h localhost -p {{ outputs.port.value }} -U postgres -c "CREATE USER my_repl_user WITH REPLICATION PASSWORD 'my_repl_password';"
+        PGPASSWORD=pg_passwd psql -h localhost -p {{ outputs.port.value }} -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO my_repl_user;"
+        PGPASSWORD=pg_passwd psql -h localhost -p {{ outputs.port.value }} -U postgres -c "DROP TABLE IF EXISTS events;"
+        PGPASSWORD=pg_passwd psql -h localhost -p {{ outputs.port.value }} -U postgres -c "CREATE TABLE events (events_id SERIAL, event_title VARCHAR(256), event_description VARCHAR(256), PRIMARY KEY (events_id));"
+        PGPASSWORD=pg_passwd psql -h localhost -p {{ outputs.port.value }} -U postgres -c "INSERT INTO events(events_id, event_title, event_description) VALUES (1,'Machine Head','Cool concert'),(2,'Dropkick Murphys','Very cool concert'),(3,'Pink Floyd','Cool'),(4,'TV show','Some TV'),(5,'Nothing','Boring');"
 
   - id: capture
     type: io.kestra.plugin.debezium.postgres.Capture
-    hostname: "{{ read(outputs.init_postgres.outputFiles['host.txt']) }}"
-    port: "5432"
+    hostname: localhost
+    port: "{{ outputs.port.value }}"
     username: postgres
     password: pg_passwd
     database: postgres

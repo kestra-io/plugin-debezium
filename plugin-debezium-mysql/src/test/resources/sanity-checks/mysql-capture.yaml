@@ -2,10 +2,16 @@ id: mysql-capture
 namespace: sanitychecks.plugin-debezium-mysql
 
 tasks:
+  - id: port
+    type: io.kestra.plugin.core.debug.Return
+    format: "{{ randomPort() }}"
+
   - id: start_mysql
     type: io.kestra.plugin.docker.Run
     containerImage: mysql:8.0
     wait: false
+    portBindings:
+      - "{{ outputs.port.value }}:3306"
     env:
       MYSQL_ROOT_PASSWORD: mysql_passwd
       MYSQL_DATABASE: kestra
@@ -23,25 +29,22 @@ tasks:
   - id: init_mysql
     type: io.kestra.plugin.docker.Run
     containerImage: mysql:8.0
-    networkMode: "container:{{ outputs.start_mysql.taskRunner.containerId }}"
+    networkMode: host
     entryPoint:
       - /bin/sh
     commands:
       - -c
       - |
-        until mysqladmin ping -h 127.0.0.1 -P 3306 -u root -pmysql_passwd --silent 2>/dev/null; do sleep 2; done
-        mysql -h 127.0.0.1 -P 3306 -u root -pmysql_passwd kestra -e "DROP TABLE IF EXISTS capture_events;"
-        mysql -h 127.0.0.1 -P 3306 -u root -pmysql_passwd kestra -e "CREATE TABLE capture_events (events_id BIGINT AUTO_INCREMENT PRIMARY KEY, event_title VARCHAR(256), event_description VARCHAR(256));"
-        mysql -h 127.0.0.1 -P 3306 -u root -pmysql_passwd kestra -e "INSERT INTO capture_events(event_title, event_description) VALUES ('Machine Head','Cool concert'),('Dropkick Murphys','Very cool concert'),('Pink Floyd','Cool'),('TV show','Some TV'),('Nothing','Boring');"
-        hostname -I | awk '{print $1}' | tr -d '\n' > host.txt
-    outputFiles:
-      - host.txt
+        until mysqladmin ping -h localhost -P {{ outputs.port.value }} -u root -pmysql_passwd --silent 2>/dev/null; do sleep 2; done
+        mysql -h localhost -P {{ outputs.port.value }} -u root -pmysql_passwd kestra -e "DROP TABLE IF EXISTS capture_events;"
+        mysql -h localhost -P {{ outputs.port.value }} -u root -pmysql_passwd kestra -e "CREATE TABLE capture_events (events_id BIGINT AUTO_INCREMENT PRIMARY KEY, event_title VARCHAR(256), event_description VARCHAR(256));"
+        mysql -h localhost -P {{ outputs.port.value }} -u root -pmysql_passwd kestra -e "INSERT INTO capture_events(event_title, event_description) VALUES ('Machine Head','Cool concert'),('Dropkick Murphys','Very cool concert'),('Pink Floyd','Cool'),('TV show','Some TV'),('Nothing','Boring');"
 
   - id: capture
     type: io.kestra.plugin.debezium.mysql.Capture
     serverId: 123456789
-    hostname: "{{ read(outputs.init_mysql.outputFiles['host.txt']) }}"
-    port: "3306"
+    hostname: localhost
+    port: "{{ outputs.port.value }}"
     username: root
     password: mysql_passwd
     snapshotMode: INITIAL
