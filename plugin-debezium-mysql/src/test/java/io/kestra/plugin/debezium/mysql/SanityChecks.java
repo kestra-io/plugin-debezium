@@ -39,10 +39,18 @@ class SanityChecks extends AbstractDebeziumTest {
     @BeforeEach
     void setup() throws Exception {
         cleanupFlowState(kvStoreService, "sanitychecks.plugin-debezium-mysql", "mysql-capture", "debezium-state");
+        resetMaster();
+        executeSqlScript("scripts/mysql.sql");
+    }
+
+    private void resetMaster() throws Exception {
+        try (var connection = getConnection(); var statement = connection.createStatement()) {
+            statement.execute("RESET MASTER");
+        }
     }
 
     @Test
-    @ExecuteFlow("sanity-checks/mysql-capture.yaml")
+    @ExecuteFlow("sanity-checks/mysql-capture-ci.yaml")
     void mysqlCapture(Execution execution) {
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
     }

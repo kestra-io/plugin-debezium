@@ -38,11 +38,13 @@ class SanityChecks extends AbstractDebeziumTest {
 
     @BeforeEach
     void setup() throws Exception {
+        PostgresDebeziumTestHelper.dropReplicationArtifacts(this::getConnection, "kestra", "kestra_publication");
         cleanupFlowState(kvStoreService, "sanitychecks.plugin-debezium-postgres", "postgres-capture", "debezium-state");
+        executeSqlScript("scripts/postgres.sql");
     }
 
     @Test
-    @ExecuteFlow("sanity-checks/postgres-capture.yaml")
+    @ExecuteFlow("sanity-checks/postgres-capture-ci.yaml")
     void postgresCapture(Execution execution) {
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
     }

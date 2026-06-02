@@ -1,5 +1,8 @@
 package io.kestra.plugin.debezium.oracle;
 
+import java.io.StringReader;
+
+import org.h2.tools.RunScript;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -39,10 +42,15 @@ class SanityChecks extends AbstractDebeziumTest {
     @BeforeEach
     void setup() throws Exception {
         cleanupFlowState(kvStoreService, "sanitychecks.plugin-debezium-oracle", "oracle-capture", "debezium-state");
+        try {
+            RunScript.execute(getConnection(), new StringReader("DROP TABLE events"));
+        } catch (Exception ignored) {
+        }
+        executeSqlScript("scripts/oracle.sql");
     }
 
     @Test
-    @ExecuteFlow("sanity-checks/oracle-capture.yaml")
+    @ExecuteFlow("sanity-checks/oracle-capture-ci.yaml")
     void oracleCapture(Execution execution) {
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
     }
