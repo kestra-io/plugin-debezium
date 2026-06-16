@@ -303,19 +303,39 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
      * three remain consistent. A user-supplied `properties` map applied afterwards can still
      * override any of these values.
      */
-    static String deriveConnectorId(RunContext runContext) {
+    String deriveConnectorId(RunContext runContext) {
         var flowInfo = runContext.flowInfo();
         var taskRunInfo = runContext.taskRunInfo();
 
         String namespace = flowInfo.namespace() != null ? flowInfo.namespace() : "";
         String flowId = flowInfo.id() != null ? flowInfo.id() : "";
-        String taskId = taskRunInfo != null && taskRunInfo.taskId() != null ? taskRunInfo.taskId() : "";
+
+        String taskRunTaskId = taskRunInfo != null ? taskRunInfo.taskId() : null;
+        String taskId = resolveTaskId(this.getId(), taskRunTaskId);
 
         // Include task-run value when present (ForEach / parallel iterations) to distinguish
         // concurrently running iterations of the same task.
         String iterationValue = taskRunInfo != null && taskRunInfo.value() != null ? taskRunInfo.value().toString() : "";
 
         return connectorIdFromParts(namespace, flowId, taskId, iterationValue);
+    }
+
+    /**
+     * Resolves the task component of the connector identity.
+     *
+     * Prefers the task/trigger's own id: it is always set, including during trigger
+     * evaluation where {@code taskRunInfo} is empty (no execution/taskrun exists yet).
+     * Without this, two distinct Debezium triggers in the same flow would derive the same
+     * id and their JMX MBeans would still collide. Falls back to the taskRunInfo task id,
+     * then to an empty string, only as a safety net.
+     *
+     * Exposed package-private for unit testing without a full DI context.
+     */
+    static String resolveTaskId(String ownId, String taskRunTaskId) {
+        if (ownId != null) {
+            return ownId;
+        }
+        return taskRunTaskId != null ? taskRunTaskId : "";
     }
 
     /**

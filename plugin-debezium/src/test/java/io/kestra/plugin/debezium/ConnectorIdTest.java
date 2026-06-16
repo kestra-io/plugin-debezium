@@ -48,4 +48,32 @@ class ConnectorIdTest {
 
         assertThat(id1, is(not(id2)));
     }
+
+    @Test
+    void resolveTaskIdPrefersOwnId() {
+        // During trigger evaluation taskRunInfo is empty (no execution yet), so the
+        // task/trigger's own id is what keeps two triggers in the same flow distinct.
+        assertThat(AbstractDebeziumTask.resolveTaskId("my-trigger", null), is("my-trigger"));
+        // Own id always wins, even when taskRunInfo would also provide one.
+        assertThat(AbstractDebeziumTask.resolveTaskId("my-task", "taskrun-task-id"), is("my-task"));
+    }
+
+    @Test
+    void resolveTaskIdFallsBackWhenOwnIdMissing() {
+        assertThat(AbstractDebeziumTask.resolveTaskId(null, "taskrun-task-id"), is("taskrun-task-id"));
+        assertThat(AbstractDebeziumTask.resolveTaskId(null, null), is(""));
+    }
+
+    @Test
+    void distinctTriggersInSameFlowGetDistinctIds() {
+        // Two Debezium triggers in the same namespace/flow, differentiated only by their own
+        // id — this is the trigger-evaluation case where taskRunInfo is empty. They must not
+        // collide, otherwise their JMX MBean names would clash on the same JVM.
+        var triggerA = AbstractDebeziumTask.connectorIdFromParts(
+            "ns", "flow", AbstractDebeziumTask.resolveTaskId("trigger-a", null), "");
+        var triggerB = AbstractDebeziumTask.connectorIdFromParts(
+            "ns", "flow", AbstractDebeziumTask.resolveTaskId("trigger-b", null), "");
+
+        assertThat(triggerA, is(not(triggerB)));
+    }
 }
