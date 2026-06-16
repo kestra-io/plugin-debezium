@@ -42,10 +42,6 @@ import io.kestra.core.models.annotations.PluginProperty;
 @NoArgsConstructor
 public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger implements RealtimeTriggerInterface, TriggerOutput<AbstractDebeziumRealtimeTrigger.StreamOutput> {
 
-    private static final String OFFSETS_DATA_FILE = "offsets.dat";
-
-    private static final String DBHISTORY_DATA_FILE = "dbhistory.dat";
-
     @Builder.Default
     protected Property<AbstractDebeziumTask.Format> format = Property.ofValue(AbstractDebeziumTask.Format.INLINE);
 
@@ -121,8 +117,8 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     public Publisher<AbstractDebeziumRealtimeTrigger.StreamOutput> publisher(AbstractDebeziumTask task, RunContext runContext) throws IllegalVariableEvaluationException {
 
         var rOffsetsCommitMode = runContext.render(offsetsCommitMode).as(OffsetCommitMode.class).orElse(OffsetCommitMode.ON_STOP);
-        var offsetFile = runContext.workingDir().path().resolve(OFFSETS_DATA_FILE);
-        var historyFile = runContext.workingDir().path().resolve(DBHISTORY_DATA_FILE);
+        var offsetFile = runContext.workingDir().path().resolve(AbstractDebeziumTask.OFFSETS_DATA_FILE);
+        var historyFile = runContext.workingDir().path().resolve(AbstractDebeziumTask.DBHISTORY_DATA_FILE);
 
         return Flux.create(sink ->
         {

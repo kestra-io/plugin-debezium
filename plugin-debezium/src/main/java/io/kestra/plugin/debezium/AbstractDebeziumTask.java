@@ -403,7 +403,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         try {
             HashMap<byte[], byte[]> offsets;
-            try (var ois = new ObjectInputStream(new FileInputStream(offsetFile.toFile()))) {
+            try (var fis = new FileInputStream(offsetFile.toFile());
+                 var ois = new ObjectInputStream(fis)) {
                 @SuppressWarnings("unchecked")
                 var loaded = (HashMap<byte[], byte[]>) ois.readObject();
                 offsets = loaded;
@@ -774,9 +775,10 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         )
         private String stateOffsetKey;
 
+        @Deprecated
         @Schema(
-            title = "The KV Store key under which the combined Debezium state (offset + schema history) is stored.",
-            description = "Same as `stateOffsetKey` — both fields point to the single atomic combined entry."
+            title = "Deprecated — use stateOffsetKey.",
+            description = "Deprecated — use stateOffsetKey."
         )
         private String stateHistoryKey;
 
