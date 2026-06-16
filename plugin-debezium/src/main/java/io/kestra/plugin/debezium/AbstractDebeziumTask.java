@@ -34,6 +34,7 @@ import io.kestra.core.storages.kv.KVStore;
 import io.kestra.core.storages.kv.KVValue;
 import io.kestra.core.storages.kv.KVValueAndMetadata;
 import io.kestra.core.utils.Await;
+import io.kestra.core.utils.Hashing;
 
 import ch.qos.logback.classic.LoggerContext;
 import io.debezium.embedded.Connect;
@@ -290,10 +291,51 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             .build();
     }
 
+    /**
+     * Derives a stable, unique connector identity scoped to this task's logical identity
+     * (namespace + flow + task, plus iteration value when inside a ForEach).
+     *
+     * The 8-character hex suffix (murmur3-128 truncated) keeps the identifier short and
+     * valid as a Debezium topic.prefix while guaranteeing uniqueness across concurrent
+     * connectors on the same JVM so their JMX MBean names never collide.
+     *
+     * The same value is used for `topic.prefix`, `name`, and `database.server.name` so all
+     * three remain consistent. A user-supplied `properties` map applied afterwards can still
+     * override any of these values.
+     */
+    static String deriveConnectorId(RunContext runContext) {
+        var flowInfo = runContext.flowInfo();
+        var taskRunInfo = runContext.taskRunInfo();
+
+        String namespace = flowInfo.namespace() != null ? flowInfo.namespace() : "";
+        String flowId = flowInfo.id() != null ? flowInfo.id() : "";
+        String taskId = taskRunInfo != null && taskRunInfo.taskId() != null ? taskRunInfo.taskId() : "";
+
+        // Include task-run value when present (ForEach / parallel iterations) to distinguish
+        // concurrently running iterations of the same task.
+        String iterationValue = taskRunInfo != null && taskRunInfo.value() != null ? taskRunInfo.value().toString() : "";
+
+        return connectorIdFromParts(namespace, flowId, taskId, iterationValue);
+    }
+
+    /**
+     * Pure function that computes the connector id from its constituent parts.
+     * Exposed package-private for unit testing without a full DI context.
+     */
+    static String connectorIdFromParts(String namespace, String flowId, String taskId, String iterationValue) {
+        String identity = namespace + "|" + flowId + "|" + taskId + "|" + iterationValue;
+        // Truncate to 8 hex chars (32 bits of murmur3-128) — short but collision-resistant
+        // enough for the expected cardinality of concurrent Kestra tasks.
+        String hash = Hashing.hashToString(identity).substring(0, 8);
+        return "kestra_" + hash;
+    }
+
     protected Properties properties(RunContext runContext, Path offsetFile, Path historyFile) throws Exception {
         final Properties props = new Properties();
 
-        props.setProperty("name", "engine");
+        var connectorId = deriveConnectorId(runContext);
+
+        props.setProperty("name", connectorId);
 
         // offset
         props.setProperty("offset.storage", "org.apache.kafka.connect.storage.FileOffsetBackingStore");
@@ -301,7 +343,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         props.setProperty("offset.flush.interval.ms", "1000");
 
         // database
-        props.setProperty("database.server.name", "kestra");
+        props.setProperty("database.server.name", connectorId);
 
         if (this.needDatabaseHistory()) {
             props.setProperty("schema.history.internal", "io.debezium.storage.file.history.FileSchemaHistory");
@@ -332,8 +374,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         // delete are send with a full rows, we don't want to emulate kafka behaviour
         props.setProperty("tombstones.on.delete", "false");
 
-        // required
-        props.setProperty("topic.prefix", "kestra_");
+        // required — use the same connector-unique id so JMX MBean names never collide
+        props.setProperty("topic.prefix", connectorId);
 
         if (this.includedDatabases != null) {
             props.setProperty("database.include.list", joinProperties(runContext, this.includedDatabases));
