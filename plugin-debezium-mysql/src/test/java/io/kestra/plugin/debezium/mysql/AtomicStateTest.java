@@ -176,6 +176,35 @@ class AtomicStateTest {
     }
 
     @Test
+    void historyTaskDoesNotWriteIncompleteEntryWhenHistoryFileMissing(@TempDir Path tempDir) throws Exception {
+        var stateName = "debezium-state-" + IdUtils.create();
+        var task = HistoryTask.builder()
+            .id(IdUtils.create())
+            .type(HistoryTask.class.getName())
+            .stateName(Property.ofValue(stateName))
+            .build();
+
+        var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+
+        var offsetFile = tempDir.resolve("offsets.dat");
+        var historyFile = tempDir.resolve("dbhistory.dat"); // deliberately absent
+        Files.write(offsetFile, "offsets-content".getBytes());
+
+        var result = task.saveStateAtomically(runContext, offsetFile, historyFile);
+
+        // Must return null — no write should have occurred.
+        assertThat(result, is(nullValue()));
+
+        // The combined key must not exist in the KV store.
+        var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+        var combinedKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(
+            runContext, stateName, AbstractDebeziumTask.COMBINED_STATE_FILE, null);
+        var stored = kvStore.getValue(combinedKey);
+        assertThat("combined key must not have been written when history file is absent",
+            stored.isPresent(), is(false));
+    }
+
+    @Test
     void combinedKeyTakesPrecedenceOverLegacy(@TempDir Path tempDir) throws Exception {
         var stateName = "debezium-state-" + IdUtils.create();
         var task = HistoryTask.builder()

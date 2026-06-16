@@ -228,9 +228,11 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         Output.OutputBuilder outputBuilder = Output.builder();
 
         if (offsetFile.toFile().exists()) {
-            String combinedKey = saveStateAtomically(runContext, offsetFile, historyFile);
-            outputBuilder.stateOffsetKey(combinedKey);
-            outputBuilder.stateHistoryKey(combinedKey);
+            var combinedKey = saveStateAtomically(runContext, offsetFile, historyFile);
+            if (combinedKey != null) {
+                outputBuilder.stateOffsetKey(combinedKey);
+                outputBuilder.stateHistoryKey(combinedKey);
+            }
         }
 
         outputBuilder
@@ -444,10 +446,23 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     /**
      * Writes offset + history as ONE atomic KV entry so the two states can never desync on crash.
-     * Returns the combined key written.
+     * Returns the combined key written, or null if the entry would be inconsistent (offsets absent,
+     * or history absent for a history-needing connector) — in that case nothing is written.
      */
     public String saveStateAtomically(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
         try {
+            if (!offsetFile.toFile().exists()) {
+                return null;
+            }
+            if (this.needDatabaseHistory() && !historyFile.toFile().exists()) {
+                // Writing offsets without history would cause "db history topic is missing" on restore.
+                runContext.logger().debug(
+                    "Skipping atomic state save: history file not yet available ({}). Will retry on next batch or end-of-run.",
+                    historyFile.getFileName()
+                );
+                return null;
+            }
+
             var taskRunValue = runContext.storage().getTaskStorageContext()
                 .map(StorageContext.Task::getTaskRunValue)
                 .orElse(null);
@@ -456,10 +471,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             var combinedKey = computeKvStoreKey(runContext, stateName, COMBINED_STATE_FILE, taskRunValue);
 
             var stateMap = new LinkedHashMap<String, byte[]>();
-            if (offsetFile.toFile().exists()) {
-                stateMap.put(STATE_KEY_OFFSETS, Files.readAllBytes(offsetFile));
-            }
-            if (this.needDatabaseHistory() && historyFile.toFile().exists()) {
+            stateMap.put(STATE_KEY_OFFSETS, Files.readAllBytes(offsetFile));
+            if (this.needDatabaseHistory()) {
                 stateMap.put(STATE_KEY_HISTORY, Files.readAllBytes(historyFile));
             }
 
