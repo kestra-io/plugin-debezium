@@ -1,6 +1,5 @@
 package io.kestra.plugin.debezium;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,8 +27,6 @@ import io.kestra.core.models.triggers.TriggerOutput;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.storages.StorageContext;
 import io.kestra.core.storages.kv.KVStore;
-import io.kestra.core.storages.kv.KVValue;
-import io.kestra.core.storages.kv.KVValueAndMetadata;
 import io.kestra.core.utils.Hashing;
 import io.kestra.core.utils.Slugify;
 
@@ -134,11 +131,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         return Flux.create(sink ->
         {
             try {
-                restoreStateFromKv(runContext, task, offsetFile, OFFSETS_DATA_FILE);
-
-                if (task.needDatabaseHistory()) {
-                    restoreStateFromKv(runContext, task, historyFile, DBHISTORY_DATA_FILE);
-                }
+                restoreStateFromKv(runContext, task, offsetFile, historyFile);
 
                 final Properties props = task.properties(runContext, offsetFile, historyFile);
 
@@ -194,69 +187,64 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         });
     }
 
-    private static void restoreStateFromKv(RunContext runContext, AbstractDebeziumTask task, Path targetFile, String filename) throws IOException {
+    /**
+     * Restores debezium state from KV. Tries the combined atomic key first; falls back to the
+     * two legacy per-file keys so existing deployments upgrade without a forced re-snapshot.
+     */
+    private static void restoreStateFromKv(RunContext runContext, AbstractDebeziumTask task, Path offsetFile, Path historyFile) throws IOException {
         try {
-            String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
+            var taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
+            var stateName = runContext.render(task.stateName).as(String.class).orElseThrow();
+            var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
 
-            String stateName = runContext.render(task.stateName).as(String.class).orElseThrow();
+            var combinedKey = computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.COMBINED_STATE_FILE, taskRunValue);
+            var combinedValue = kvStore.getValue(combinedKey);
 
-            String kvKey = computeKvStoreKey(runContext, stateName, filename, taskRunValue);
-
-            KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
-            Optional<KVValue> kvValue = kvStore.getValue(kvKey);
-
-            if (kvValue.isPresent() && kvValue.get().value() != null) {
-                byte[] stateData = (byte[]) kvValue.get().value();
-                Files.write(targetFile, stateData);
+            if (combinedValue.isPresent() && combinedValue.get().value() != null) {
+                @SuppressWarnings("unchecked")
+                var stateMap = (Map<String, Object>) combinedValue.get().value();
+                writeFileFromMap(stateMap, AbstractDebeziumTask.STATE_KEY_OFFSETS, offsetFile);
+                if (task.needDatabaseHistory()) {
+                    writeFileFromMap(stateMap, AbstractDebeziumTask.STATE_KEY_HISTORY, historyFile);
+                }
+                return;
             }
 
+            // Legacy fallback: read the two separate keys written by older versions.
+            readLegacyKey(kvStore, runContext, stateName, AbstractDebeziumTask.OFFSETS_DATA_FILE, offsetFile, taskRunValue);
+            if (task.needDatabaseHistory()) {
+                readLegacyKey(kvStore, runContext, stateName, AbstractDebeziumTask.DBHISTORY_DATA_FILE, historyFile, taskRunValue);
+            }
         } catch (IllegalVariableEvaluationException | ResourceExpiredException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static void saveOffsets(AbstractDebeziumTask task, RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
-        String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
-
-        KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
-
-        if (offsetFile.toFile().exists()) {
-            try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
-                String stateName = runContext.render(task.stateName).as(String.class).orElseThrow();
-
-                String kvKey = computeKvStoreKey(
-                    runContext,
-                    stateName,
-                    offsetFile.getFileName().toString(),
-                    taskRunValue
-                );
-
-                kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
-            } catch (IllegalVariableEvaluationException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        if (task.needDatabaseHistory() && historyFile.toFile().exists()) {
-            try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
-                String stateName = runContext.render(task.stateName).as(String.class).orElseThrow();
-
-                String kvKey = computeKvStoreKey(
-                    runContext,
-                    stateName,
-                    historyFile.getFileName().toString(),
-                    taskRunValue
-                );
-
-                kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
-                ;
-            } catch (IllegalVariableEvaluationException e) {
-                throw new RuntimeException(e);
-            }
+    private static void writeFileFromMap(Map<String, Object> stateMap, String key, Path targetFile) throws IOException {
+        var data = stateMap.get(key);
+        if (data instanceof byte[] bytes) {
+            Files.write(targetFile, bytes);
         }
     }
 
-    static String computeKvStoreKey(RunContext runContext, String stateName, String filename, String taskRunValue) throws IllegalVariableEvaluationException {
+    private static void readLegacyKey(KVStore kvStore, RunContext runContext, String stateName, String filename, Path targetFile, String taskRunValue)
+        throws IOException, ResourceExpiredException {
+        try {
+            var kvKey = computeKvStoreKey(runContext, stateName, filename, taskRunValue);
+            var kvValue = kvStore.getValue(kvKey);
+            if (kvValue.isPresent() && kvValue.get().value() != null) {
+                Files.write(targetFile, (byte[]) kvValue.get().value());
+            }
+        } catch (IllegalVariableEvaluationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static void saveOffsets(AbstractDebeziumTask task, RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
+        task.saveStateAtomically(runContext, offsetFile, historyFile);
+    }
+
+    public static String computeKvStoreKey(RunContext runContext, String stateName, String filename, String taskRunValue) throws IllegalVariableEvaluationException {
 
         String separator = "_";
         boolean hashTaskRunValue = taskRunValue != null;

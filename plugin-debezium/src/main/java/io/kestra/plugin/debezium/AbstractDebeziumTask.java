@@ -1,10 +1,10 @@
 package io.kestra.plugin.debezium;
 
 import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -31,7 +31,6 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.storages.StorageContext;
 import io.kestra.core.storages.kv.KVStore;
-import io.kestra.core.storages.kv.KVValue;
 import io.kestra.core.storages.kv.KVValueAndMetadata;
 import io.kestra.core.utils.Await;
 
@@ -53,9 +52,17 @@ import static io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger.computeK
 @NoArgsConstructor
 public abstract class AbstractDebeziumTask extends Task implements RunnableTask<AbstractDebeziumTask.Output>, AbstractDebeziumInterface {
 
-    private static final String OFFSETS_DATA_FILE = "offsets.dat";
+    public static final String OFFSETS_DATA_FILE = "offsets.dat";
 
-    private static final String DBHISTORY_DATA_FILE = "dbhistory.dat";
+    public static final String DBHISTORY_DATA_FILE = "dbhistory.dat";
+
+    // Single combined key written atomically; replaces the two legacy per-file keys.
+    public static final String COMBINED_STATE_FILE = "debezium-state.dat";
+
+    // Map keys used inside the combined KV entry.
+    public static final String STATE_KEY_OFFSETS = "offsets";
+
+    public static final String STATE_KEY_HISTORY = "history";
 
     @Builder.Default
     protected Property<Format> format = Property.ofValue(Format.INLINE);
@@ -174,12 +181,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         ZonedDateTime lastRecord = ZonedDateTime.now();
 
         Path offsetFile = runContext.workingDir().path().resolve(OFFSETS_DATA_FILE);
-        this.restoreState(runContext, offsetFile);
-
         Path historyFile = runContext.workingDir().path().resolve(DBHISTORY_DATA_FILE);
-        if (this.needDatabaseHistory()) {
-            this.restoreState(runContext, historyFile);
-        }
+        this.restoreState(runContext, offsetFile, historyFile);
 
         final Properties props = this.properties(runContext, offsetFile, historyFile);
 
@@ -225,33 +228,9 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         Output.OutputBuilder outputBuilder = Output.builder();
 
         if (offsetFile.toFile().exists()) {
-            try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
-                String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
-                String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
-                String fileName = offsetFile.getFileName().toString();
-                String kvKey = computeKvStoreKey(runContext, stateName, fileName, taskRunValue);
-
-                KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
-
-                kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
-
-                outputBuilder.stateOffsetKey(kvKey);
-            }
-        }
-
-        if (this.needDatabaseHistory()) {
-            try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
-                String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
-                String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
-                String fileName = historyFile.getFileName().toString();
-                String kvKey = computeKvStoreKey(runContext, stateName, fileName, taskRunValue);
-
-                KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
-
-                kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
-
-                outputBuilder.stateHistoryKey(kvKey);
-            }
+            String combinedKey = saveStateAtomically(runContext, offsetFile, historyFile);
+            outputBuilder.stateOffsetKey(combinedKey);
+            outputBuilder.stateHistoryKey(combinedKey);
         }
 
         outputBuilder
@@ -404,59 +383,95 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         return false;
     }
 
-    protected void restoreState(RunContext runContext, Path path) throws IOException {
+    /**
+     * Restores debezium state from KV. Tries the combined atomic key first; falls back to the
+     * two legacy per-file keys so existing deployments upgrade without a forced re-snapshot.
+     */
+    public void restoreState(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
         try {
-            String taskRunValue = runContext.storage().getTaskStorageContext()
+            var taskRunValue = runContext.storage().getTaskStorageContext()
                 .map(StorageContext.Task::getTaskRunValue)
                 .orElse(null);
-            String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
-            String filename = path.getFileName().toString();
+            var stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
+            var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
 
-            String kvKey = computeKvStoreKey(runContext, stateName, filename, taskRunValue);
+            var combinedKey = computeKvStoreKey(runContext, stateName, COMBINED_STATE_FILE, taskRunValue);
+            var combinedValue = kvStore.getValue(combinedKey);
 
-            KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
-            Optional<KVValue> kvValue = kvStore.getValue(kvKey);
+            if (combinedValue.isPresent() && combinedValue.get().value() != null) {
+                @SuppressWarnings("unchecked")
+                var stateMap = (Map<String, Object>) combinedValue.get().value();
+                restoreFileFromMap(stateMap, STATE_KEY_OFFSETS, offsetFile);
+                if (this.needDatabaseHistory()) {
+                    restoreFileFromMap(stateMap, STATE_KEY_HISTORY, historyFile);
+                }
+                return;
+            }
 
+            // Legacy fallback: read the two separate keys written by older versions.
+            restoreLegacyKey(kvStore, runContext, stateName, OFFSETS_DATA_FILE, offsetFile, taskRunValue);
+            if (this.needDatabaseHistory()) {
+                restoreLegacyKey(kvStore, runContext, stateName, DBHISTORY_DATA_FILE, historyFile, taskRunValue);
+            }
+        } catch (FileNotFoundException | ResourceExpiredException ignored) {
+        } catch (IllegalVariableEvaluationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static void restoreFileFromMap(Map<String, Object> stateMap, String key, Path targetFile) throws IOException {
+        var data = stateMap.get(key);
+        if (data instanceof byte[] bytes) {
+            Files.write(targetFile, bytes);
+        }
+    }
+
+    private static void restoreLegacyKey(KVStore kvStore, RunContext runContext, String stateName, String filename, Path targetFile, String taskRunValue)
+        throws IOException, ResourceExpiredException {
+        try {
+            var kvKey = computeKvStoreKey(runContext, stateName, filename, taskRunValue);
+            var kvValue = kvStore.getValue(kvKey);
             if (kvValue.isPresent() && kvValue.get().value() != null) {
-                byte[] stateData = (byte[]) kvValue.get().value();
                 FileUtils.copyInputStreamToFile(
-                    new ByteArrayInputStream(stateData),
-                    path.toFile()
+                    new ByteArrayInputStream((byte[]) kvValue.get().value()),
+                    targetFile.toFile()
                 );
             }
-            ;
-        } catch (FileNotFoundException | ResourceExpiredException ignored) {
+        } catch (IllegalVariableEvaluationException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
+    /**
+     * Writes offset + history as ONE atomic KV entry so the two states can never desync on crash.
+     * Returns the combined key written.
+     */
+    public String saveStateAtomically(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
+        try {
+            var taskRunValue = runContext.storage().getTaskStorageContext()
+                .map(StorageContext.Task::getTaskRunValue)
+                .orElse(null);
+            var stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
+            var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+            var combinedKey = computeKvStoreKey(runContext, stateName, COMBINED_STATE_FILE, taskRunValue);
+
+            var stateMap = new LinkedHashMap<String, byte[]>();
+            if (offsetFile.toFile().exists()) {
+                stateMap.put(STATE_KEY_OFFSETS, Files.readAllBytes(offsetFile));
+            }
+            if (this.needDatabaseHistory() && historyFile.toFile().exists()) {
+                stateMap.put(STATE_KEY_HISTORY, Files.readAllBytes(historyFile));
+            }
+
+            kvStore.put(combinedKey, new KVValueAndMetadata(null, stateMap));
+            return combinedKey;
         } catch (IllegalVariableEvaluationException e) {
             throw new RuntimeException(e);
         }
     }
 
     protected void saveOffsetsForTask(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
-        try {
-            String taskRunValue = runContext.storage().getTaskStorageContext()
-                .map(StorageContext.Task::getTaskRunValue)
-                .orElse(null);
-            String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
-
-            KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
-
-            if (offsetFile.toFile().exists()) {
-                try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
-                    String kvKey = computeKvStoreKey(runContext, stateName, offsetFile.getFileName().toString(), taskRunValue);
-                    kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
-                }
-            }
-
-            if (this.needDatabaseHistory() && historyFile.toFile().exists()) {
-                try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
-                    String kvKey = computeKvStoreKey(runContext, stateName, historyFile.getFileName().toString(), taskRunValue);
-                    kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
-                }
-            }
-        } catch (IllegalVariableEvaluationException e) {
-            throw new RuntimeException(e);
-        }
+        saveStateAtomically(runContext, offsetFile, historyFile);
     }
 
     private void shutdown(Logger logger, ExecutorService executorService) {
@@ -474,12 +489,17 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The KV Store key under which the state of the offset is stored"
+            title = "The KV Store key under which the combined Debezium state (offset + schema history) is stored.",
+            description = """
+                Both `stateOffsetKey` and `stateHistoryKey` point to the same combined entry written atomically.
+                The entry holds a map with keys `offsets` and `history` so both states are always consistent.
+                """
         )
         private String stateOffsetKey;
 
         @Schema(
-            title = "The KV Store key under which the state of the database history is stored"
+            title = "The KV Store key under which the combined Debezium state (offset + schema history) is stored.",
+            description = "Same as `stateOffsetKey` — both fields point to the single atomic combined entry."
         )
         private String stateHistoryKey;
 
