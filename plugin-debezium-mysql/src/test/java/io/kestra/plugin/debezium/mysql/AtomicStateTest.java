@@ -19,6 +19,7 @@ import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 
 import jakarta.inject.Inject;
+import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -35,8 +36,12 @@ class AtomicStateTest {
     private RunContextFactory runContextFactory;
 
     // Minimal no-history task (like MongoDB) to test the offsets-only path.
+    // Mirrors real plugin tasks (@SuperBuilder + @NoArgsConstructor, public) so Kestra's
+    // classpath plugin scan can instantiate it; otherwise the scan aborts and the storage
+    // plugin registry is left empty.
     @SuperBuilder
-    private static class OffsetOnlyTask extends AbstractDebeziumTask {
+    @NoArgsConstructor
+    public static class OffsetOnlyTask extends AbstractDebeziumTask {
         @Override
         protected boolean needDatabaseHistory() {
             return false;
@@ -50,7 +55,8 @@ class AtomicStateTest {
 
     // Full task with history (like MySQL) to test both streams together.
     @SuperBuilder
-    private static class HistoryTask extends AbstractDebeziumTask {
+    @NoArgsConstructor
+    public static class HistoryTask extends AbstractDebeziumTask {
         @Override
         protected boolean needDatabaseHistory() {
             return true;
@@ -69,6 +75,8 @@ class AtomicStateTest {
             .id(IdUtils.create())
             .type(HistoryTask.class.getName())
             .stateName(Property.ofValue(stateName))
+            .hostname(Property.ofValue("localhost"))
+            .port(Property.ofValue("3306"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
@@ -104,6 +112,8 @@ class AtomicStateTest {
             .id(IdUtils.create())
             .type(HistoryTask.class.getName())
             .stateName(Property.ofValue(stateName))
+            .hostname(Property.ofValue("localhost"))
+            .port(Property.ofValue("3306"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
@@ -130,6 +140,8 @@ class AtomicStateTest {
             .id(IdUtils.create())
             .type(OffsetOnlyTask.class.getName())
             .stateName(Property.ofValue(stateName))
+            .hostname(Property.ofValue("localhost"))
+            .port(Property.ofValue("3306"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
@@ -156,6 +168,8 @@ class AtomicStateTest {
             .id(IdUtils.create())
             .type(HistoryTask.class.getName())
             .stateName(Property.ofValue(stateName))
+            .hostname(Property.ofValue("localhost"))
+            .port(Property.ofValue("3306"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
@@ -182,6 +196,8 @@ class AtomicStateTest {
             .id(IdUtils.create())
             .type(HistoryTask.class.getName())
             .stateName(Property.ofValue(stateName))
+            .hostname(Property.ofValue("localhost"))
+            .port(Property.ofValue("3306"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
@@ -211,6 +227,8 @@ class AtomicStateTest {
             .id(IdUtils.create())
             .type(HistoryTask.class.getName())
             .stateName(Property.ofValue(stateName))
+            .hostname(Property.ofValue("localhost"))
+            .port(Property.ofValue("3306"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
