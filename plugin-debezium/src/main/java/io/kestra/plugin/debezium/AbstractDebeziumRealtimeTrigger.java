@@ -140,6 +140,12 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                     restoreStateFromKv(runContext, task, historyFile, DBHISTORY_DATA_FILE);
                 }
 
+                var connectorId = task.deriveConnectorId(runContext);
+                AbstractDebeziumTask.migrateOffsetFile(runContext.logger(), offsetFile, connectorId);
+                if (task.needDatabaseHistory()) {
+                    AbstractDebeziumTask.migrateHistoryFile(runContext.logger(), historyFile, connectorId);
+                }
+
                 final Properties props = task.properties(runContext, offsetFile, historyFile);
 
                 ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), null, ZonedDateTime.now(), offsetFile, historyFile);

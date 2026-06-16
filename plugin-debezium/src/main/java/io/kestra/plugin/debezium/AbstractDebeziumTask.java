@@ -4,7 +4,11 @@ import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -182,6 +186,12 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             this.restoreState(runContext, historyFile);
         }
 
+        var connectorId = deriveConnectorId(runContext);
+        migrateOffsetFile(runContext.logger(), offsetFile, connectorId);
+        if (this.needDatabaseHistory()) {
+            migrateHistoryFile(runContext.logger(), historyFile, connectorId);
+        }
+
         final Properties props = this.properties(runContext, offsetFile, historyFile);
 
         ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
@@ -348,6 +358,133 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         // enough for the expected cardinality of concurrent Kestra tasks.
         String hash = Hashing.hashToString(identity).substring(0, 8);
         return "kestra_" + hash;
+    }
+
+    // Pre-fix hardcoded values — the identity every existing offset file was written with.
+    static final String LEGACY_CONNECTOR_NAME = "engine";
+    static final String LEGACY_TOPIC_PREFIX = "kestra_";
+
+    /**
+     * Builds the compact JSON key that FileOffsetBackingStore stores in its HashMap.
+     * Format: ["<name>",{"server":"<topicPrefix>"}] — no spaces, as written by Kafka Connect.
+     */
+    static String offsetKey(String connectorName, String topicPrefix) {
+        return "[\"" + connectorName + "\",{\"server\":\"" + topicPrefix + "\"}]";
+    }
+
+    /**
+     * Rewrites the offset file so the derived connector id is the active key.
+     *
+     * Without this, upgrading from the hardcoded "engine"/"kestra_" identity to the new
+     * derived "kestra_<hex>" identity makes Debezium treat the run as a first-ever start
+     * (no matching offset found) and triggers a full re-snapshot of already-captured rows.
+     *
+     * Safe: wrapped in try/catch so any failure leaves the file untouched — worst case is
+     * the pre-existing re-snapshot behavior, not a new regression.
+     */
+    static void migrateOffsetFile(Logger logger, Path offsetFile, String newConnectorId) {
+        if (!offsetFile.toFile().exists() || offsetFile.toFile().length() == 0) {
+            return;
+        }
+
+        try {
+            HashMap<byte[], byte[]> offsets;
+            try (var ois = new ObjectInputStream(new FileInputStream(offsetFile.toFile()))) {
+                @SuppressWarnings("unchecked")
+                var loaded = (HashMap<byte[], byte[]>) ois.readObject();
+                offsets = loaded;
+            }
+
+            var newKey = offsetKey(newConnectorId, newConnectorId).getBytes(StandardCharsets.UTF_8);
+            var legacyKey = offsetKey(LEGACY_CONNECTOR_NAME, LEGACY_TOPIC_PREFIX).getBytes(StandardCharsets.UTF_8);
+
+            // Idempotency: new key already present means this run was already migrated or is native.
+            boolean alreadyMigrated = offsets.keySet().stream()
+                .anyMatch(k -> Arrays.equals(k, newKey));
+            if (alreadyMigrated) {
+                return;
+            }
+
+            // MongoDB uses a different partition shape (e.g. {"rs":"...", "server_id":"..."});
+            // its legacy offset key won't match LEGACY_CONNECTOR_NAME / LEGACY_TOPIC_PREFIX so
+            // this method is effectively a no-op for MongoDB — the file is left unchanged.
+            byte[] legacyValue = null;
+            byte[] legacyKeyInMap = null;
+            for (var entry : offsets.entrySet()) {
+                if (Arrays.equals(entry.getKey(), legacyKey)) {
+                    legacyValue = entry.getValue();
+                    legacyKeyInMap = entry.getKey();
+                    break;
+                }
+            }
+
+            if (legacyValue == null) {
+                return;
+            }
+
+            offsets.remove(legacyKeyInMap);
+            offsets.put(newKey, legacyValue);
+
+            try (var oos = new ObjectOutputStream(Files.newOutputStream(offsetFile))) {
+                oos.writeObject(offsets);
+            }
+
+            logger.info("Migrated legacy Debezium offset from connector 'engine' to '{}'", newConnectorId);
+        } catch (Exception e) {
+            logger.warn("Could not migrate legacy offset file; Debezium may re-snapshot (file left untouched): {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Rewrites the schema-history file (used by MySQL, Oracle, SQLServer, Db2) so that
+     * references to the legacy server name "kestra_" become the new derived connector id.
+     *
+     * FileSchemaHistory stores one JSON object per line; each record embeds the logical server
+     * name in its source/partition section. We do a targeted string replacement so that only
+     * the server-name token changes and the rest of each record is preserved verbatim.
+     *
+     * Best-effort: any line we cannot safely rewrite is left unchanged. Any I/O or parse
+     * failure leaves the file untouched.
+     */
+    static void migrateHistoryFile(Logger logger, Path historyFile, String newConnectorId) {
+        if (!historyFile.toFile().exists() || historyFile.toFile().length() == 0) {
+            return;
+        }
+
+        try {
+            var lines = Files.readAllLines(historyFile, StandardCharsets.UTF_8);
+
+            // Idempotency: if any line already references the new id, the file was already migrated.
+            boolean alreadyMigrated = lines.stream().anyMatch(l -> l.contains("\"" + newConnectorId + "\""));
+            if (alreadyMigrated) {
+                return;
+            }
+
+            // Replace "kestra_" server token with the new id in every line that contains it.
+            // We match the JSON string literal exactly to avoid touching unrelated content.
+            var legacyToken = "\"" + LEGACY_TOPIC_PREFIX + "\"";
+            var newToken = "\"" + newConnectorId + "\"";
+
+            boolean anyChanged = false;
+            var rewritten = new ArrayList<String>(lines.size());
+            for (var line : lines) {
+                if (line.contains(legacyToken)) {
+                    rewritten.add(line.replace(legacyToken, newToken));
+                    anyChanged = true;
+                } else {
+                    rewritten.add(line);
+                }
+            }
+
+            if (!anyChanged) {
+                return;
+            }
+
+            Files.write(historyFile, rewritten, StandardCharsets.UTF_8);
+            logger.info("Migrated legacy Debezium schema history from server 'kestra_' to '{}'", newConnectorId);
+        } catch (Exception e) {
+            logger.warn("Could not migrate legacy schema-history file; Debezium may re-snapshot (file left untouched): {}", e.getMessage());
+        }
     }
 
     protected Properties properties(RunContext runContext, Path offsetFile, Path historyFile) throws Exception {
