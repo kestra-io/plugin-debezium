@@ -241,12 +241,10 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         Output.OutputBuilder outputBuilder = Output.builder();
 
-        if (offsetFile.toFile().exists()) {
-            var combinedKey = saveStateAtomically(runContext, offsetFile, historyFile);
-            if (combinedKey != null) {
-                outputBuilder.stateOffsetKey(combinedKey);
-                outputBuilder.stateHistoryKey(combinedKey);
-            }
+        var combinedKey = saveFinalState(runContext, offsetFile, historyFile);
+        if (combinedKey != null) {
+            outputBuilder.stateOffsetKey(combinedKey);
+            outputBuilder.stateHistoryKey(combinedKey);
         }
 
         outputBuilder
@@ -734,6 +732,23 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     protected void saveOffsetsForTask(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
         saveStateAtomically(runContext, offsetFile, historyFile);
+    }
+
+    /**
+     * Persists state at end-of-run. Unlike the per-batch save (which logs a skip at debug, since the
+     * history file routinely lags during early streaming), this warns when offsets were produced but
+     * nothing could be persisted — the last-chance case that silently forces a re-snapshot next run.
+     */
+    public String saveFinalState(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
+        var combinedKey = saveStateAtomically(runContext, offsetFile, historyFile);
+        if (combinedKey == null && offsetFile.toFile().exists()) {
+            runContext.logger().warn(
+                "Debezium produced offsets but state was not persisted because the schema history file ({}) is missing; "
+                + "the next run will re-snapshot from scratch.",
+                historyFile.getFileName()
+            );
+        }
+        return combinedKey;
     }
 
     private void shutdown(Logger logger, ExecutorService executorService) {

@@ -178,7 +178,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
             } finally {
                 if (rOffsetsCommitMode == OffsetCommitMode.ON_STOP) {
                     try {
-                        saveOffsets(task, runContext, offsetFile, historyFile);
+                        task.saveFinalState(runContext, offsetFile, historyFile);
                     } catch (IOException e) {
                         sink.error(new RuntimeException(e));
                     }
