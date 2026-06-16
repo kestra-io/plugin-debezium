@@ -79,7 +79,7 @@ services:
 #      start_period: 240s
 
   oracle:
-    image: gvenzl/oracle-xe:21-full
+    image: gvenzl/oracle-xe:21-slim
     ports:
       - "1521:1521"
     environment:

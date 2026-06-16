@@ -19,6 +19,11 @@
 # cp certs/client/* plugin-debezium-postgres/src/test/resources/ssl/
 # cp certs/ca.crt plugin-debezium-postgres/src/test/resources/ssl/
 
+# Reclaim runner disk before pulling the DB images. The CI runner only has ~14GB
+# free, and the combined database images previously filled it to 0MB, causing image
+# pulls to fail with "no space left on device".
+docker image prune -af || true
+
 docker compose -f docker-compose-ci.yml up -d mysql
 docker compose -f docker-compose-ci.yml up -d
 sleep 10
