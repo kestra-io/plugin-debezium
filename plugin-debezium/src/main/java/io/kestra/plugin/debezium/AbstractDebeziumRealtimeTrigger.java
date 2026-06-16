@@ -140,10 +140,10 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                     restoreStateFromKv(runContext, task, historyFile, DBHISTORY_DATA_FILE);
                 }
 
-                var connectorId = task.deriveConnectorId(runContext);
-                AbstractDebeziumTask.migrateOffsetFile(runContext.logger(), offsetFile, connectorId);
+                var identity = task.resolveEffectiveIdentity(runContext);
+                AbstractDebeziumTask.migrateOffsetFile(runContext.logger(), offsetFile, identity.name(), identity.topicPrefix());
                 if (task.needDatabaseHistory()) {
-                    AbstractDebeziumTask.migrateHistoryFile(runContext.logger(), historyFile, connectorId);
+                    AbstractDebeziumTask.migrateHistoryFile(runContext.logger(), historyFile, identity.topicPrefix());
                 }
 
                 final Properties props = task.properties(runContext, offsetFile, historyFile);

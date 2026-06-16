@@ -20,6 +20,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -37,6 +39,7 @@ import io.kestra.core.storages.StorageContext;
 import io.kestra.core.storages.kv.KVStore;
 import io.kestra.core.storages.kv.KVValue;
 import io.kestra.core.storages.kv.KVValueAndMetadata;
+import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.utils.Await;
 import io.kestra.core.utils.Hashing;
 
@@ -186,10 +189,10 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             this.restoreState(runContext, historyFile);
         }
 
-        var connectorId = deriveConnectorId(runContext);
-        migrateOffsetFile(runContext.logger(), offsetFile, connectorId);
+        var identity = resolveEffectiveIdentity(runContext);
+        migrateOffsetFile(runContext.logger(), offsetFile, identity.name(), identity.topicPrefix());
         if (this.needDatabaseHistory()) {
-            migrateHistoryFile(runContext.logger(), historyFile, connectorId);
+            migrateHistoryFile(runContext.logger(), historyFile, identity.topicPrefix());
         }
 
         final Properties props = this.properties(runContext, offsetFile, historyFile);
@@ -360,6 +363,35 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         return "kestra_" + hash;
     }
 
+    /** Carries the effective connector name and topic prefix after applying user overrides. */
+    record ConnectorIdentity(String name, String topicPrefix) {}
+
+    /**
+     * Resolves the effective connector name and topic.prefix for this run.
+     *
+     * The base values are the derived connector id. If the user supplied a `properties` map that
+     * overrides `name` or `topic.prefix`, those override values win — matching exactly what
+     * {@link #properties(RunContext, Path, Path)} applies at runtime. Migration must target the
+     * same effective key that Debezium will actually look up in the offset store.
+     */
+    ConnectorIdentity resolveEffectiveIdentity(RunContext runContext) throws IllegalVariableEvaluationException {
+        var connectorId = deriveConnectorId(runContext);
+        var effectiveName = connectorId;
+        var effectiveTopicPrefix = connectorId;
+
+        if (this.properties != null) {
+            var userProps = runContext.render(this.properties).asMap(String.class, String.class);
+            if (userProps.containsKey("name")) {
+                effectiveName = runContext.render(userProps.get("name"));
+            }
+            if (userProps.containsKey("topic.prefix")) {
+                effectiveTopicPrefix = runContext.render(userProps.get("topic.prefix"));
+            }
+        }
+
+        return new ConnectorIdentity(effectiveName, effectiveTopicPrefix);
+    }
+
     // Pre-fix hardcoded values — the identity every existing offset file was written with.
     static final String LEGACY_CONNECTOR_NAME = "engine";
     static final String LEGACY_TOPIC_PREFIX = "kestra_";
@@ -373,16 +405,19 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     }
 
     /**
-     * Rewrites the offset file so the derived connector id is the active key.
+     * Rewrites the offset file so the effective connector identity is the active key.
      *
      * Without this, upgrading from the hardcoded "engine"/"kestra_" identity to the new
      * derived "kestra_<hex>" identity makes Debezium treat the run as a first-ever start
      * (no matching offset found) and triggers a full re-snapshot of already-captured rows.
      *
+     * The target key is built from the effective name and topic.prefix, which may differ when
+     * the user overrides either in the `properties` map — matching what Debezium will look up.
+     *
      * Safe: wrapped in try/catch so any failure leaves the file untouched — worst case is
      * the pre-existing re-snapshot behavior, not a new regression.
      */
-    static void migrateOffsetFile(Logger logger, Path offsetFile, String newConnectorId) {
+    static void migrateOffsetFile(Logger logger, Path offsetFile, String effectiveName, String effectiveTopicPrefix) {
         if (!offsetFile.toFile().exists() || offsetFile.toFile().length() == 0) {
             return;
         }
@@ -395,7 +430,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 offsets = loaded;
             }
 
-            var newKey = offsetKey(newConnectorId, newConnectorId).getBytes(StandardCharsets.UTF_8);
+            var newKey = offsetKey(effectiveName, effectiveTopicPrefix).getBytes(StandardCharsets.UTF_8);
             var legacyKey = offsetKey(LEGACY_CONNECTOR_NAME, LEGACY_TOPIC_PREFIX).getBytes(StandardCharsets.UTF_8);
 
             // Idempotency: new key already present means this run was already migrated or is native.
@@ -429,7 +464,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 oos.writeObject(offsets);
             }
 
-            logger.info("Migrated legacy Debezium offset from connector 'engine' to '{}'", newConnectorId);
+            logger.info("Migrated legacy Debezium offset from connector 'engine'/'kestra_' to '{}'/'{}''", effectiveName, effectiveTopicPrefix);
         } catch (Exception e) {
             logger.warn("Could not migrate legacy offset file; Debezium may re-snapshot (file left untouched): {}", e.getMessage());
         }
@@ -437,16 +472,17 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     /**
      * Rewrites the schema-history file (used by MySQL, Oracle, SQLServer, Db2) so that
-     * references to the legacy server name "kestra_" become the new derived connector id.
+     * {@code source.server} entries matching the legacy server name "kestra_" become the
+     * new effective topic prefix.
      *
-     * FileSchemaHistory stores one JSON object per line; each record embeds the logical server
-     * name in its source/partition section. We do a targeted string replacement so that only
-     * the server-name token changes and the rest of each record is preserved verbatim.
+     * FileSchemaHistory stores one JSON object per line. Scoping the rewrite to
+     * {@code source.server} prevents corrupting DDL text or column values that happen to
+     * contain the literal string "kestra_".
      *
-     * Best-effort: any line we cannot safely rewrite is left unchanged. Any I/O or parse
-     * failure leaves the file untouched.
+     * Best-effort: any line that cannot be parsed as JSON is left unchanged verbatim. Any I/O
+     * or overall failure leaves the file untouched.
      */
-    static void migrateHistoryFile(Logger logger, Path historyFile, String newConnectorId) {
+    static void migrateHistoryFile(Logger logger, Path historyFile, String newTopicPrefix) {
         if (!historyFile.toFile().exists() || historyFile.toFile().length() == 0) {
             return;
         }
@@ -454,26 +490,40 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         try {
             var lines = Files.readAllLines(historyFile, StandardCharsets.UTF_8);
 
-            // Idempotency: if any line already references the new id, the file was already migrated.
-            boolean alreadyMigrated = lines.stream().anyMatch(l -> l.contains("\"" + newConnectorId + "\""));
+            // Idempotency: if any source.server already equals the new prefix, file is migrated.
+            var mapper = JacksonMapper.ofJson();
+            boolean alreadyMigrated = lines.stream().anyMatch(line -> {
+                try {
+                    var node = mapper.readTree(line);
+                    var sourceServer = node.path("source").path("server");
+                    return !sourceServer.isMissingNode() && newTopicPrefix.equals(sourceServer.asText());
+                } catch (Exception ignored) {
+                    return false;
+                }
+            });
             if (alreadyMigrated) {
                 return;
             }
 
-            // Replace "kestra_" server token with the new id in every line that contains it.
-            // We match the JSON string literal exactly to avoid touching unrelated content.
-            var legacyToken = "\"" + LEGACY_TOPIC_PREFIX + "\"";
-            var newToken = "\"" + newConnectorId + "\"";
-
             boolean anyChanged = false;
             var rewritten = new ArrayList<String>(lines.size());
             for (var line : lines) {
-                if (line.contains(legacyToken)) {
-                    rewritten.add(line.replace(legacyToken, newToken));
-                    anyChanged = true;
-                } else {
-                    rewritten.add(line);
+                String out = line;
+                try {
+                    var node = mapper.readTree(line);
+                    var source = node.path("source");
+                    if (!source.isMissingNode() && source.isObject()) {
+                        var serverNode = source.path("server");
+                        if (!serverNode.isMissingNode() && LEGACY_TOPIC_PREFIX.equals(serverNode.asText())) {
+                            ((ObjectNode) source).put("server", newTopicPrefix);
+                            out = mapper.writeValueAsString(node);
+                            anyChanged = true;
+                        }
+                    }
+                } catch (Exception ignored) {
+                    // Unparseable line left as-is — best-effort guarantee.
                 }
+                rewritten.add(out);
             }
 
             if (!anyChanged) {
@@ -481,7 +531,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             }
 
             Files.write(historyFile, rewritten, StandardCharsets.UTF_8);
-            logger.info("Migrated legacy Debezium schema history from server 'kestra_' to '{}'", newConnectorId);
+            logger.info("Migrated legacy Debezium schema history from server 'kestra_' to '{}'", newTopicPrefix);
         } catch (Exception e) {
             logger.warn("Could not migrate legacy schema-history file; Debezium may re-snapshot (file left untouched): {}", e.getMessage());
         }

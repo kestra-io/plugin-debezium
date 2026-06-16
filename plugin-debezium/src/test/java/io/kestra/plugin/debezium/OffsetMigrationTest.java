@@ -65,7 +65,7 @@ class OffsetMigrationTest {
             legacyValue
         ));
 
-        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, newId);
+        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, newId, newId);
 
         var result = readOffsets(offsetFile);
         var expectedKey = AbstractDebeziumTask.offsetKey(newId, newId).getBytes(StandardCharsets.UTF_8);
@@ -103,7 +103,7 @@ class OffsetMigrationTest {
 
         var sizeBefore = Files.size(offsetFile);
 
-        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, newId);
+        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, newId, newId);
 
         // File must not have changed at all.
         assertThat(Files.size(offsetFile), is(sizeBefore));
@@ -125,8 +125,8 @@ class OffsetMigrationTest {
             legacyValue
         ));
 
-        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, newId);
-        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, newId); // second call must be a no-op
+        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, newId, newId);
+        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, newId, newId); // second call must be a no-op
 
         var result = readOffsets(offsetFile);
         assertThat(result.size(), is(1));
@@ -145,7 +145,7 @@ class OffsetMigrationTest {
         var offsetFile = tmp.resolve("absent.dat");
 
         // Must not throw.
-        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, "kestra_aabbccdd");
+        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, "kestra_aabbccdd", "kestra_aabbccdd");
 
         assertThat(offsetFile.toFile().exists(), is(false));
     }
@@ -156,7 +156,7 @@ class OffsetMigrationTest {
         Files.createFile(offsetFile);
 
         // Must not throw.
-        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, "kestra_aabbccdd");
+        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, "kestra_aabbccdd", "kestra_aabbccdd");
 
         assertThat(Files.size(offsetFile), is(0L));
     }
@@ -167,7 +167,7 @@ class OffsetMigrationTest {
         Files.write(offsetFile, new byte[]{0x00, 0x01, 0x02, (byte) 0xFF});
 
         // Must not throw — only log a warning.
-        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, "kestra_aabbccdd");
+        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, "kestra_aabbccdd", "kestra_aabbccdd");
 
         // File left untouched.
         assertThat(Files.readAllBytes(offsetFile), is(new byte[]{0x00, 0x01, 0x02, (byte) 0xFF}));
@@ -186,9 +186,76 @@ class OffsetMigrationTest {
 
         // The mongo-style key doesn't match the new key format, so the idempotency guard
         // doesn't fire. The legacy-key scan also finds nothing and exits cleanly.
-        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, "kestra_cafe1234");
+        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, "kestra_cafe1234", "kestra_cafe1234");
 
         assertThat(Files.size(offsetFile), is(sizeBefore));
+    }
+
+    // ---------------------------------------------------------------------------
+    // Offset file migration — user override of topic.prefix / name (Issue 1)
+    // ---------------------------------------------------------------------------
+
+    @Test
+    void migratesLegacyOffsetKeyToOverriddenTopicPrefix(@TempDir Path tmp) throws Exception {
+        var offsetFile = tmp.resolve("offsets.dat");
+        var effectiveName = "kestra_aabbccdd";
+        var overriddenPrefix = "my_custom_prefix";
+        var legacyValue = "{\"lsn\":99}".getBytes(StandardCharsets.UTF_8);
+
+        writeOffsets(offsetFile, Map.of(
+            AbstractDebeziumTask.offsetKey(
+                AbstractDebeziumTask.LEGACY_CONNECTOR_NAME,
+                AbstractDebeziumTask.LEGACY_TOPIC_PREFIX
+            ),
+            legacyValue
+        ));
+
+        AbstractDebeziumTask.migrateOffsetFile(log, offsetFile, effectiveName, overriddenPrefix);
+
+        var result = readOffsets(offsetFile);
+        var expectedKey = AbstractDebeziumTask.offsetKey(effectiveName, overriddenPrefix).getBytes(StandardCharsets.UTF_8);
+
+        assertThat("overridden key present", result.keySet().stream().anyMatch(k -> Arrays.equals(k, expectedKey)));
+        assertThat("legacy key removed", result.keySet().stream().noneMatch(k -> Arrays.equals(
+            k,
+            AbstractDebeziumTask.offsetKey(
+                AbstractDebeziumTask.LEGACY_CONNECTOR_NAME,
+                AbstractDebeziumTask.LEGACY_TOPIC_PREFIX
+            ).getBytes(StandardCharsets.UTF_8)
+        )));
+    }
+
+    @Test
+    void noOpWhenEffectiveIdentityEqualsLegacy(@TempDir Path tmp) throws Exception {
+        // When user pins name=engine and topic.prefix=kestra_, effective == legacy.
+        // The idempotency guard (new key == legacy key) makes this a correct no-op.
+        var offsetFile = tmp.resolve("offsets.dat");
+        var legacyValue = "{\"lsn\":1}".getBytes(StandardCharsets.UTF_8);
+
+        writeOffsets(offsetFile, Map.of(
+            AbstractDebeziumTask.offsetKey(
+                AbstractDebeziumTask.LEGACY_CONNECTOR_NAME,
+                AbstractDebeziumTask.LEGACY_TOPIC_PREFIX
+            ),
+            legacyValue
+        ));
+
+        // effective == legacy, so the target key is already present → idempotency guard fires.
+        AbstractDebeziumTask.migrateOffsetFile(
+            log, offsetFile,
+            AbstractDebeziumTask.LEGACY_CONNECTOR_NAME,
+            AbstractDebeziumTask.LEGACY_TOPIC_PREFIX
+        );
+
+        // File unchanged: one entry with the legacy key still intact.
+        var result = readOffsets(offsetFile);
+        assertThat(result.size(), is(1));
+        var legacyKeyBytes = AbstractDebeziumTask.offsetKey(
+            AbstractDebeziumTask.LEGACY_CONNECTOR_NAME,
+            AbstractDebeziumTask.LEGACY_TOPIC_PREFIX
+        ).getBytes(StandardCharsets.UTF_8);
+        assertThat("legacy key still present",
+            result.keySet().stream().anyMatch(k -> Arrays.equals(k, legacyKeyBytes)));
     }
 
     // ---------------------------------------------------------------------------
@@ -265,6 +332,51 @@ class OffsetMigrationTest {
         AbstractDebeziumTask.migrateHistoryFile(log, historyFile, "kestra_aabbccdd");
 
         assertThat(Files.readString(historyFile, StandardCharsets.UTF_8), is(contentBefore));
+    }
+
+    // ---------------------------------------------------------------------------
+    // Schema-history file migration — DDL content safety (Issue 2)
+    // ---------------------------------------------------------------------------
+
+    @Test
+    void historyMigrationDoesNotCorruptDdlContainingLegacyToken(@TempDir Path tmp) throws Exception {
+        // A DDL string or column default that happens to contain "kestra_" must not be touched.
+        // Only source.server should be updated.
+        var historyFile = tmp.resolve("dbhistory.dat");
+        var newId = "kestra_aabbccdd";
+        var line = "{\"source\":{\"server\":\"kestra_\"},\"position\":{\"ts_sec\":1},\"databaseName\":\"mydb\"," +
+            "\"ddl\":\"CREATE TABLE kestra_events (kestra_ VARCHAR(64) DEFAULT 'kestra_' NOT NULL);\"}";
+        Files.write(historyFile, List.of(line), StandardCharsets.UTF_8);
+
+        AbstractDebeziumTask.migrateHistoryFile(log, historyFile, newId);
+
+        var result = Files.readAllLines(historyFile, StandardCharsets.UTF_8);
+        assertThat(result.size(), is(1));
+        var rewritten = result.getFirst();
+
+        // source.server must be updated.
+        assertThat("source.server migrated", rewritten.contains("\"server\":\"" + newId + "\""));
+        // The DDL body with "kestra_" table/column/default values must be byte-for-byte intact.
+        assertThat("DDL table name preserved", rewritten.contains("kestra_events"));
+        assertThat("DDL column name preserved", rewritten.contains("kestra_ VARCHAR"));
+        assertThat("DDL default value preserved", rewritten.contains("'kestra_'"));
+    }
+
+    @Test
+    void historyMigrationToOverriddenTopicPrefix(@TempDir Path tmp) throws Exception {
+        var historyFile = tmp.resolve("dbhistory.dat");
+        var overriddenPrefix = "my_custom_prefix";
+        var lines = List.of(
+            "{\"source\":{\"server\":\"kestra_\"},\"databaseName\":\"db\",\"ddl\":\"CREATE TABLE t (id INT);\"}"
+        );
+        Files.write(historyFile, lines, StandardCharsets.UTF_8);
+
+        AbstractDebeziumTask.migrateHistoryFile(log, historyFile, overriddenPrefix);
+
+        var result = Files.readAllLines(historyFile, StandardCharsets.UTF_8);
+        assertThat(result.size(), is(1));
+        assertThat("overridden prefix in source.server", result.getFirst().contains("\"server\":\"" + overriddenPrefix + "\""));
+        assertThat("legacy server token gone", !result.getFirst().contains("\"server\":\"kestra_\""));
     }
 
     // ---------------------------------------------------------------------------
