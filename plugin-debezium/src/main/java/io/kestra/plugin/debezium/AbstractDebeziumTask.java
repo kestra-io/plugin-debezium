@@ -4,7 +4,11 @@ import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -15,6 +19,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -31,9 +37,10 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.storages.StorageContext;
 import io.kestra.core.storages.kv.KVStore;
-import io.kestra.core.storages.kv.KVValue;
 import io.kestra.core.storages.kv.KVValueAndMetadata;
+import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.utils.Await;
+import io.kestra.core.utils.Hashing;
 
 import ch.qos.logback.classic.LoggerContext;
 import io.debezium.embedded.Connect;
@@ -53,9 +60,17 @@ import static io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger.computeK
 @NoArgsConstructor
 public abstract class AbstractDebeziumTask extends Task implements RunnableTask<AbstractDebeziumTask.Output>, AbstractDebeziumInterface {
 
-    private static final String OFFSETS_DATA_FILE = "offsets.dat";
+    public static final String OFFSETS_DATA_FILE = "offsets.dat";
 
-    private static final String DBHISTORY_DATA_FILE = "dbhistory.dat";
+    public static final String DBHISTORY_DATA_FILE = "dbhistory.dat";
+
+    // Single combined key written atomically; replaces the two legacy per-file keys.
+    public static final String COMBINED_STATE_FILE = "debezium-state.dat";
+
+    // Map keys used inside the combined KV entry.
+    public static final String STATE_KEY_OFFSETS = "offsets";
+
+    public static final String STATE_KEY_HISTORY = "history";
 
     @Builder.Default
     protected Property<Format> format = Property.ofValue(Format.INLINE);
@@ -174,11 +189,13 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         ZonedDateTime lastRecord = ZonedDateTime.now();
 
         Path offsetFile = runContext.workingDir().path().resolve(OFFSETS_DATA_FILE);
-        this.restoreState(runContext, offsetFile);
-
         Path historyFile = runContext.workingDir().path().resolve(DBHISTORY_DATA_FILE);
+        this.restoreState(runContext, offsetFile, historyFile);
+
+        var identity = resolveEffectiveIdentity(runContext);
+        migrateOffsetFile(runContext.logger(), offsetFile, identity.name(), identity.topicPrefix());
         if (this.needDatabaseHistory()) {
-            this.restoreState(runContext, historyFile);
+            migrateHistoryFile(runContext.logger(), historyFile, identity.topicPrefix());
         }
 
         final Properties props = this.properties(runContext, offsetFile, historyFile);
@@ -224,34 +241,10 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         Output.OutputBuilder outputBuilder = Output.builder();
 
-        if (offsetFile.toFile().exists()) {
-            try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
-                String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
-                String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
-                String fileName = offsetFile.getFileName().toString();
-                String kvKey = computeKvStoreKey(runContext, stateName, fileName, taskRunValue);
-
-                KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
-
-                kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
-
-                outputBuilder.stateOffsetKey(kvKey);
-            }
-        }
-
-        if (this.needDatabaseHistory()) {
-            try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
-                String taskRunValue = runContext.storage().getTaskStorageContext().map(StorageContext.Task::getTaskRunValue).orElse(null);
-                String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
-                String fileName = historyFile.getFileName().toString();
-                String kvKey = computeKvStoreKey(runContext, stateName, fileName, taskRunValue);
-
-                KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
-
-                kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
-
-                outputBuilder.stateHistoryKey(kvKey);
-            }
+        var combinedKey = saveFinalState(runContext, offsetFile, historyFile);
+        if (combinedKey != null) {
+            outputBuilder.stateOffsetKey(combinedKey);
+            outputBuilder.stateHistoryKey(combinedKey);
         }
 
         outputBuilder
@@ -290,10 +283,246 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             .build();
     }
 
+    /**
+     * Derives a stable, unique connector identity scoped to this task's logical identity
+     * (namespace + flow + task, plus iteration value when inside a ForEach).
+     *
+     * The 8-character hex suffix (murmur3-128 truncated) keeps the identifier short and
+     * valid as a Debezium topic.prefix while guaranteeing uniqueness across concurrent
+     * connectors on the same JVM so their JMX MBean names never collide.
+     *
+     * The same value is used for `topic.prefix`, `name`, and `database.server.name` so all
+     * three remain consistent. A user-supplied `properties` map applied afterwards can still
+     * override any of these values.
+     */
+    String deriveConnectorId(RunContext runContext) {
+        var flowInfo = runContext.flowInfo();
+        var taskRunInfo = runContext.taskRunInfo();
+
+        String namespace = flowInfo.namespace() != null ? flowInfo.namespace() : "";
+        String flowId = flowInfo.id() != null ? flowInfo.id() : "";
+
+        String taskRunTaskId = taskRunInfo != null ? taskRunInfo.taskId() : null;
+        String taskId = resolveTaskId(this.getId(), taskRunTaskId);
+
+        // Include task-run value when present (ForEach / parallel iterations) to distinguish
+        // concurrently running iterations of the same task.
+        String iterationValue = taskRunInfo != null && taskRunInfo.value() != null ? taskRunInfo.value().toString() : "";
+
+        return connectorIdFromParts(namespace, flowId, taskId, iterationValue);
+    }
+
+    /**
+     * Resolves the task component of the connector identity.
+     *
+     * Prefers the task/trigger's own id: it is always set, including during trigger
+     * evaluation where {@code taskRunInfo} is empty (no execution/taskrun exists yet).
+     * Without this, two distinct Debezium triggers in the same flow would derive the same
+     * id and their JMX MBeans would still collide. Falls back to the taskRunInfo task id,
+     * then to an empty string, only as a safety net.
+     *
+     * Exposed package-private for unit testing without a full DI context.
+     */
+    static String resolveTaskId(String ownId, String taskRunTaskId) {
+        if (ownId != null) {
+            return ownId;
+        }
+        return taskRunTaskId != null ? taskRunTaskId : "";
+    }
+
+    /**
+     * Pure function that computes the connector id from its constituent parts.
+     * Exposed package-private for unit testing without a full DI context.
+     */
+    static String connectorIdFromParts(String namespace, String flowId, String taskId, String iterationValue) {
+        String identity = namespace + "|" + flowId + "|" + taskId + "|" + iterationValue;
+        // Truncate to 8 hex chars (32 bits of murmur3-128) — short but collision-resistant
+        // enough for the expected cardinality of concurrent Kestra tasks.
+        String hash = Hashing.hashToString(identity).substring(0, 8);
+        return "kestra_" + hash;
+    }
+
+    /** Carries the effective connector name and topic prefix after applying user overrides. */
+    record ConnectorIdentity(String name, String topicPrefix) {}
+
+    /**
+     * Resolves the effective connector name and topic.prefix for this run.
+     *
+     * The base values are the derived connector id. If the user supplied a `properties` map that
+     * overrides `name` or `topic.prefix`, those override values win — matching exactly what
+     * {@link #properties(RunContext, Path, Path)} applies at runtime. Migration must target the
+     * same effective key that Debezium will actually look up in the offset store.
+     */
+    ConnectorIdentity resolveEffectiveIdentity(RunContext runContext) throws IllegalVariableEvaluationException {
+        var connectorId = deriveConnectorId(runContext);
+        var effectiveName = connectorId;
+        var effectiveTopicPrefix = connectorId;
+
+        if (this.properties != null) {
+            var userProps = runContext.render(this.properties).asMap(String.class, String.class);
+            if (userProps.containsKey("name")) {
+                effectiveName = runContext.render(userProps.get("name"));
+            }
+            if (userProps.containsKey("topic.prefix")) {
+                effectiveTopicPrefix = runContext.render(userProps.get("topic.prefix"));
+            }
+        }
+
+        return new ConnectorIdentity(effectiveName, effectiveTopicPrefix);
+    }
+
+    // Pre-fix hardcoded values — the identity every existing offset file was written with.
+    static final String LEGACY_CONNECTOR_NAME = "engine";
+    static final String LEGACY_TOPIC_PREFIX = "kestra_";
+
+    /**
+     * Builds the compact JSON key that FileOffsetBackingStore stores in its HashMap.
+     * Format: ["<name>",{"server":"<topicPrefix>"}] — no spaces, as written by Kafka Connect.
+     */
+    static String offsetKey(String connectorName, String topicPrefix) {
+        return "[\"" + connectorName + "\",{\"server\":\"" + topicPrefix + "\"}]";
+    }
+
+    /**
+     * Rewrites the offset file so the effective connector identity is the active key.
+     *
+     * Without this, upgrading from the hardcoded "engine"/"kestra_" identity to the new
+     * derived "kestra_<hex>" identity makes Debezium treat the run as a first-ever start
+     * (no matching offset found) and triggers a full re-snapshot of already-captured rows.
+     *
+     * The target key is built from the effective name and topic.prefix, which may differ when
+     * the user overrides either in the `properties` map — matching what Debezium will look up.
+     *
+     * Safe: wrapped in try/catch so any failure leaves the file untouched — worst case is
+     * the pre-existing re-snapshot behavior, not a new regression.
+     */
+    static void migrateOffsetFile(Logger logger, Path offsetFile, String effectiveName, String effectiveTopicPrefix) {
+        if (!offsetFile.toFile().exists() || offsetFile.toFile().length() == 0) {
+            return;
+        }
+
+        try {
+            HashMap<byte[], byte[]> offsets;
+            try (var fis = new FileInputStream(offsetFile.toFile());
+                 var ois = new ObjectInputStream(fis)) {
+                @SuppressWarnings("unchecked")
+                var loaded = (HashMap<byte[], byte[]>) ois.readObject();
+                offsets = loaded;
+            }
+
+            var newKey = offsetKey(effectiveName, effectiveTopicPrefix).getBytes(StandardCharsets.UTF_8);
+            var legacyKey = offsetKey(LEGACY_CONNECTOR_NAME, LEGACY_TOPIC_PREFIX).getBytes(StandardCharsets.UTF_8);
+
+            // Idempotency: new key already present means this run was already migrated or is native.
+            boolean alreadyMigrated = offsets.keySet().stream()
+                .anyMatch(k -> Arrays.equals(k, newKey));
+            if (alreadyMigrated) {
+                return;
+            }
+
+            // MongoDB uses a different partition shape (e.g. {"rs":"...", "server_id":"..."});
+            // its legacy offset key won't match LEGACY_CONNECTOR_NAME / LEGACY_TOPIC_PREFIX so
+            // this method is effectively a no-op for MongoDB — the file is left unchanged.
+            byte[] legacyValue = null;
+            byte[] legacyKeyInMap = null;
+            for (var entry : offsets.entrySet()) {
+                if (Arrays.equals(entry.getKey(), legacyKey)) {
+                    legacyValue = entry.getValue();
+                    legacyKeyInMap = entry.getKey();
+                    break;
+                }
+            }
+
+            if (legacyValue == null) {
+                return;
+            }
+
+            offsets.remove(legacyKeyInMap);
+            offsets.put(newKey, legacyValue);
+
+            try (var oos = new ObjectOutputStream(Files.newOutputStream(offsetFile))) {
+                oos.writeObject(offsets);
+            }
+
+            logger.info("Migrated legacy Debezium offset from connector 'engine'/'kestra_' to '{}'/'{}''", effectiveName, effectiveTopicPrefix);
+        } catch (Exception e) {
+            logger.warn("Could not migrate legacy offset file; Debezium may re-snapshot (file left untouched): {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Rewrites the schema-history file (used by MySQL, Oracle, SQLServer, Db2) so that
+     * {@code source.server} entries matching the legacy server name "kestra_" become the
+     * new effective topic prefix.
+     *
+     * FileSchemaHistory stores one JSON object per line. Scoping the rewrite to
+     * {@code source.server} prevents corrupting DDL text or column values that happen to
+     * contain the literal string "kestra_".
+     *
+     * Best-effort: any line that cannot be parsed as JSON is left unchanged verbatim. Any I/O
+     * or overall failure leaves the file untouched.
+     */
+    static void migrateHistoryFile(Logger logger, Path historyFile, String newTopicPrefix) {
+        if (!historyFile.toFile().exists() || historyFile.toFile().length() == 0) {
+            return;
+        }
+
+        try {
+            var lines = Files.readAllLines(historyFile, StandardCharsets.UTF_8);
+
+            // Idempotency: if any source.server already equals the new prefix, file is migrated.
+            var mapper = JacksonMapper.ofJson();
+            boolean alreadyMigrated = lines.stream().anyMatch(line -> {
+                try {
+                    var node = mapper.readTree(line);
+                    var sourceServer = node.path("source").path("server");
+                    return !sourceServer.isMissingNode() && newTopicPrefix.equals(sourceServer.asText());
+                } catch (Exception ignored) {
+                    return false;
+                }
+            });
+            if (alreadyMigrated) {
+                return;
+            }
+
+            boolean anyChanged = false;
+            var rewritten = new ArrayList<String>(lines.size());
+            for (var line : lines) {
+                String out = line;
+                try {
+                    var node = mapper.readTree(line);
+                    var source = node.path("source");
+                    if (!source.isMissingNode() && source.isObject()) {
+                        var serverNode = source.path("server");
+                        if (!serverNode.isMissingNode() && LEGACY_TOPIC_PREFIX.equals(serverNode.asText())) {
+                            ((ObjectNode) source).put("server", newTopicPrefix);
+                            out = mapper.writeValueAsString(node);
+                            anyChanged = true;
+                        }
+                    }
+                } catch (Exception ignored) {
+                    // Unparseable line left as-is — best-effort guarantee.
+                }
+                rewritten.add(out);
+            }
+
+            if (!anyChanged) {
+                return;
+            }
+
+            Files.write(historyFile, rewritten, StandardCharsets.UTF_8);
+            logger.info("Migrated legacy Debezium schema history from server 'kestra_' to '{}'", newTopicPrefix);
+        } catch (Exception e) {
+            logger.warn("Could not migrate legacy schema-history file; Debezium may re-snapshot (file left untouched): {}", e.getMessage());
+        }
+    }
+
     protected Properties properties(RunContext runContext, Path offsetFile, Path historyFile) throws Exception {
         final Properties props = new Properties();
 
-        props.setProperty("name", "engine");
+        var connectorId = deriveConnectorId(runContext);
+
+        props.setProperty("name", connectorId);
 
         // offset
         props.setProperty("offset.storage", "org.apache.kafka.connect.storage.FileOffsetBackingStore");
@@ -301,7 +530,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         props.setProperty("offset.flush.interval.ms", "1000");
 
         // database
-        props.setProperty("database.server.name", "kestra");
+        props.setProperty("database.server.name", connectorId);
 
         if (this.needDatabaseHistory()) {
             props.setProperty("schema.history.internal", "io.debezium.storage.file.history.FileSchemaHistory");
@@ -332,8 +561,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         // delete are send with a full rows, we don't want to emulate kafka behaviour
         props.setProperty("tombstones.on.delete", "false");
 
-        // required
-        props.setProperty("topic.prefix", "kestra_");
+        // required — use the same connector-unique id so JMX MBean names never collide
+        props.setProperty("topic.prefix", connectorId);
 
         if (this.includedDatabases != null) {
             props.setProperty("database.include.list", joinProperties(runContext, this.includedDatabases));
@@ -404,59 +633,123 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         return false;
     }
 
-    protected void restoreState(RunContext runContext, Path path) throws IOException {
+    /**
+     * Restores debezium state from KV. Tries the combined atomic key first; falls back to the
+     * two legacy per-file keys so existing deployments upgrade without a forced re-snapshot.
+     */
+    public void restoreState(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
         try {
-            String taskRunValue = runContext.storage().getTaskStorageContext()
+            var taskRunValue = runContext.storage().getTaskStorageContext()
                 .map(StorageContext.Task::getTaskRunValue)
                 .orElse(null);
-            String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
-            String filename = path.getFileName().toString();
+            var stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
+            var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
 
-            String kvKey = computeKvStoreKey(runContext, stateName, filename, taskRunValue);
+            var combinedKey = computeKvStoreKey(runContext, stateName, COMBINED_STATE_FILE, taskRunValue);
+            var combinedValue = kvStore.getValue(combinedKey);
 
-            KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
-            Optional<KVValue> kvValue = kvStore.getValue(kvKey);
+            if (combinedValue.isPresent() && combinedValue.get().value() != null) {
+                @SuppressWarnings("unchecked")
+                var stateMap = (Map<String, Object>) combinedValue.get().value();
+                restoreFileFromMap(stateMap, STATE_KEY_OFFSETS, offsetFile);
+                if (this.needDatabaseHistory()) {
+                    restoreFileFromMap(stateMap, STATE_KEY_HISTORY, historyFile);
+                }
+                return;
+            }
 
+            // Legacy fallback: read the two separate keys written by older versions.
+            restoreLegacyKey(kvStore, runContext, stateName, OFFSETS_DATA_FILE, offsetFile, taskRunValue);
+            if (this.needDatabaseHistory()) {
+                restoreLegacyKey(kvStore, runContext, stateName, DBHISTORY_DATA_FILE, historyFile, taskRunValue);
+            }
+        } catch (FileNotFoundException | ResourceExpiredException ignored) {
+        } catch (IllegalVariableEvaluationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static void restoreFileFromMap(Map<String, Object> stateMap, String key, Path targetFile) throws IOException {
+        var data = stateMap.get(key);
+        if (data instanceof byte[] bytes) {
+            Files.write(targetFile, bytes);
+        }
+    }
+
+    private static void restoreLegacyKey(KVStore kvStore, RunContext runContext, String stateName, String filename, Path targetFile, String taskRunValue)
+        throws IOException, ResourceExpiredException {
+        try {
+            var kvKey = computeKvStoreKey(runContext, stateName, filename, taskRunValue);
+            var kvValue = kvStore.getValue(kvKey);
             if (kvValue.isPresent() && kvValue.get().value() != null) {
-                byte[] stateData = (byte[]) kvValue.get().value();
                 FileUtils.copyInputStreamToFile(
-                    new ByteArrayInputStream(stateData),
-                    path.toFile()
+                    new ByteArrayInputStream((byte[]) kvValue.get().value()),
+                    targetFile.toFile()
                 );
             }
-            ;
-        } catch (FileNotFoundException | ResourceExpiredException ignored) {
+        } catch (IllegalVariableEvaluationException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
+    /**
+     * Writes offset + history as ONE atomic KV entry so the two states can never desync on crash.
+     * Returns the combined key written, or null if the entry would be inconsistent (offsets absent,
+     * or history absent for a history-needing connector) — in that case nothing is written.
+     */
+    public String saveStateAtomically(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
+        try {
+            if (!offsetFile.toFile().exists()) {
+                return null;
+            }
+            if (this.needDatabaseHistory() && !historyFile.toFile().exists()) {
+                // Writing offsets without history would cause "db history topic is missing" on restore.
+                runContext.logger().debug(
+                    "Skipping atomic state save: history file not yet available ({}). Will retry on next batch or end-of-run.",
+                    historyFile.getFileName()
+                );
+                return null;
+            }
+
+            var taskRunValue = runContext.storage().getTaskStorageContext()
+                .map(StorageContext.Task::getTaskRunValue)
+                .orElse(null);
+            var stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
+            var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+            var combinedKey = computeKvStoreKey(runContext, stateName, COMBINED_STATE_FILE, taskRunValue);
+
+            var stateMap = new LinkedHashMap<String, byte[]>();
+            stateMap.put(STATE_KEY_OFFSETS, Files.readAllBytes(offsetFile));
+            if (this.needDatabaseHistory()) {
+                stateMap.put(STATE_KEY_HISTORY, Files.readAllBytes(historyFile));
+            }
+
+            kvStore.put(combinedKey, new KVValueAndMetadata(null, stateMap));
+            return combinedKey;
         } catch (IllegalVariableEvaluationException e) {
             throw new RuntimeException(e);
         }
     }
 
     protected void saveOffsetsForTask(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
-        try {
-            String taskRunValue = runContext.storage().getTaskStorageContext()
-                .map(StorageContext.Task::getTaskRunValue)
-                .orElse(null);
-            String stateName = runContext.render(this.stateName).as(String.class).orElseThrow();
+        saveStateAtomically(runContext, offsetFile, historyFile);
+    }
 
-            KVStore kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
-
-            if (offsetFile.toFile().exists()) {
-                try (FileInputStream fis = new FileInputStream(offsetFile.toFile())) {
-                    String kvKey = computeKvStoreKey(runContext, stateName, offsetFile.getFileName().toString(), taskRunValue);
-                    kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
-                }
-            }
-
-            if (this.needDatabaseHistory() && historyFile.toFile().exists()) {
-                try (FileInputStream fis = new FileInputStream(historyFile.toFile())) {
-                    String kvKey = computeKvStoreKey(runContext, stateName, historyFile.getFileName().toString(), taskRunValue);
-                    kvStore.put(kvKey, new KVValueAndMetadata(null, fis.readAllBytes()));
-                }
-            }
-        } catch (IllegalVariableEvaluationException e) {
-            throw new RuntimeException(e);
+    /**
+     * Persists state at end-of-run. Unlike the per-batch save (which logs a skip at debug, since the
+     * history file routinely lags during early streaming), this warns when offsets were produced but
+     * nothing could be persisted — the last-chance case that silently forces a re-snapshot next run.
+     */
+    public String saveFinalState(RunContext runContext, Path offsetFile, Path historyFile) throws IOException {
+        var combinedKey = saveStateAtomically(runContext, offsetFile, historyFile);
+        if (combinedKey == null && offsetFile.toFile().exists()) {
+            runContext.logger().warn(
+                "Debezium produced offsets but state was not persisted because the schema history file ({}) is missing; "
+                + "the next run will re-snapshot from scratch.",
+                historyFile.getFileName()
+            );
         }
+        return combinedKey;
     }
 
     private void shutdown(Logger logger, ExecutorService executorService) {
@@ -474,12 +767,18 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The KV Store key under which the state of the offset is stored"
+            title = "The KV Store key under which the combined Debezium state (offset + schema history) is stored.",
+            description = """
+                Both `stateOffsetKey` and `stateHistoryKey` point to the same combined entry written atomically.
+                The entry holds a map with keys `offsets` and `history` so both states are always consistent.
+                """
         )
         private String stateOffsetKey;
 
+        @Deprecated
         @Schema(
-            title = "The KV Store key under which the state of the database history is stored"
+            title = "Deprecated — use stateOffsetKey.",
+            description = "Deprecated — use stateOffsetKey."
         )
         private String stateHistoryKey;
 
