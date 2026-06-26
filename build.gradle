@@ -11,6 +11,7 @@ plugins {
     id 'net.researchgate.release' version '3.1.0'
     id "com.vanniktech.maven.publish" version "0.36.0"
     id "io.kestra.gradle.inject-bom-versions" version "1.1.0"
+    id "io.kestra.gradle.plugin-doc-lint" version "1.2.4" apply(false)
 }
 
 def isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
@@ -44,6 +45,7 @@ subprojects {
 
     apply plugin: "java-library"
     apply plugin: "idea"
+    apply plugin: "io.kestra.gradle.plugin-doc-lint"
 
     configurations.all {
         resolutionStrategy {

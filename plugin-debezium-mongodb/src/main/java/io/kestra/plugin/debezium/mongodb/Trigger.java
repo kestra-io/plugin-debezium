@@ -28,7 +28,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Trigger a flow on a change data capture event in MongoDB and create new execution per batch.",
+    title = "Trigger a flow on a change data capture event in MongoDB and create new execution per batch",
     description = "If you would like to consume each message from change data capture in real-time and create one execution per message, you can use the [io.kestra.plugin.debezium.mongodb.RealtimeTrigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.mongodb.realtimetrigger) instead."
 
 )
@@ -137,10 +137,13 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @Builder.Default
     protected Property<String> stateName = Property.ofValue("debezium-state");
 
+    @Schema(title = "Maximum number of records to fetch before stopping")
     private Property<Integer> maxRecords;
 
+    @Schema(title = "Maximum duration of the capture before stopping")
     private Property<Duration> maxDuration;
 
+    @Schema(title = "Maximum wait for new records before stopping")
     @Builder.Default
     private Property<Duration> maxWait = Property.ofValue(Duration.ofSeconds(10));
 
@@ -148,7 +151,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     private Property<MongodbInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
     @Schema(
-        title = "When to commit the offsets to the KV Store.",
+        title = "When to commit the offsets to the KV Store",
         description = """
             - `ON_EACH_BATCH`: after each batch of records consumed by this trigger, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
             - `ON_STOP`: when this trigger is stopped or killed, the offsets will be stored in the KV Store. This avoids any un-necessary writes to the KV Store, but if the trigger is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption.
