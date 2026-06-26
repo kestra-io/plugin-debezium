@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotNull;
 
 public interface MysqlInterface {
     @Schema(
-        title = "Specifies the criteria for running a snapshot when the connector starts.",
+        title = "Specifies the criteria for running a snapshot when the connector starts",
         description = "Possible settings are:\n" +
             "- `INITIAL`: The connector runs a snapshot only when no offsets have been recorded for the logical server name.\n" +
             "- `INITIAL_ONLY`: The connector runs a snapshot only when no offsets have been recorded for the logical server name and then stops; i.e. it will not read change events from the binlog.\n"
@@ -31,7 +31,7 @@ public interface MysqlInterface {
     Property<SnapshotMode> getSnapshotMode();
 
     @Schema(
-        title = "A numeric ID of this database client.",
+        title = "A numeric ID of this database client",
         description = "This must be unique across all currently-running database processes in the MySQL cluster. " +
             "This connector joins the MySQL database cluster as another server (with this unique ID) so it can read " +
             "the binlog. By default, a random number between 5400 and 6400 is generated, though the recommendation " +

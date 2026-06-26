@@ -92,7 +92,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     protected Property<String> stateName = Property.ofValue("debezium-state");
 
     @Schema(
-        title = "When to commit the offsets to the KV Store.",
+        title = "When to commit the offsets to the KV Store",
         description = """
             - `ON_EACH_BATCH`: after each batch of records consumed by this trigger, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
             - `ON_STOP`: when this trigger is stopped or killed, the offsets will be stored in the KV Store. This avoids any un-necessary writes to the KV Store, but if the trigger is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption.
@@ -259,11 +259,11 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     @Getter
     public static class StreamOutput implements io.kestra.core.models.tasks.Output {
 
-        @Schema(title = "Stream.", description = "Stream source")
+        @Schema(title = "Stream", description = "Stream source")
         @PluginProperty(group = "advanced")
         private String stream;
 
-        @Schema(title = "Data.", description = "Data extracted.")
+        @Schema(title = "Data", description = "Data extracted.")
         @PluginProperty(group = "advanced")
         private Map<String, Object> data;
     }

@@ -19,7 +19,7 @@ public interface MongodbInterface {
     Property<String> getConnectionString();
 
     @Schema(
-        title = "The name of the MongoDB database collection included from which to stream the changes.",
+        title = "The name of the MongoDB database collection included from which to stream the changes",
         description = "A list of regular expressions that match the collection namespaces (for example, <dbName>.<collectionName>) of all collections to be monitored",
         example = "inventory[.]*"
     )
@@ -27,7 +27,7 @@ public interface MongodbInterface {
     Object getIncludedCollections();
 
     @Schema(
-        title = "The name of the MongoDB database collection excluded from which to stream the changes.",
+        title = "The name of the MongoDB database collection excluded from which to stream the changes",
         description = "A list of regular expressions that match the collection namespaces (for example, <dbName>.<collectionName>) of all collections to be excluded",
         example = "inventory[.]*"
     )
@@ -35,7 +35,7 @@ public interface MongodbInterface {
     Object getExcludedCollections();
 
     @Schema(
-        title = "Specifies the criteria for running a snapshot when the connector starts.",
+        title = "Specifies the criteria for running a snapshot when the connector starts",
         description = " Possible settings are:\n" +
             "- `INITIAL`: The connector runs a snapshot only when no offsets have been recorded for the logical server name.\n" +
             "- `INITIAL_ONLY`: The connector runs a snapshot only when no offsets have been recorded for the logical server name and then stops; i.e. it will not read change events from the binlog.\n"
