@@ -10,7 +10,7 @@ import jakarta.validation.constraints.NotNull;
 
 public interface AbstractDebeziumInterface {
     @Schema(
-        title = "The format of the output.",
+        title = "The format of the output",
         description = " Possible settings are:\n" +
             "- `RAW`: Send raw data from debezium.\n" +
             "- `INLINE`: Send a row like in the source with only data (remove after & before), all the columns will be present for each row.\n" +
@@ -20,7 +20,7 @@ public interface AbstractDebeziumInterface {
     Property<AbstractDebeziumTask.Format> getFormat();
 
     @Schema(
-        title = "Specify how to handle deleted rows.",
+        title = "Specify how to handle deleted rows",
         description = " Possible settings are:\n" +
             "- `ADD_FIELD`: Add a deleted field as boolean.\n" +
             "- `NULL`: Send a row with all values as null.\n" +
@@ -30,14 +30,14 @@ public interface AbstractDebeziumInterface {
     Property<AbstractDebeziumTask.Deleted> getDeleted();
 
     @Schema(
-        title = "The name of deleted field if deleted is `ADD_FIELD`."
+        title = "The name of deleted field if deleted is `ADD_FIELD`"
     )
     @NotNull
     @PluginProperty(group = "main")
     Property<String> getDeletedFieldName();
 
     @Schema(
-        title = "Specify how to handle key.",
+        title = "Specify how to handle key",
         description = " Possible settings are:\n" +
             "- `ADD_FIELD`: Add key(s) merged with columns.\n" +
             "- `DROP`: Drop keys."
@@ -46,7 +46,7 @@ public interface AbstractDebeziumInterface {
     Property<AbstractDebeziumTask.Key> getKey();
 
     @Schema(
-        title = "Specify how to handle metadata.",
+        title = "Specify how to handle metadata",
         description = " Possible settings are:\n" +
             "- `ADD_FIELD`: Add metadata in a column named `metadata`.\n" +
             "- `DROP`: Drop metadata."
@@ -55,14 +55,14 @@ public interface AbstractDebeziumInterface {
     Property<AbstractDebeziumTask.Metadata> getMetadata();
 
     @Schema(
-        title = "The name of metadata field if metadata is `ADD_FIELD`."
+        title = "The name of metadata field if metadata is `ADD_FIELD`"
     )
     @NotNull
     @PluginProperty(group = "main")
     Property<String> getMetadataFieldName();
 
     @Schema(
-        title = "Split table on separate output `uris`.",
+        title = "Split table on separate output `uris`",
         description = " Possible settings are:\n" +
             "- `TABLE`: This will split all rows by tables on output with name `database.table`\n" +
             "- `DATABASE`: This will split all rows by databases on output with name `database`.\n" +
@@ -72,7 +72,7 @@ public interface AbstractDebeziumInterface {
     Property<AbstractDebeziumTask.SplitTable> getSplitTable();
 
     @Schema(
-        title = "Ignore DDL statement.",
+        title = "Ignore DDL statement",
         description = "Ignore CREATE, ALTER, DROP and TRUNCATE operations."
     )
     @NotNull
@@ -80,82 +80,82 @@ public interface AbstractDebeziumInterface {
     Property<Boolean> getIgnoreDdl();
 
     @Schema(
-        title = "Hostname of the remote server."
+        title = "Hostname of the remote server"
     )
     @NotNull
     @PluginProperty(group = "main")
     Property<String> getHostname();
 
     @Schema(
-        title = "Port of the remote server."
+        title = "Port of the remote server"
     )
     @NotNull
     @PluginProperty(group = "main")
     Property<String> getPort();
 
     @Schema(
-        title = "Username on the remote server."
+        title = "Username on the remote server"
     )
     @PluginProperty(group = "connection", secret = true)
     Property<String> getUsername();
 
     @Schema(
-        title = "Password on the remote server."
+        title = "Password on the remote server"
     )
     @PluginProperty(group = "connection", secret = true)
     Property<String> getPassword();
 
     @Schema(
-        title = "An optional, comma-separated list of regular expressions that match the names of the databases for which to capture changes.",
+        title = "An optional, comma-separated list of regular expressions that match the names of the databases for which to capture changes",
         description = "The connector does not capture changes in any database whose name is not in `includedDatabases`. By default, the connector captures changes in all databases. Do not also set the `excludedDatabases` connector configuration property."
     )
     @PluginProperty(dynamic = true, group = "advanced")
     Object getIncludedDatabases();
 
     @Schema(
-        title = "An optional, comma-separated list of regular expressions that match the names of databases for which you do not want to capture changes.",
+        title = "An optional, comma-separated list of regular expressions that match the names of databases for which you do not want to capture changes",
         description = "The connector captures changes in any database whose name is not in the `excludedDatabases`. Do not also set the `includedDatabases` connector configuration property."
     )
     @PluginProperty(dynamic = true, group = "advanced")
     Object getExcludedDatabases();
 
     @Schema(
-        title = "An optional, comma-separated list of regular expressions that match fully-qualified table identifiers of tables whose changes you want to capture.",
+        title = "An optional, comma-separated list of regular expressions that match fully-qualified table identifiers of tables whose changes you want to capture",
         description = "The connector does not capture changes in any table not included in `includedTables`. Each identifier is of the form databaseName.tableName. By default, the connector captures changes in every non-system table in each database whose changes are being captured. Do not also specify the `excludedTables` connector configuration property."
     )
     @PluginProperty(dynamic = true, group = "advanced")
     Object getIncludedTables();
 
     @Schema(
-        title = "An optional, comma-separated list of regular expressions that match fully-qualified table identifiers for tables whose changes you do not want to capture.",
+        title = "An optional, comma-separated list of regular expressions that match fully-qualified table identifiers for tables whose changes you do not want to capture",
         description = "The connector captures changes in any table not included in `excludedTables`. Each identifier is of the form databaseName.tableName. Do not also specify the `includedTables` connector configuration property."
     )
     @PluginProperty(dynamic = true, group = "advanced")
     Object getExcludedTables();
 
     @Schema(
-        title = "An optional, comma-separated list of regular expressions that match the fully-qualified names of columns to exclude from change event record values.",
+        title = "An optional, comma-separated list of regular expressions that match the fully-qualified names of columns to exclude from change event record values",
         description = "Fully-qualified names for columns are of the form databaseName.tableName.columnName. Do not also specify the `excludedColumns` connector configuration property."
     )
     @PluginProperty(dynamic = true, group = "advanced")
     Object getIncludedColumns();
 
     @Schema(
-        title = "An optional, comma-separated list of regular expressions that match the fully-qualified names of columns to include in change event record values.",
+        title = "An optional, comma-separated list of regular expressions that match the fully-qualified names of columns to include in change event record values",
         description = "Fully-qualified names for columns are of the form databaseName.tableName.columnName. Do not also specify the `includedColumns` connector configuration property.\""
     )
     @PluginProperty(dynamic = true, group = "advanced")
     Object getExcludedColumns();
 
     @Schema(
-        title = "Additional configuration properties.",
+        title = "Additional configuration properties",
         description = "Any additional configuration properties that is valid for the current driver."
     )
     @PluginProperty(group = "advanced")
     Property<Map<String, String>> getProperties();
 
     @Schema(
-        title = "The name of the Debezium state file stored in the KV Store for that namespace."
+        title = "The name of the Debezium state file stored in the KV Store for that namespace"
     )
     @NotNull
     @PluginProperty(group = "main")

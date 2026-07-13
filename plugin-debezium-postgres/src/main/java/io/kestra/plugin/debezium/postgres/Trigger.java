@@ -25,7 +25,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Trigger a flow via a PostgreSQL change data capture event periodically and create one execution per row.",
+    title = "Trigger a flow via a PostgreSQL change data capture event periodically and create one execution per row",
     description = "If you would like to consume each message from change data capture in real-time and create one execution per message, you can use the [io.kestra.plugin.debezium.postgres.RealtimeTrigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.postgres.realtimetrigger) instead."
 )
 @Plugin(

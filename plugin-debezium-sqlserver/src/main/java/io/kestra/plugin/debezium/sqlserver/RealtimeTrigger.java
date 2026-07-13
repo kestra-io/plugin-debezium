@@ -23,7 +23,7 @@ import reactor.core.publisher.Flux;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Trigger a flow via a SQL Server change data capture event in real-time and create one execution per row.",
+    title = "Trigger a flow via a SQL Server change data capture event in real-time and create one execution per row",
     description = "If you would like to consume multiple messages processed within a given time frame and process them in batch, you can use the [io.kestra.plugin.debezium.sqlserver.Trigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.sqlserver.trigger) instead."
 )
 @Plugin(
@@ -58,6 +58,7 @@ public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements 
     @Builder.Default
     private Property<SqlServerInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
+    @Schema(title = "Unique identifier for the Debezium SQL Server connector")
     private String serverId;
 
     @Override

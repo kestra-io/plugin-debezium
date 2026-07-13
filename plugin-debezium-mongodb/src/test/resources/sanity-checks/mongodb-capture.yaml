@@ -1,0 +1,15 @@
+id: mongodb-capture
+namespace: sanitychecks.plugin-debezium-mongodb
+
+tasks:
+  - id: capture
+    type: io.kestra.plugin.debezium.mongodb.Capture
+    connectionString: mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/?replicaSet=rs0
+    snapshotMode: INITIAL
+    maxRecords: 20
+    maxWait: PT30S
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - "{{ outputs.capture.size >= 20 }}"

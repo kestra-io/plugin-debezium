@@ -23,7 +23,8 @@ import io.kestra.core.models.annotations.PluginProperty;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for a change data capture event on PostgreSQL server and capture the event as an internal storage file."
+    title = "Wait for a change data capture event on PostgreSQL server and capture the event as an internal storage file",
+    description = "Streams change data capture (CDC) events from a PostgreSQL database using Debezium and writes them to Kestra's internal storage."
 )
 @Plugin(
     examples = {
@@ -31,7 +32,7 @@ import io.kestra.core.models.annotations.PluginProperty;
             title = "Capture data from PostgreSQL server.",
             full = true,
             code = """
-                id: pg_capture
+                 id: pg_capture
                  namespace: company.team
 
                  tasks:
@@ -84,7 +85,7 @@ public class Capture extends AbstractDebeziumTask implements PostgresInterface {
     @PluginProperty(group = "connection")
     protected Property<String> sslKey;
 
-    @PluginProperty(group = "connection")
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> sslKeyPassword;
 
     @Builder.Default

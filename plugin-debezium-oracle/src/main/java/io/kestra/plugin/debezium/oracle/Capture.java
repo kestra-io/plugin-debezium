@@ -24,7 +24,8 @@ import io.kestra.core.models.annotations.PluginProperty;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for a change data capture event on Oracle server and capture the event as an internal storage file."
+    title = "Wait for a change data capture event on Oracle server and capture the event as an internal storage file",
+    description = "Streams change data capture (CDC) events from an Oracle database using Debezium and writes them to Kestra's internal storage."
 )
 @Plugin(
     examples = {

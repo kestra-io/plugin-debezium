@@ -8,14 +8,14 @@ import io.kestra.core.models.annotations.PluginProperty;
 
 public interface Db2Interface {
     @Schema(
-        title = "The name of the DB2 database from which to stream the changes."
+        title = "The name of the DB2 database from which to stream the changes"
     )
     @NotNull
     @PluginProperty(group = "main")
     Property<String> getDatabase();
 
     @Schema(
-        title = "Specifies the criteria for running a snapshot when the connector starts.",
+        title = "Specifies the criteria for running a snapshot when the connector starts",
         description = " Possible settings are:\n" +
             "- `ALWAYS`: The connector performs a snapshot every time that it starts.\n" +
             "- `INITIAL`: The connector runs a snapshot only when no offsets have been recorded for the logical server name.\n" +

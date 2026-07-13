@@ -1,0 +1,21 @@
+id: postgres-capture
+namespace: sanitychecks.plugin-debezium-postgres
+
+tasks:
+  - id: capture
+    type: io.kestra.plugin.debezium.postgres.Capture
+    hostname: 127.0.0.1
+    port: "65432"
+    username: postgres
+    password: pg_passwd
+    database: postgres
+    snapshotMode: INITIAL
+    maxRecords: 5
+    maxWait: PT30S
+    includedTables:
+      - public.events
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - "{{ outputs.capture.size >= 5 }}"

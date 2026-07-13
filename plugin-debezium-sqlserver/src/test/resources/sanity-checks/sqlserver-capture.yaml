@@ -1,0 +1,23 @@
+id: sqlserver-capture
+namespace: sanitychecks.plugin-debezium-sqlserver
+
+tasks:
+  - id: capture
+    type: io.kestra.plugin.debezium.sqlserver.Capture
+    hostname: 127.0.0.1
+    port: "61433"
+    username: sa
+    password: "Sqls3rv3r_Pa55word!"
+    database: deb
+    snapshotMode: INITIAL_ONLY
+    maxRecords: 5
+    maxWait: PT30S
+    includedTables:
+      - dbo.events
+    properties:
+      database.encrypt: "false"
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - "{{ outputs.capture.size >= 5 }}"

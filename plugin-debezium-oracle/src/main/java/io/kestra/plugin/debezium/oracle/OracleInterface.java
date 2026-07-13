@@ -9,21 +9,21 @@ import jakarta.validation.constraints.NotNull;
 public interface OracleInterface {
 
     @Schema(
-        title = "The name of the database to capture changes from."
+        title = "The name of the database to capture changes from"
     )
     @NotNull
     @PluginProperty(group = "main")
     Property<String> getSid();
 
     @Schema(
-        title = "The name of the Oracle pluggable database that the connector captures changes from. Used in container database (CDB) installations only.",
+        title = "The name of the Oracle pluggable database that the connector captures changes from. Used in container database (CDB) installations only",
         description = "For non-container database (non-CDB) installation, do not specify the pluggableDatabase property."
     )
     @PluginProperty(group = "connection")
     Property<String> getPluggableDatabase();
 
     @Schema(
-        title = "Specifies the criteria for running a snapshot when the connector starts.",
+        title = "Specifies the criteria for running a snapshot when the connector starts",
         description = " Possible settings are:\n" +
             "- `ALWAYS`: The connector runs a snapshot on each connector start.\n" +
             "- `INITIAL`: The connector runs a snapshot only when no offsets have been recorded for the logical server name.\n" +

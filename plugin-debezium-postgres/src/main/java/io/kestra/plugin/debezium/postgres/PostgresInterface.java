@@ -8,14 +8,14 @@ import io.kestra.core.models.annotations.PluginProperty;
 
 public interface PostgresInterface {
     @Schema(
-        title = "The name of the PostgreSQL database from which to stream the changes."
+        title = "The name of the PostgreSQL database from which to stream the changes"
     )
     @NotNull
     @PluginProperty(group = "main")
     Property<String> getDatabase();
 
     @Schema(
-        title = "The name of the [PostgreSQL logical decoding](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-output-plugin) plug-in installed on the PostgreSQL server.",
+        title = "The name of the [PostgreSQL logical decoding](https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-output-plugin) plug-in installed on the PostgreSQL server",
         description = "If you are using a `wal2json` plug-in and transactions are very large, the JSON batch event " +
             "that contains all transaction changes might not fit into the hard-coded memory buffer, which has a size " +
             "of 1 GB. In such cases, switch to a streaming plug-in, by setting the plugin-name property to " +
@@ -27,7 +27,7 @@ public interface PostgresInterface {
     Property<PluginName> getPluginName();
 
     @Schema(
-        title = "The name of the PostgreSQL publication created for streaming changes when using `PGOUTPUT`.",
+        title = "The name of the PostgreSQL publication created for streaming changes when using `PGOUTPUT`",
         description = "This publication is created at start-up if it does not already exist and it includes all tables. " +
             "Debezium then applies its own include/exclude list filtering, if configured, to limit the publication to " +
             "change events for the specific tables of interest. The connector user must have superuser permissions to " +
@@ -41,7 +41,7 @@ public interface PostgresInterface {
     Property<String> getPublicationName();
 
     @Schema(
-        title = "The name of the PostgreSQL logical decoding slot that was created for streaming changes from a particular plug-in for a particular database/schema.",
+        title = "The name of the PostgreSQL logical decoding slot that was created for streaming changes from a particular plug-in for a particular database/schema",
         description = "The server uses this slot to stream events to the Debezium connector that you are configuring.\n" +
             "Slot names must conform to [PostgreSQL replication slot naming rules](https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION), "
             +
@@ -52,7 +52,8 @@ public interface PostgresInterface {
     Property<String> getSlotName();
 
     @Schema(
-        title = "Whether to use an encrypted connection to the PostgreSQL server. Options include:\n" +
+        title = "SSL mode",
+        description = "Whether to use an encrypted connection to the PostgreSQL server. Options include:\n" +
             "- `DISABLE` uses an unencrypted connection.\n" +
             "- `REQUIRE` uses a secure (encrypted) connection, and fails if one cannot be established.\n" +
             "- `VERIFY_CA` behaves like require but also verifies the server TLS certificate against the configured Certificate Authority (CA) certificates, or fails if no valid matching CA certificates are found.\n"
@@ -64,34 +65,34 @@ public interface PostgresInterface {
     Property<SslMode> getSslMode();
 
     @Schema(
-        title = "The root certificate(s) against which the server is validated.",
+        title = "The root certificate(s) against which the server is validated",
         description = "Must be a PEM encoded certificate."
     )
     @PluginProperty(group = "connection")
     Property<String> getSslRootCert();
 
     @Schema(
-        title = "The SSL certificate for the client.",
+        title = "The SSL certificate for the client",
         description = "Must be a PEM encoded certificate."
     )
     @PluginProperty(group = "connection")
     Property<String> getSslCert();
 
     @Schema(
-        title = "The SSL private key of the client.",
+        title = "The SSL private key of the client",
         description = "Must be a PEM encoded key."
     )
     @PluginProperty(group = "connection", secret = true)
     Property<String> getSslKey();
 
     @Schema(
-        title = "The password to access the client private key `sslKey`."
+        title = "The password to access the client private key `sslKey`"
     )
     @PluginProperty(group = "connection", secret = true)
     Property<String> getSslKeyPassword();
 
     @Schema(
-        title = "Specifies the criteria for running a snapshot when the connector starts.",
+        title = "Specifies the criteria for running a snapshot when the connector starts",
         description = " Possible settings are:\n" +
             "- `INITIAL`: The connector performs a snapshot only when no offsets have been recorded for the logical server name.\n" +
             "- `ALWAYS`: The connector performs a snapshot each time the connector starts.\n" +

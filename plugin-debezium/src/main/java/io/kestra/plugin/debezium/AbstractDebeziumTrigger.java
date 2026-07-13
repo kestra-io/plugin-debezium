@@ -74,21 +74,21 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
     protected Property<String> stateName = Property.ofValue("debezium-state");
 
     @Schema(
-        title = "The maximum number of rows to fetch before stopping.",
+        title = "The maximum number of rows to fetch before stopping",
         description = "It's not an hard limit and is evaluated every second."
     )
     @PluginProperty(group = "execution")
     protected Property<Integer> maxRecords;
 
     @Schema(
-        title = "The maximum duration waiting for new rows.",
+        title = "The maximum duration waiting for new rows",
         description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
     @PluginProperty(group = "execution")
     protected Property<Duration> maxDuration;
 
     @Schema(
-        title = "The maximum total processing duration.",
+        title = "The maximum total processing duration",
         description = "It's not an hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
     @Builder.Default
@@ -96,7 +96,7 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
     protected Property<Duration> maxWait = Property.ofValue(Duration.ofSeconds(10));
 
     @Schema(
-        title = "The maximum duration waiting for the snapshot to ends.",
+        title = "The maximum duration waiting for the snapshot to ends",
         description = "It's not an hard limit and is evaluated every second.\n The properties 'maxRecord', 'maxDuration' and 'maxWait' are evaluated only after the snapshot is done."
     )
     @Builder.Default
@@ -104,7 +104,7 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
     protected Property<Duration> maxSnapshotDuration = Property.ofValue(Duration.ofHours(1));
 
     @Schema(
-        title = "When to commit the offsets to the KV Store.",
+        title = "When to commit the offsets to the KV Store",
         description = """
             - `ON_EACH_BATCH`: after each batch of records consumed by this trigger, the offsets will be stored in the KV Store. This avoids any duplicated records being consumed but can be costly if many events are produced.
             - `ON_STOP`: when this trigger is stopped or killed, the offsets will be stored in the KV Store. This avoids any un-necessary writes to the KV Store, but if the trigger is not stopped gracefully, the KV Store value may not be updated leading to duplicated records consumption.

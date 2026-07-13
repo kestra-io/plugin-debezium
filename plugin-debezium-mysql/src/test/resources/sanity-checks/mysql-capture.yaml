@@ -1,0 +1,21 @@
+id: mysql-capture
+namespace: sanitychecks.plugin-debezium-mysql
+
+tasks:
+  - id: capture
+    type: io.kestra.plugin.debezium.mysql.Capture
+    serverId: 123456789
+    hostname: 127.0.0.1
+    port: "63306"
+    username: root
+    password: mysql_passwd
+    snapshotMode: NEVER
+    maxRecords: 5
+    maxWait: PT30S
+    includedTables:
+      - kestra.capture_events
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - "{{ outputs.capture.size >= 5 }}"

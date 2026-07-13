@@ -25,7 +25,8 @@ import io.kestra.core.models.annotations.PluginProperty;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Wait for change data capture event on MongoDB server and capture the event as an internal storage file."
+    title = "Wait for change data capture event on MongoDB server and capture the event as an internal storage file",
+    description = "Streams change data capture (CDC) events from a MongoDB deployment using Debezium and writes them to Kestra's internal storage."
 )
 @Plugin(
     examples = {

@@ -1,0 +1,21 @@
+id: db2-capture
+namespace: sanitychecks.plugin-debezium-db2
+
+tasks:
+  - id: capture
+    type: io.kestra.plugin.debezium.db2.Capture
+    hostname: 127.0.0.1
+    port: "5023"
+    username: db2inst1
+    password: password
+    database: kestra
+    snapshotMode: INITIAL
+    maxRecords: 5
+    maxWait: PT30S
+    includedTables:
+      - DB2INST1.EVENTS
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - "{{ outputs.capture.size >= 5 }}"

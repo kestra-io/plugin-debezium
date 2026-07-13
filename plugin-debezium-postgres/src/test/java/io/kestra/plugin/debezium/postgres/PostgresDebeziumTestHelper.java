@@ -11,8 +11,8 @@ import io.kestra.core.storages.kv.KVEntry;
 import io.kestra.core.storages.kv.KVStore;
 import io.kestra.core.storages.kv.KVStoreException;
 import io.kestra.core.tenant.TenantService;
-import io.kestra.core.utils.Hashing;
 import io.kestra.core.utils.Slugify;
+import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 
 final class PostgresDebeziumTestHelper {
@@ -47,8 +47,12 @@ final class PostgresDebeziumTestHelper {
             .orElse(null);
         var stateName = runContext.render(task.getStateName()).as(String.class).orElse("debezium-state");
 
-        deleteAllVersions(kvStore, computeKvStoreKey(runContext, stateName, "offsets.dat", taskRunValue));
-        deleteAllVersions(kvStore, computeKvStoreKey(runContext, stateName, "dbhistory.dat", taskRunValue));
+        // Combined atomic key (current format).
+        deleteAllVersions(kvStore, AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.COMBINED_STATE_FILE, taskRunValue));
+
+        // Legacy per-file keys (older format, kept for backward compatibility).
+        deleteAllVersions(kvStore, AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.OFFSETS_DATA_FILE, taskRunValue));
+        deleteAllVersions(kvStore, AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.DBHISTORY_DATA_FILE, taskRunValue));
     }
 
     static void cleanupFlowState(KVStoreService kvStoreService, String namespace, String flowId, String... stateNames) throws Exception {
@@ -69,22 +73,6 @@ final class PostgresDebeziumTestHelper {
         for (var key : keysToDelete) {
             deleteAllVersions(kvStore, key);
         }
-    }
-
-    private static String computeKvStoreKey(RunContext runContext, String stateName, String filename, String taskRunValue) throws Exception {
-        String separator = "_";
-        boolean hashTaskRunValue = taskRunValue != null;
-
-        String flowId = runContext.flowInfo().id();
-        String flowIdPrefix = (flowId == null) ? "" : (Slugify.of(flowId) + separator);
-        String prefix = flowIdPrefix + "states" + separator + stateName;
-
-        if (taskRunValue != null) {
-            String taskRunSuffix = hashTaskRunValue ? Hashing.hashToString(taskRunValue) : taskRunValue;
-            prefix = prefix + separator + taskRunSuffix;
-        }
-
-        return prefix + separator + filename;
     }
 
     private static void deleteAllVersions(KVStore kvStore, String key) throws Exception {

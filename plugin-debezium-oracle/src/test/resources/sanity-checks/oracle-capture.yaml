@@ -1,0 +1,20 @@
+id: oracle-capture
+namespace: sanitychecks.plugin-debezium-oracle
+
+tasks:
+  - id: capture
+    type: io.kestra.plugin.debezium.oracle.Capture
+    hostname: 127.0.0.1
+    port: "1521"
+    username: c##dbzuser
+    password: dbz
+    sid: XE
+    snapshotMode: INITIAL_ONLY
+    maxRecords: 5
+    maxWait: PT30S
+    includedTables: KESTRA.EVENTS
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - "{{ outputs.capture.size >= 5 }}"

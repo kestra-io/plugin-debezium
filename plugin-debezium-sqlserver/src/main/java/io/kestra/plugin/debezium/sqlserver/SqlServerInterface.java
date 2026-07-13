@@ -14,14 +14,14 @@ import io.kestra.core.models.annotations.PluginProperty;
 
 public interface SqlServerInterface {
     @Schema(
-        title = "The name of the Microsoft SQL Server database from which to stream the changes."
+        title = "The name of the Microsoft SQL Server database from which to stream the changes"
     )
     @NotNull
     @PluginProperty(group = "main")
     Property<String> getDatabase();
 
     @Schema(
-        title = "Specifies the criteria for running a snapshot when the connector starts.",
+        title = "Specifies the criteria for running a snapshot when the connector starts",
         description = " Possible settings are:\n" +
             "- `INITIAL`: Takes a snapshot of structure and data of captured tables; useful if topics should be populated with a complete representation of the data from the captured tables.\n"
             +

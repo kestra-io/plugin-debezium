@@ -18,6 +18,7 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
 
@@ -111,28 +112,13 @@ class CaptureTest extends AbstractDebeziumTest {
             .orElse(null);
         String stateName = runContext.render(task.getStateName()).as(String.class).orElse("debezium-state");
 
-        var offsetKey = computeKvStoreKey(runContext, stateName, "offsets.dat", taskRunValue);
-        kvStore.delete(offsetKey);
+        // Combined atomic key (current format).
+        kvStore.delete(AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.COMBINED_STATE_FILE, taskRunValue));
 
+        // Legacy per-file keys (older format).
+        kvStore.delete(AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.OFFSETS_DATA_FILE, taskRunValue));
         if (task.needDatabaseHistory()) {
-            var historyKey = computeKvStoreKey(runContext, stateName, "dbhistory.dat", taskRunValue);
-            kvStore.delete(historyKey);
+            kvStore.delete(AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.DBHISTORY_DATA_FILE, taskRunValue));
         }
-    }
-
-    private static String computeKvStoreKey(RunContext runContext, String stateName, String filename, String taskRunValue) throws Exception {
-        String separator = "_";
-        boolean hashTaskRunValue = taskRunValue != null;
-
-        String flowId = runContext.flowInfo().id();
-        String flowIdPrefix = (flowId == null) ? "" : (io.kestra.core.utils.Slugify.of(flowId) + separator);
-        String prefix = flowIdPrefix + "states" + separator + stateName;
-
-        if (taskRunValue != null) {
-            String taskRunSuffix = hashTaskRunValue ? io.kestra.core.utils.Hashing.hashToString(taskRunValue) : taskRunValue;
-            prefix = prefix + separator + taskRunSuffix;
-        }
-
-        return prefix + separator + filename;
     }
 }

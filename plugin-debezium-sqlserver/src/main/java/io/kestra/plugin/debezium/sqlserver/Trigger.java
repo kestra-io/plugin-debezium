@@ -25,7 +25,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Trigger a flow via a SQL Server change data capture event periodically and create one execution per row.",
+    title = "Trigger a flow via a SQL Server change data capture event periodically and create one execution per row",
     description = "If you would like to consume each message from change data capture in real-time and create one execution per message, you can use the [io.kestra.plugin.debezium.sqlserver.RealtimeTrigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.sqlserver.realtimetrigger) instead."
 )
 @Plugin(
@@ -62,6 +62,7 @@ public class Trigger extends AbstractDebeziumTrigger implements SqlServerInterfa
     @Builder.Default
     private Property<SqlServerInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
+    @Schema(title = "Unique identifier for the Debezium SQL Server connector")
     private String serverId;
 
     @Override
