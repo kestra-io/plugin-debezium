@@ -3,6 +3,7 @@ package io.kestra.plugin.debezium.sqlserver;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Disabled;
@@ -10,15 +11,12 @@ import org.junit.jupiter.api.Test;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.executions.Execution;
-import io.kestra.core.queues.QueueFactoryInterface;
-import io.kestra.core.queues.QueueInterface;
+import io.kestra.core.queues.DispatchQueueInterface;
 import io.kestra.core.repositories.LocalFlowRepositoryLoader;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
 
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
-import reactor.core.publisher.Flux;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -27,8 +25,7 @@ import static org.hamcrest.Matchers.*;
 @Disabled("This test works but when we added it, the CI will fail on the Trigger test. It may be caused by a database setup ...")
 class RealtimeTriggerTest extends AbstractDebeziumTest {
     @Inject
-    @Named(QueueFactoryInterface.EXECUTION_NAMED)
-    private QueueInterface<Execution> executionQueue;
+    private DispatchQueueInterface<Execution> executionQueue;
 
     @Inject
     protected LocalFlowRepositoryLoader repositoryLoader;
@@ -54,9 +51,12 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
         executeSqlScript("scripts/sqlserver.sql");
 
         CountDownLatch queueCount = new CountDownLatch(1);
-        Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
-            queueCount.countDown();
-            assertThat(execution.getLeft().getFlowId(), is("trigger"));
+        AtomicReference<Execution> last = new AtomicReference<>();
+        executionQueue.addListener(execution -> {
+            if (execution.getFlowId().equals("trigger")) {
+                last.set(execution);
+                queueCount.countDown();
+            }
         });
 
         repositoryLoader.load(Objects.requireNonNull(RealtimeTriggerTest.class.getClassLoader().getResource("flows/realtime.yaml")));
@@ -64,7 +64,7 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
         boolean await = queueCount.await(15, TimeUnit.SECONDS);
         assertThat(await, is(true));
 
-        Map<String, Object> data = (Map<String, Object>) receive.blockLast().getTrigger().getVariables().get("data");
+        Map<String, Object> data = (Map<String, Object>) last.get().getTrigger().getVariables().get("data");
 
         assertThat(data, notNullValue());
         assertThat(data.size(), greaterThanOrEqualTo(5));
