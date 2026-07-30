@@ -28,7 +28,7 @@ import reactor.core.publisher.Flux;
 @Plugin(
     examples = {
         @Example(
-            title = "Consume a message from a Oracle database via change data capture in real-time.",
+            title = "Consume a message from an Oracle database via change data capture in real-time.",
             full = true,
             code = """
                 id: debezium_oracle

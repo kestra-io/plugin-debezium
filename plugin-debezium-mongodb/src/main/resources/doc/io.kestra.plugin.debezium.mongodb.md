@@ -10,8 +10,8 @@ Stream change data capture (CDC) events from MongoDB using [Debezium](https://de
 
 ## Connection
 
-Provide the MongoDB connection details (hostname, port, username, password, database) via [Kestra secrets](https://kestra.io/docs/concepts/secret) for credentials. MongoDB requires a replica set or sharded cluster with the oplog available.
+Provide the MongoDB `connectionString` (a replica-set or sharded-cluster URI, with credentials injected via [Kestra secrets](https://kestra.io/docs/concepts/secret)). MongoDB requires a replica set or sharded cluster with the oplog available.
 
 ## Notes
 
-Debezium tracks progress with an offset and database history stored under a state name, so a restarted task resumes from the last committed position rather than re-reading the whole log from the start.
+Debezium tracks progress with an offset stored under a state name, so a restarted task resumes from the last committed position rather than re-reading the whole log from the start.

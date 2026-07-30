@@ -10,7 +10,7 @@ Stream change data capture (CDC) events from Oracle using [Debezium](https://deb
 
 ## Connection
 
-Provide the Oracle connection details (hostname, port, username, password, database) via [Kestra secrets](https://kestra.io/docs/concepts/secret) for credentials. Oracle requires LogMiner or XStream access configured for CDC.
+Provide the Oracle connection details (hostname, port, username, password, `sid`, and an optional pluggable database) via [Kestra secrets](https://kestra.io/docs/concepts/secret) for credentials. Oracle requires LogMiner or XStream access configured for CDC.
 
 ## Notes
 
