@@ -11,8 +11,8 @@ import jakarta.validation.constraints.NotNull;
 public interface AbstractDebeziumInterface {
     @Schema(
         title = "The format of the output",
-        description = " Possible settings are:\n" +
-            "- `RAW`: Send raw data from debezium.\n" +
+        description = "Possible settings are:\n" +
+            "- `RAW`: Send raw data from Debezium.\n" +
             "- `INLINE`: Send a row like in the source with only data (remove after & before), all the columns will be present for each row.\n" +
             "- `WRAP`: Send a row like INLINE but wrapped in a `record` field.\n"
     )
@@ -21,7 +21,7 @@ public interface AbstractDebeziumInterface {
 
     @Schema(
         title = "Specify how to handle deleted rows",
-        description = " Possible settings are:\n" +
+        description = "Possible settings are:\n" +
             "- `ADD_FIELD`: Add a deleted field as boolean.\n" +
             "- `NULL`: Send a row with all values as null.\n" +
             "- `DROP`: Don't send deleted row."
@@ -38,7 +38,7 @@ public interface AbstractDebeziumInterface {
 
     @Schema(
         title = "Specify how to handle key",
-        description = " Possible settings are:\n" +
+        description = "Possible settings are:\n" +
             "- `ADD_FIELD`: Add key(s) merged with columns.\n" +
             "- `DROP`: Drop keys."
     )
@@ -47,7 +47,7 @@ public interface AbstractDebeziumInterface {
 
     @Schema(
         title = "Specify how to handle metadata",
-        description = " Possible settings are:\n" +
+        description = "Possible settings are:\n" +
             "- `ADD_FIELD`: Add metadata in a column named `metadata`.\n" +
             "- `DROP`: Drop metadata."
     )
@@ -63,7 +63,7 @@ public interface AbstractDebeziumInterface {
 
     @Schema(
         title = "Split table on separate output `uris`",
-        description = " Possible settings are:\n" +
+        description = "Possible settings are:\n" +
             "- `TABLE`: This will split all rows by tables on output with name `database.table`\n" +
             "- `DATABASE`: This will split all rows by databases on output with name `database`.\n" +
             "- `OFF`: This will **NOT** split all rows resulting in a single `data` output."
@@ -134,15 +134,15 @@ public interface AbstractDebeziumInterface {
     Object getExcludedTables();
 
     @Schema(
-        title = "An optional, comma-separated list of regular expressions that match the fully-qualified names of columns to exclude from change event record values",
+        title = "An optional, comma-separated list of regular expressions that match the fully-qualified names of columns to include in change event record values",
         description = "Fully-qualified names for columns are of the form databaseName.tableName.columnName. Do not also specify the `excludedColumns` connector configuration property."
     )
     @PluginProperty(dynamic = true, group = "advanced")
     Object getIncludedColumns();
 
     @Schema(
-        title = "An optional, comma-separated list of regular expressions that match the fully-qualified names of columns to include in change event record values",
-        description = "Fully-qualified names for columns are of the form databaseName.tableName.columnName. Do not also specify the `includedColumns` connector configuration property.\""
+        title = "An optional, comma-separated list of regular expressions that match the fully-qualified names of columns to exclude from change event record values",
+        description = "Fully-qualified names for columns are of the form databaseName.tableName.columnName. Do not also specify the `includedColumns` connector configuration property."
     )
     @PluginProperty(dynamic = true, group = "advanced")
     Object getExcludedColumns();

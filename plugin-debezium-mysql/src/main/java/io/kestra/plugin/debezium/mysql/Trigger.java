@@ -25,7 +25,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Trigger a flow via a MySQL change data capture event periodically and create one execution per row",
+    title = "Trigger a flow via a MySQL change data capture event periodically and create one execution per batch",
     description = "If you would like to consume each message from change data capture in real-time and create one execution per message, you can use the [io.kestra.plugin.debezium.mysql.RealtimeTrigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.mysql.realtimetrigger) instead."
 )
 @Plugin(
@@ -44,7 +44,7 @@ import lombok.experimental.SuperBuilder;
 
                 triggers:
                   - id: trigger
-                    type: io.kestra.plugin.debezium.mysql.RealtimeTrigger
+                    type: io.kestra.plugin.debezium.mysql.Trigger
                     snapshotMode: NEVER
                     hostname: 127.0.0.1
                     port: "3306"

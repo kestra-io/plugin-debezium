@@ -45,8 +45,8 @@ import reactor.core.publisher.Flux;
                     type: io.kestra.plugin.debezium.sqlserver.RealtimeTrigger
                     hostname: 127.0.0.1
                     port: "1433"
-                    username: "{{ secret('MYSQL_USERNAME') }}"
-                    password: "{{ secret('MYSQL_PASSWORD') }}"
+                    username: "{{ secret('SQLSERVER_USERNAME') }}"
+                    password: "{{ secret('SQLSERVER_PASSWORD') }}"
                     database: deb
                 """
         )

@@ -32,17 +32,18 @@ import io.kestra.core.models.annotations.PluginProperty;
             title = "Wait for change data capture event on Microsoft SQL Server.",
             full = true,
             code = """
-                id: mysql_capture
+                id: sqlserver_capture
                 namespace: company.team
 
                 tasks:
                   - id: capture
-                    type: io.kestra.plugin.debezium.mysql.Capture
-                    snapshotMode: NEVER
+                    type: io.kestra.plugin.debezium.sqlserver.Capture
+                    snapshotMode: INITIAL
                     hostname: 127.0.0.1
-                    port: "3306"
-                    username: "{{ secret('MYSQL_USERNAME') }}"
-                    password: "{{ secret('MYSQL_PASSWORD') }}"
+                    port: "1433"
+                    username: "{{ secret('SQLSERVER_USERNAME') }}"
+                    password: "{{ secret('SQLSERVER_PASSWORD') }}"
+                    database: deb
                     maxRecords: 100
                 """
         )
