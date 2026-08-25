@@ -10,6 +10,8 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Driver;
+import java.sql.DriverManager;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.*;
@@ -517,7 +519,59 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         }
     }
 
+    /**
+     * Whether this connector needs a {@link Driver} registered with {@link DriverManager} before
+     * connecting. True for every JDBC-based connector; overridden to false by connectors that
+     * don't go through java.sql at all (e.g. MongoDB), so {@link #registerJdbcDriver(RunContext)}
+     * doesn't log a spurious diagnostic for them.
+     */
+    protected boolean requiresJdbcDriver() {
+        return true;
+    }
+
+    /**
+     * Explicitly registers this connector's JDBC driver with {@link DriverManager}.
+     *
+     * DriverManager auto-discovers drivers via {@code ServiceLoader.load(Driver.class)} only
+     * once per JVM, the first time it's touched, using whichever classloader is active at that
+     * moment. That happens before this plugin's isolated classloader exists, so the driver
+     * bundled in this jar (with a correct META-INF/services/java.sql.Driver entry) is never seen
+     * by that one-shot scan, even though it's genuinely present. Debezium's JdbcConnection then
+     * fails with "No suitable driver found" despite the driver being right there.
+     *
+     * Re-running the same ServiceLoader lookup here, explicitly scoped to this classloader,
+     * registers whatever driver this connector's jar actually bundles (no per-dialect driver
+     * class name needed). If nothing is found, that "No suitable driver found" failure is about
+     * to happen regardless (this is a hard prerequisite, not a "might still work" situation), so
+     * this logs as ERROR right at the source rather than leaving the generic exception a few
+     * frames downstream as the only clue (e.g. if a future driver version ever ships a
+     * broken/missing service file).
+     */
+    private void registerJdbcDriver(RunContext runContext) throws Exception {
+        if (!this.requiresJdbcDriver()) {
+            return;
+        }
+
+        boolean found = false;
+        for (Driver driver : ServiceLoader.load(Driver.class, this.getClass().getClassLoader())) {
+            found = true;
+            if (DriverManager.drivers().noneMatch(driver.getClass()::isInstance)) {
+                DriverManager.registerDriver(driver);
+            }
+        }
+
+        if (!found) {
+            runContext.logger().error(
+                "No java.sql.Driver implementation found via ServiceLoader in {}'s classloader; " +
+                    "the connection is about to fail with 'No suitable driver found'.",
+                this.getClass().getName()
+            );
+        }
+    }
+
     protected Properties properties(RunContext runContext, Path offsetFile, Path historyFile) throws Exception {
+        this.registerJdbcDriver(runContext);
+
         final Properties props = new Properties();
 
         var connectorId = deriveConnectorId(runContext);
