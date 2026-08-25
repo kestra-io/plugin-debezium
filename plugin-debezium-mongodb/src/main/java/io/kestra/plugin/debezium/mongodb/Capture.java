@@ -120,6 +120,11 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
     }
 
     @Override
+    protected boolean requiresJdbcDriver() {
+        return false;
+    }
+
+    @Override
     protected Properties properties(RunContext runContext, Path offsetFile, Path historyFile) throws Exception {
         Properties props = super.properties(runContext, offsetFile, historyFile);
 
