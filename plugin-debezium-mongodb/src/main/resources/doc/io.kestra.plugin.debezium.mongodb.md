@@ -5,8 +5,8 @@ Stream change data capture (CDC) events from MongoDB using [Debezium](https://de
 ## Tasks
 
 - `Capture`: run a one-off capture that collects CDC events until a record count, duration, or wait limit is reached, then writes them to internal storage.
-- `Trigger`: poll for CDC events on a schedule and start a flow when new events arrive.
-- `RealtimeTrigger`: stream CDC events continuously and start one execution per event.
+- `Trigger`: poll for CDC events on a schedule and start a flow with one execution per batch of new events (reads the oplog/change streams, not a `find` query).
+- `RealtimeTrigger`: stream CDC events continuously and start one execution per event (reads the oplog/change streams, not a `find` query).
 
 ## Connection
 
