@@ -24,9 +24,12 @@ import reactor.core.publisher.Flux;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Trigger a flow on real-time message consumption from a MongoDB database via change data capture and create one execution per row",
-    description = "If you would like to consume multiple messages processed within a given time frame and process them in batch, you can use the [io.kestra.plugin.debezium.mongodb.Trigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.mongodb.trigger) instead."
+    title = "MongoDB Realtime CDC Trigger",
+    description = """
+        Streams change data capture (CDC) events from MongoDB's oplog or change streams via [Debezium](https://debezium.io/) in real time, starting one execution per event as it is captured. This is a change-data-capture trigger, not a polling `find`-based trigger — it does not query MongoDB documents directly, it reads the underlying change log.
 
+        If you would like to consume multiple messages processed within a given time frame and process them in batch, you can use the [io.kestra.plugin.debezium.mongodb.Trigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.mongodb.trigger) instead.
+        """
 )
 @Plugin(
     examples = {
