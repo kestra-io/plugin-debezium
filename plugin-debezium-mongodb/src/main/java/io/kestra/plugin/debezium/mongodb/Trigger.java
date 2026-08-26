@@ -28,9 +28,12 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Trigger a flow on a change data capture event in MongoDB and create new execution per batch",
-    description = "If you would like to consume each message from change data capture in real-time and create one execution per message, you can use the [io.kestra.plugin.debezium.mongodb.RealtimeTrigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.mongodb.realtimetrigger) instead."
+    title = "MongoDB CDC Trigger",
+    description = """
+        Captures change data capture (CDC) events from MongoDB's oplog or change streams via [Debezium](https://debezium.io/) and starts an execution for each batch of accumulated events. This is a change-data-capture trigger, not a polling `find`-based trigger — it does not query MongoDB documents directly, it reads the underlying change log.
 
+        If you would like to consume each message from change data capture in real-time and create one execution per message, you can use the [io.kestra.plugin.debezium.mongodb.RealtimeTrigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.mongodb.realtimetrigger) instead.
+        """
 )
 @Plugin(
     examples = {
