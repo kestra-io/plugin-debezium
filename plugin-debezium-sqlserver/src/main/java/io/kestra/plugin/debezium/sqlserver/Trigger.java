@@ -25,7 +25,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Trigger a flow via a SQL Server change data capture event periodically and create one execution per row",
+    title = "Trigger a flow via a SQL Server change data capture event periodically and create one execution per batch",
     description = "If you would like to consume each message from change data capture in real-time and create one execution per message, you can use the [io.kestra.plugin.debezium.sqlserver.RealtimeTrigger](https://kestra.io/plugins/plugin-debezium/triggers/io.kestra.plugin.debezium.sqlserver.realtimetrigger) instead."
 )
 @Plugin(
@@ -48,8 +48,8 @@ import lombok.experimental.SuperBuilder;
                     snapshotMode: INITIAL
                     hostname: 127.0.0.1
                     port: "1433"
-                    username: "{{ secret('MYSQL_USERNAME') }}"
-                    password: "{{ secret('MYSQL_PASSWORD') }}"
+                    username: "{{ secret('SQLSERVER_USERNAME') }}"
+                    password: "{{ secret('SQLSERVER_PASSWORD') }}"
                     database: deb
                     maxRecords: 100
                 """

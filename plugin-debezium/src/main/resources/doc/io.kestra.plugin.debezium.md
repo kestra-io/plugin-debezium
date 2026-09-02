@@ -21,7 +21,7 @@ Each database connector requires one additional identifier:
 
 ## Tasks
 
-Each database has a `Capture` task that reads a bounded batch of change events and writes them to Kestra's internal storage. The output includes `size` (row count), `uris` (map of table name → file URI), `stateOffsetKey`, and `stateHistoryKey`.
+Each database has a `Capture` task that reads a bounded batch of change events and writes them to Kestra's internal storage. The output includes `size` (row count), `uris` (map of table name → file URI), and `stateOffsetKey`.
 
 ## Triggers
 

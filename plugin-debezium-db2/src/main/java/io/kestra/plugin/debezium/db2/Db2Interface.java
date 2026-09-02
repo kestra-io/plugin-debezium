@@ -19,7 +19,7 @@ public interface Db2Interface {
         description = " Possible settings are:\n" +
             "- `ALWAYS`: The connector performs a snapshot every time that it starts.\n" +
             "- `INITIAL`: The connector runs a snapshot only when no offsets have been recorded for the logical server name.\n" +
-            "- `INITIAL_ONLY`: The connector runs a snapshot only when no offsets have been recorded for the logical server name and then stops; i.e. it will not read change events from the binlog.\n"
+            "- `INITIAL_ONLY`: The connector runs a snapshot only when no offsets have been recorded for the logical server name and then stops; i.e. it will not stream change events from the transaction log.\n"
             +
             "- `WHEN_NEEDED`: After the connector starts, it performs a snapshot only if it detects one of the following circumstances: 1. It cannot detect any topic offsets. 2. A previously recorded offset specifies a log position that is not available on the server.\n"
             +

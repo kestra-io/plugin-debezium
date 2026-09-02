@@ -9,10 +9,10 @@ import jakarta.validation.constraints.NotNull;
 public interface MongodbInterface {
 
     @Schema(
-        title = "Defines connection string to mongodb replica set or sharded",
+        title = "Connection string to a MongoDB replica set or sharded cluster",
         examples = {
-            "mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/?replicaSet=rs0",
-            "mongodb://mongo_user:mongo_passwd@mongos0.example.com:27017,mongos1.example.com:27017/"
+            "mongodb://mongo_user:<password>@127.0.0.1:27017/?replicaSet=rs0",
+            "mongodb://mongo_user:<password>@mongos0.example.com:27017,mongos1.example.com:27017/"
         }
     )
     @PluginProperty(group = "connection", secret = true)
@@ -38,11 +38,11 @@ public interface MongodbInterface {
         title = "Specifies the criteria for running a snapshot when the connector starts",
         description = " Possible settings are:\n" +
             "- `INITIAL`: The connector runs a snapshot only when no offsets have been recorded for the logical server name.\n" +
-            "- `INITIAL_ONLY`: The connector runs a snapshot only when no offsets have been recorded for the logical server name and then stops; i.e. it will not read change events from the binlog.\n"
+            "- `INITIAL_ONLY`: The connector runs a snapshot only when no offsets have been recorded for the logical server name and then stops; i.e. it will not stream change events from the oplog.\n"
             +
-            "- `NO_DATA`: The connector captures the structure of all relevant tables, performing all the steps described in the default snapshot workflow, except that it does not create READ events to represent the data set at the point of the connector’s start-up.\n"
+            "- `NO_DATA`: The connector captures the structure of all relevant collections, performing all the steps described in the default snapshot workflow, except that it does not create READ events to represent the data set at the point of the connector’s start-up.\n"
             +
-            "- `WHEN_NEEDED`: The connector runs a snapshot upon startup whenever it deems it necessary. That is, when no offsets are available, or when a previously recorded offset specifies a binlog location or GTID that is not available in the server."
+            "- `WHEN_NEEDED`: The connector runs a snapshot upon startup whenever it deems it necessary. That is, when no offsets are available, or when a previously recorded offset specifies an oplog position that is not available on the server."
     )
     @NotNull
     @PluginProperty(group = "main")
