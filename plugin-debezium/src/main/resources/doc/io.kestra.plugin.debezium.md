@@ -6,7 +6,7 @@ Capture change data (CDC) from relational databases and MongoDB into Kestra flow
 
 Set `hostname`, `port`, `username`, and `password` to connect to the source database. Control output shape with `format` (`INLINE` by default, also `RAW` or `WRAP`), `deleted` (how to handle deletes — `ADD_FIELD` by default), `key` and `metadata` (both `ADD_FIELD` by default), and `splitTable` (`TABLE` by default — splits output by `database.table`). Filter captured data with `includedDatabases`, `excludedDatabases`, `includedTables`, `excludedTables`, `includedColumns`, and `excludedColumns`. Bound capture batches with `maxRecords`, `maxDuration`, and `maxWait` (default 10 seconds). Control snapshotting with `snapshotMode` (default `INITIAL` for all databases). Offset state is stored in Kestra's KV store under `stateName` (default `debezium-state`).
 
-Apply connection properties globally with [plugin defaults](https://kestra.io/docs/workflow-components/plugin-defaults).
+Set connection properties on each task.
 
 ## Database-specific required properties
 
