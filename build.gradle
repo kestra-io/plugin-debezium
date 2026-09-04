@@ -204,7 +204,7 @@ subprojects { Project subproject ->
         pom {
             name        = project.name
             description = "${project.group}:${project.name}:${rootProject.version}"
-            url         = "https://github.com/kestra-io/${rootProject.name}"
+            url         = "https://github.com/kestra-io/plugin-debezium"
 
             licenses {
                 license {
@@ -221,7 +221,7 @@ subprojects { Project subproject ->
             }
             scm {
                 connection = 'scm:git:'
-                url = "https://github.com/kestra-io/${rootProject.name}"
+                url = "https://github.com/kestra-io/plugin-debezium"
             }
         }
     }
