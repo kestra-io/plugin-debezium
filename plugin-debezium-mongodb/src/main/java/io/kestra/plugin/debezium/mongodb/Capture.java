@@ -130,7 +130,9 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
 
         props.setProperty("connector.class", MongoDbConnector.class.getName());
 
-        props.setProperty("mongodb.connection.string", runContext.render(this.connectionString).as(String.class).orElse(null));
+        String renderedConnectionString = runContext.render(this.connectionString).as(String.class).orElse(null);
+        MongoConnectionGuard.ensureAllowed(renderedConnectionString);
+        props.setProperty("mongodb.connection.string", renderedConnectionString);
 
         if (this.includedCollections != null) {
             props.setProperty("collection.include.list", joinProperties(runContext, this.includedCollections));
