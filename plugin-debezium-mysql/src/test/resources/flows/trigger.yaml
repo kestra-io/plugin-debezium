@@ -15,8 +15,6 @@ triggers:
     includedTables:
       - kestra.trigger_events
     stateName: "debezium-state-default-v2"
-    properties:
-      offset.storage: org.apache.kafka.connect.storage.MemoryOffsetBackingStore
 
 tasks:
   - id: end

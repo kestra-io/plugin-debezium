@@ -11,10 +11,9 @@ triggers:
     database: deb
     maxRecords: 5
     snapshotMode: INITIAL_ONLY
+    stateName: "debezium-state-{{ now() | date('yyyyMMddHHmmssSSS') }}"
     properties:
       database.encrypt: false
-      offset.storage: org.apache.kafka.connect.storage.MemoryOffsetBackingStore
-      database.history: io.debezium.relational.history.MemoryDatabaseHistory
     includedTables:
       - dbo.events
 
