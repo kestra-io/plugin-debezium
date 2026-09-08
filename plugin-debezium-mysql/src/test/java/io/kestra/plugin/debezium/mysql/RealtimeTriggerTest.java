@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.kestra.core.junit.annotations.KestraTest;
@@ -12,6 +13,7 @@ import io.kestra.core.models.executions.Execution;
 import io.kestra.core.queues.QueueFactoryInterface;
 import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.LocalFlowRepositoryLoader;
+import io.kestra.core.services.KVStoreService;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
 
@@ -31,6 +33,9 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
     @Inject
     protected LocalFlowRepositoryLoader repositoryLoader;
 
+    @Inject
+    private KVStoreService kvStoreService;
+
     @Override
     protected String getUrl() {
         return "jdbc:mysql://127.0.0.1:63306/kestra";
@@ -44,6 +49,12 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
     @Override
     protected String getPassword() {
         return "mysql_passwd";
+    }
+
+    @BeforeEach
+    void cleanup() throws Exception {
+        // Start each run from a clean offset instead of resuming a purged binlog position.
+        cleanupFlowState(kvStoreService, "io.kestra.tests", "trigger", "debezium-state", "debezium-state-default-v2");
     }
 
     @Test
