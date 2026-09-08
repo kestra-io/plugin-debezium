@@ -8,6 +8,8 @@ Set `hostname`, `port`, `username`, and `password` to connect to the source data
 
 Set connection properties on each task.
 
+The `properties` map is restricted: keys that make Debezium or the JDBC driver load an arbitrary class, or that move Debezium's offset and schema-history storage, are rejected (for example `transforms*`, `converters`, `config.providers*`, `offset.storage*`, `schema.history.internal` backend and Kafka client settings, and `database.*` / `driver.*` class-loading or local-file parameters such as `socketFactory`, `sslfactory`, `queryInterceptors`). Regular tuning keys are unaffected. A rejected key fails the task with a message naming the key.
+
 ## Database-specific required properties
 
 Each database connector requires one additional identifier:

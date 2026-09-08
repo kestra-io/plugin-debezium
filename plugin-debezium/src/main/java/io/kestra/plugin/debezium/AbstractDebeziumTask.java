@@ -644,7 +644,10 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         if (this.properties != null) {
             for (Map.Entry<String, String> entry : runContext.render(this.properties).asMap(String.class, String.class).entrySet()) {
-                props.setProperty(runContext.render(entry.getKey()), runContext.render(entry.getValue()));
+                String key = runContext.render(entry.getKey());
+                PropertiesGuard.ensureAllowed(key);
+
+                props.setProperty(key, runContext.render(entry.getValue()));
             }
         }
 

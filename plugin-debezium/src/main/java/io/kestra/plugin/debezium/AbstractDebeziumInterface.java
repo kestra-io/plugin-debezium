@@ -149,7 +149,16 @@ public interface AbstractDebeziumInterface {
 
     @Schema(
         title = "Additional configuration properties",
-        description = "Any additional configuration properties that is valid for the current driver."
+        description = """
+            Any additional configuration properties that is valid for the current driver.
+
+            Properties that make Debezium or the JDBC driver load arbitrary classes, or that move Debezium's \
+            offset and schema history storage, are rejected: `connector.class`, `converters`, `transforms*`, \
+            `predicates*`, `post.processors*`, `config.providers*`, `*.converter*`, `topic.naming.strategy`, \
+            `sourceinfo.struct.maker`, `transaction.metadata.factory`, `offset.storage*`, the \
+            `schema.history.internal` backend and its Kafka client settings, and class-loading or local-file \
+            JDBC parameters under `database.*` / `driver.*` (for example `socketFactory`, `sslfactory`, \
+            `queryInterceptors`, `autoDeserialize`, `allowLoadLocalInfile`)."""
     )
     @PluginProperty(group = "advanced")
     Property<Map<String, String>> getProperties();
