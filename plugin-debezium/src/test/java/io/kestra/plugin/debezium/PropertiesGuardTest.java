@@ -75,7 +75,28 @@ class PropertiesGuardTest {
         "database.sslpasswordcallback",
         // Debezium JdbcConfiguration connection factory (dotted class key, both pass-through prefixes)
         "database.connection.factory.class",
-        "driver.connection.factory.class"
+        "driver.connection.factory.class",
+        // class-load params shipped in the pinned drivers that an earlier list missed
+        "database.logger",
+        "database.profilerEventHandler",
+        "database.connectExecutor",
+        "database.connectExecutorArg",
+        "database.classLoaderStrategy",
+        "database.authenticationWebAuthnCallbackHandler",
+        "database.authenticationOpenidConnectCallbackHandler",
+        // URL open (SSRF) and local file read / write
+        "database.clientCertificateKeyStoreUrl",
+        "database.trustCertificateKeyStoreUrl",
+        "database.idTokenFile",
+        "database.ociConfigFile",
+        "database.sslkey",
+        "database.sslcert",
+        "database.sslrootcert",
+        "database.traceFile",
+        "database.traceDirectory",
+        // schema-history subtree is denied wholesale, so new backends are blocked too
+        "schema.history.internal.jdbc.url",
+        "schema.history.internal.redis.address"
     })
     void deniesUnsafeKeys(String key) {
         var exception = assertThrows(IllegalArgumentException.class, () -> PropertiesGuard.ensureAllowed(key));
@@ -112,9 +133,13 @@ class PropertiesGuardTest {
         // JCA algorithm names, not class names - the suffix rule must not catch these
         "driver.oracle.net.ssl.keyManagerFactory.algorithm",
         "database.ssl.trustManagerFactory.algorithm",
-        // schema history DDL tuning stays usable, only the backend and its Kafka client are blocked
+        // schema history DDL tuning stays usable, only the backend and its client config are blocked
         "schema.history.internal.skip.unparseable.ddl",
-        "schema.history.internal.store.only.captured.tables.ddl"
+        "schema.history.internal.store.only.captured.tables.ddl",
+        "schema.history.internal.store.only.captured.databases.ddl",
+        "schema.history.internal.ddl.filter",
+        // a log level is neither a class nor a file, so it must stay usable
+        "database.loggerLevel"
     })
     void allowsRegularProperties(String key) {
         assertDoesNotThrow(() -> PropertiesGuard.ensureAllowed(key));
