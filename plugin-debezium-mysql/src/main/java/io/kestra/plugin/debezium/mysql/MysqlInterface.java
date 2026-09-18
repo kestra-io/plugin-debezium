@@ -34,7 +34,7 @@ public interface MysqlInterface {
         title = "A numeric ID of this database client",
         description = "This must be unique across all currently-running database processes in the MySQL cluster. " +
             "This connector joins the MySQL database cluster as another server (with this unique ID) so it can read " +
-            "the binlog. By default, a random number between 5400 and 6400 is generated, though the recommendation " +
+            "the binlog. By default, the plugin generates a random number between 5400 and 6400, though the recommendation " +
             "is to explicitly set a value."
     )
     @PluginProperty(dynamic = true, group = "advanced")

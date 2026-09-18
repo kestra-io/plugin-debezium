@@ -3,10 +3,12 @@ package io.kestra.plugin.debezium.mysql;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.Random;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
@@ -14,10 +16,8 @@ import io.kestra.plugin.debezium.AbstractDebeziumTask;
 
 import io.debezium.connector.mysql.MySqlConnector;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -62,8 +62,7 @@ public class Capture extends AbstractDebeziumTask implements MysqlInterface {
     @Builder.Default
     private Property<MysqlInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
-    @NotNull
-    @PluginProperty(group = "main")
+    @PluginProperty(group = "advanced")
     private Property<String> serverId;
 
     @Override
@@ -76,7 +75,10 @@ public class Capture extends AbstractDebeziumTask implements MysqlInterface {
         Properties props = super.properties(runContext, offsetFile, historyFile);
 
         props.setProperty("connector.class", MySqlConnector.class.getName());
-        props.setProperty("database.server.id", runContext.render(this.serverId).as(String.class).orElse(null));
+        props.setProperty(
+            "database.server.id",
+            runContext.render(this.serverId).as(String.class).orElseGet(() -> String.valueOf(new Random().nextInt(5400, 6401)))
+        );
         props.setProperty("include.schema.changes", "false");
 
         if (this.snapshotMode != null) {
