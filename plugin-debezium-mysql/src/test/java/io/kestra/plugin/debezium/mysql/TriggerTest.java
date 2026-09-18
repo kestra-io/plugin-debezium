@@ -19,7 +19,6 @@ import static org.hamcrest.Matchers.is;
 
 @KestraTest
 class TriggerTest extends AbstractDebeziumTest {
-
     @Inject
     private KVStoreService kvStoreService;
 
@@ -47,7 +46,7 @@ class TriggerTest extends AbstractDebeziumTest {
 
     @Test
     @EvaluateTrigger(flow = "flows/trigger.yaml", triggerId = "watch")
-    void flow(Optional<Execution> optionalExecution) {
+    void flowWithoutServerId(Optional<Execution> optionalExecution) {
         assertThat(optionalExecution.isPresent(), is(true));
         Integer size = (Integer) optionalExecution.get().getTrigger().getVariables().get("size");
         assertThat(size, greaterThanOrEqualTo(5));

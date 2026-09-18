@@ -12,11 +12,11 @@ The `properties` map is restricted: keys that make Debezium or the JDBC driver l
 
 For MongoDB, connection-string URI options that redirect the connection or disable TLS validation (`proxyHost`, `proxyPort`, `tlsInsecure`, `tlsAllowInvalidCertificates`, `tlsAllowInvalidHostnames`, and their `ssl*` aliases) are rejected in `connectionString`.
 
-## Database-specific required properties
+## Database-specific properties
 
-Each database connector requires one additional identifier:
+Configure the identifier for your database connector:
 
-- **MySQL** — set `serverId` (required, a unique numeric client ID for the MySQL binary log)
+- **MySQL** — optionally set `serverId` (a unique numeric client ID for the MySQL binary log; the plugin generates one between 5400 and 6400 when omitted)
 - **PostgreSQL** — set `database` (required). Configure `pluginName` (default `PGOUTPUT`), `slotName` (default `kestra`), `publicationName` (default `kestra_publication`), and `sslMode` (default `DISABLE`) with optional SSL certificate fields
 - **SQL Server** — set `database` (required)
 - **Oracle** — set `sid` (required, the System Identifier or CDB name). Optionally set `pluggableDatabase`
