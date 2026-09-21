@@ -296,8 +296,9 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
      * The same value is used for `topic.prefix`, `name`, and `database.server.name` so all
      * three remain consistent. A user-supplied `properties` map applied afterwards can still
      * override any of these values.
+     * Subclasses may reuse this identity to derive other stable connector-scoped values.
      */
-    String deriveConnectorId(RunContext runContext) {
+    protected String deriveConnectorId(RunContext runContext) {
         var flowInfo = runContext.flowInfo();
         var taskRunInfo = runContext.taskRunInfo();
 
