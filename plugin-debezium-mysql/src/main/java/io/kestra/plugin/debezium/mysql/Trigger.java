@@ -50,6 +50,7 @@ import lombok.experimental.SuperBuilder;
                     port: "3306"
                     username: "{{ secret('MYSQL_USERNAME') }}"
                     password: "{{ secret('MYSQL_PASSWORD') }}"
+                    serverId: "123456789"
                 """
         )
     }
