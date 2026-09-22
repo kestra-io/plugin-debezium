@@ -77,14 +77,16 @@ public class Capture extends AbstractDebeziumTask implements MysqlInterface {
         Properties props = super.properties(runContext, offsetFile, historyFile);
 
         props.setProperty("connector.class", MySqlConnector.class.getName());
-        int defaultServerId = DEFAULT_SERVER_ID_MIN
-            + Math.floorMod(
-                deriveConnectorId(runContext).hashCode(),
-                DEFAULT_SERVER_ID_RANGE
-            );
         props.setProperty(
             "database.server.id",
-            runContext.render(this.serverId).as(String.class).orElseGet(() -> String.valueOf(defaultServerId))
+            runContext.render(this.serverId).as(String.class).orElseGet(() -> {
+                int defaultServerId = DEFAULT_SERVER_ID_MIN
+                    + Math.floorMod(
+                        deriveConnectorId(runContext).hashCode(),
+                        DEFAULT_SERVER_ID_RANGE
+                    );
+                return String.valueOf(defaultServerId);
+            })
         );
         props.setProperty("include.schema.changes", "false");
 
