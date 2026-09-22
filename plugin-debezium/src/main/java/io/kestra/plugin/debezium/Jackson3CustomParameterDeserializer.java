@@ -5,6 +5,7 @@ import java.util.Map;
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.JsonToken;
 import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -14,7 +15,12 @@ import tools.jackson.databind.json.JsonMapper;
  * Micronaut's Jackson2AnnotationSupport. Both deserializers must be stacked on the same field.
  */
 public class Jackson3CustomParameterDeserializer extends ValueDeserializer<Map<String, Object>> {
-    private final JsonMapper mapper = JsonMapper.builder().build();
+    // FAIL_ON_TRAILING_TOKENS is enabled by default in Jackson 3, but mapper.readValue(p, ...) is used
+    // here to read a single value mid-stream from an already-open parser positioned on the envelope
+    // field, not a whole document, so the following envelope property must not be rejected as trailing.
+    private final JsonMapper mapper = JsonMapper.builder()
+        .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+        .build();
 
     @Override
     public Map<String, Object> deserialize(JsonParser p, DeserializationContext ctxt) {
@@ -22,10 +28,6 @@ public class Jackson3CustomParameterDeserializer extends ValueDeserializer<Map<S
             return mapper.readValue(p.getText(), Map.class);
         }
 
-        // Read a single value from the current parser position via the context, NOT the local mapper:
-        // Jackson 3 enables FAIL_ON_TRAILING_TOKENS by default, so mapper.readValue(p, ...) would treat
-        // the nested object as a whole document and reject the following envelope property as a trailing
-        // token. ctxt.readValue reads just this value and leaves the parser positioned for the rest.
-        return ctxt.readValue(p, Map.class);
+        return mapper.readValue(p, Map.class);
     }
 }
