@@ -16,7 +16,7 @@ For MongoDB, connection-string URI options that redirect the connection or disab
 
 Configure the identifier for your database connector:
 
-- **MySQL** — optionally set `serverId` (a unique numeric client ID for the MySQL binary log; the plugin generates one between 5400 and 6400 when omitted)
+- **MySQL** — optionally set `serverId` (a unique numeric client ID for the MySQL binary log). When omitted, the plugin derives a stable value between 5400 and 6400 from the connector identity. Because the default range is finite, explicitly configuring a unique value is recommended when multiple connectors access the same MySQL cluster.
 - **PostgreSQL** — set `database` (required). Configure `pluginName` (default `PGOUTPUT`), `slotName` (default `kestra`), `publicationName` (default `kestra_publication`), and `sslMode` (default `DISABLE`) with optional SSL certificate fields
 - **SQL Server** — set `database` (required)
 - **Oracle** — set `sid` (required, the System Identifier or CDB name). Optionally set `pluggableDatabase`

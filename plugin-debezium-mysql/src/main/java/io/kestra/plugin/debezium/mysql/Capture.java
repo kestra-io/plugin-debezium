@@ -3,7 +3,6 @@ package io.kestra.plugin.debezium.mysql;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Properties;
-import java.util.Random;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
@@ -59,6 +58,9 @@ import lombok.experimental.SuperBuilder;
     }
 )
 public class Capture extends AbstractDebeziumTask implements MysqlInterface {
+    private static final int DEFAULT_SERVER_ID_MIN = 5400;
+    private static final int DEFAULT_SERVER_ID_RANGE = 1001;
+
     @Builder.Default
     private Property<MysqlInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
@@ -77,7 +79,14 @@ public class Capture extends AbstractDebeziumTask implements MysqlInterface {
         props.setProperty("connector.class", MySqlConnector.class.getName());
         props.setProperty(
             "database.server.id",
-            runContext.render(this.serverId).as(String.class).orElseGet(() -> String.valueOf(new Random().nextInt(5400, 6401)))
+            runContext.render(this.serverId).as(String.class).orElseGet(() -> {
+                int defaultServerId = DEFAULT_SERVER_ID_MIN
+                    + Math.floorMod(
+                        deriveConnectorId(runContext).hashCode(),
+                        DEFAULT_SERVER_ID_RANGE
+                    );
+                return String.valueOf(defaultServerId);
+            })
         );
         props.setProperty("include.schema.changes", "false");
 

@@ -10,6 +10,7 @@ import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 
 import io.debezium.config.Configuration;
@@ -32,7 +33,7 @@ class ServerIdTest {
     @MethodSource("serverIds")
     void serverIdIsOptionalAndSupportsExpressions(Property<String> serverId) throws Exception {
         Capture task = Capture.builder()
-            .id("capture")
+            .id(IdUtils.create())
             .type(Capture.class.getName())
             .hostname(Property.ofValue("127.0.0.1"))
             .port(Property.ofValue("63306"))
@@ -53,6 +54,13 @@ class ServerIdTest {
 
         if (serverId == null) {
             assertTrue(connectorConfig.getServerId() >= 5400 && connectorConfig.getServerId() <= 6400);
+
+            var repeatedProperties = task.properties(
+                runContext,
+                runContext.workingDir().path().resolve("offsets.dat"),
+                runContext.workingDir().path().resolve("dbhistory.dat")
+            );
+            assertEquals(properties.getProperty("database.server.id"), repeatedProperties.getProperty("database.server.id"));
         } else {
             assertEquals("123456789", properties.getProperty("database.server.id"));
             assertEquals(123456789L, connectorConfig.getServerId());
