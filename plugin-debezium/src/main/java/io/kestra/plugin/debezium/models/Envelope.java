@@ -9,7 +9,6 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import io.kestra.plugin.debezium.CustomParameterDeserializer;
-import io.kestra.plugin.debezium.Jackson3CustomParameterDeserializer;
 
 import jakarta.annotation.Nullable;
 import lombok.AllArgsConstructor;
@@ -28,12 +27,10 @@ public class Envelope extends Message {
 
     @Nullable
     @JsonDeserialize(using = CustomParameterDeserializer.class)
-    @tools.jackson.databind.annotation.JsonDeserialize(using = Jackson3CustomParameterDeserializer.class)
     Map<String, Object> before;
 
     @Nullable
     @JsonDeserialize(using = CustomParameterDeserializer.class)
-    @tools.jackson.databind.annotation.JsonDeserialize(using = Jackson3CustomParameterDeserializer.class)
     Map<String, Object> after;
 
     @Nullable

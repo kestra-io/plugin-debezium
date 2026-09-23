@@ -7,21 +7,15 @@ import org.junit.jupiter.api.Test;
 import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.debezium.models.Envelope;
 
-import tools.jackson.databind.json.JsonMapper;
-
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 
 /**
- * Ensures {@link CustomParameterDeserializer} (Jackson 2) and {@link Jackson3CustomParameterDeserializer}
- * (Jackson 3) are both correctly wired on {@link Envelope#getBefore()} / {@link Envelope#getAfter()},
- * since the two Jackson majors coexist and neither {@code @JsonDeserialize} annotation is bridged
- * to the other Jackson major.
+ * Ensures {@link CustomParameterDeserializer} is wired on {@link Envelope#getBefore()} / {@link Envelope#getAfter()}
+ * and handles both nested objects and JSON-encoded strings.
  */
 class CustomParameterDeserializerTest {
-    private static final JsonMapper JACKSON3_MAPPER = JsonMapper.builder().build();
-
     @Test
     void nestedObject() throws Exception {
         var json = """
@@ -61,12 +55,8 @@ class CustomParameterDeserializerTest {
     }
 
     private void assertBeforeAfter(String json, Map<String, Object> expectedBefore, Map<String, Object> expectedAfter) throws Exception {
-        var jackson2 = JacksonMapper.ofJson().readValue(json, Envelope.class);
-        assertThat(jackson2.getBefore(), expectedBefore == null ? is(nullValue()) : is(expectedBefore));
-        assertThat(jackson2.getAfter(), expectedAfter == null ? is(nullValue()) : is(expectedAfter));
-
-        var jackson3 = JACKSON3_MAPPER.readValue(json, Envelope.class);
-        assertThat(jackson3.getBefore(), expectedBefore == null ? is(nullValue()) : is(expectedBefore));
-        assertThat(jackson3.getAfter(), expectedAfter == null ? is(nullValue()) : is(expectedAfter));
+        var envelope = JacksonMapper.ofJson().readValue(json, Envelope.class);
+        assertThat(envelope.getBefore(), expectedBefore == null ? is(nullValue()) : is(expectedBefore));
+        assertThat(envelope.getAfter(), expectedAfter == null ? is(nullValue()) : is(expectedAfter));
     }
 }

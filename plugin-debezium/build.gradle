@@ -15,12 +15,6 @@ jar {
 dependencies {
     implementation group: 'io.debezium', name: 'debezium-api', version: debeziumVersion
     implementation group: 'io.debezium', name: 'debezium-embedded', version: debeziumVersion
-
-    // Jackson 3 (tools.jackson), used only at the Micronaut 5 / HTTP boundary once the plugin runs on a
-    // Jackson-3 core. Kept off the runtime classpath (compileOnly) so this stays a no-op on the current
-    // Jackson-2-only core; version pinned to what core 2.x ships since no BOM provides it at this version.
-    compileOnly group: 'tools.jackson.core', name: 'jackson-databind', version: '3.1.6'
-    testImplementation group: 'tools.jackson.core', name: 'jackson-databind', version: '3.1.6'
 }
 
 configurations {
