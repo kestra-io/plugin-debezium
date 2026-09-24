@@ -7,7 +7,6 @@ import java.util.Properties;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
@@ -64,7 +63,6 @@ public class Capture extends AbstractDebeziumTask implements MysqlInterface {
     @Builder.Default
     private Property<MysqlInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
-    @PluginProperty(group = "advanced")
     private Property<String> serverId;
 
     @Override

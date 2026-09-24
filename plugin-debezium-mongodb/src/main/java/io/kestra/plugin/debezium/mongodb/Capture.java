@@ -17,7 +17,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -101,14 +100,11 @@ import io.kestra.core.models.annotations.PluginProperty;
 )
 public class Capture extends AbstractDebeziumTask implements MongodbInterface {
 
-    @PluginProperty(group = "advanced")
     private Object includedCollections;
 
-    @PluginProperty(group = "advanced")
     private Object excludedCollections;
 
     @NotNull
-    @PluginProperty(group = "main")
     private Property<String> connectionString;
 
     @Builder.Default
