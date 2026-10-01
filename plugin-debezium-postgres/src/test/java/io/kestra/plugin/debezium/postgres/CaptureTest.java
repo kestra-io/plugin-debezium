@@ -2,6 +2,9 @@ package io.kestra.plugin.debezium.postgres;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.sql.Connection;
+import java.sql.Statement;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -104,5 +107,56 @@ class CaptureTest extends AbstractDebeziumTest {
         // rerun state will prevent new records
         runOutput = task.run(runContext);
         assertThat(runOutput.getSize(), is(0));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void runWithSnapshotModeNever() throws Exception {
+        // init database
+        executeSqlScript("scripts/postgres.sql");
+
+        Capture task = Capture.builder()
+            .id(IdUtils.create())
+            .type(Capture.class.getName())
+            .hostname(Property.ofValue(TestUtils.hostname()))
+            .username(Property.ofValue(TestUtils.username()))
+            .password(Property.ofValue(TestUtils.password()))
+            .port(Property.ofValue("65432"))
+            .database(Property.ofValue("postgres"))
+            .pluginName(Property.ofValue(PostgresInterface.PluginName.PGOUTPUT))
+            .stateName(Property.ofValue("debezium-state-" + IdUtils.create()))
+            .snapshotMode(Property.ofValue(Capture.SnapshotMode.NEVER))
+            .maxWait(Property.ofValue(Duration.ofSeconds(5)))
+            .includedTables(List.of("public.events"))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+        PostgresDebeziumTestHelper.dropReplicationArtifacts(
+            this::getConnection,
+            runContext.render(task.getSlotName()).as(String.class).orElse("kestra"),
+            runContext.render(task.getPublicationName()).as(String.class).orElse("kestra_publication")
+        );
+        PostgresDebeziumTestHelper.cleanupTaskState(runContext, task);
+
+        // no snapshot: the connector must start (Debezium 3.x rejects "never") and see none of the existing rows
+        AbstractDebeziumTask.Output runOutput = task.run(runContext);
+        assertThat(runOutput.getSize(), is(0));
+
+        // rows inserted after the replication slot was created are streamed
+        try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO events(events_id, event_title, event_description) VALUES (6, 'Iron Maiden', 'Streamed')");
+        }
+
+        runOutput = task.run(runContext);
+        assertThat(runOutput.getSize(), is(1));
+
+        List<Map<String, Object>> events = new ArrayList<>();
+        FileSerde.reader(
+            new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, runOutput.getUris().get("postgres.events")))),
+            r -> events.add((Map<String, Object>) r)
+        );
+
+        assertThat(events.size(), is(1));
+        assertThat(events.getFirst().get("event_title"), is("Iron Maiden"));
     }
 }

@@ -96,7 +96,7 @@ public interface PostgresInterface {
         description = " Possible settings are:\n" +
             "- `INITIAL`: The connector performs a snapshot only when no offsets have been recorded for the logical server name.\n" +
             "- `ALWAYS`: The connector performs a snapshot each time the connector starts.\n" +
-            "- `NEVER`: The connector never performs snapshots. When a connector is configured this way, its behavior when it starts is as follows. If there is a previously stored LSN, the connector continues streaming changes from that position. If no LSN has been stored, the connector starts streaming changes from the point in time when the PostgreSQL logical replication slot was created on the server. The never snapshot mode is useful only when you know all data of interest is still reflected in the WAL.\n"
+            "- `NEVER`: The connector never performs snapshots. When a connector is configured this way, its behavior when it starts is as follows. If there is a previously stored LSN, the connector continues streaming changes from that position. If no LSN has been stored, the connector starts streaming changes from the point in time when the PostgreSQL logical replication slot was created on the server. The never snapshot mode is useful only when you know all data of interest is still reflected in the WAL. It maps to the Debezium `no_data` snapshot mode.\n"
             +
             "- `INITIAL_ONLY`: The connector performs an initial snapshot and then stops, without processing any subsequent changes.\n"
     )
