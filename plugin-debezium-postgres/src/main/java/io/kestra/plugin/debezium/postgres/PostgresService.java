@@ -31,8 +31,16 @@ public abstract class PostgresService {
         throws IllegalVariableEvaluationException, IOException, OperatorCreationException, PKCSException {
         properties.put("database.dbname", runContext.render(postgres.getDatabase()).as(String.class).orElseThrow());
         properties.put("plugin.name", runContext.render(postgres.getPluginName()).as(PostgresInterface.PluginName.class).orElseThrow().name().toLowerCase(Locale.ROOT));
-        properties.put("snapshot.mode", runContext.render(postgres.getSnapshotMode()).as(PostgresInterface.SnapshotMode.class).orElseThrow().name().toLowerCase(Locale.ROOT));
         properties.put("slot.name", runContext.render(postgres.getSlotName()).as(String.class).orElseThrow());
+
+        PostgresInterface.SnapshotMode rSnapshotMode = runContext.render(postgres.getSnapshotMode()).as(PostgresInterface.SnapshotMode.class).orElseThrow();
+
+        String deveziumSnapshotMode = switch (rSnapshotMode) {
+            case NEVER -> "no_data";
+            case INITIAL, ALWAYS, INITIAL_ONLY -> rSnapshotMode.name().toLowerCase(Locale.ROOT);
+        };
+
+        properties.put("snapshot.mode", deveziumSnapshotMode);
 
         if (postgres.getPublicationName() != null) {
             properties.put("publication.name", runContext.render(postgres.getPublicationName()).as(String.class).orElseThrow());
