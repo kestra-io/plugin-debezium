@@ -93,4 +93,33 @@ class CaptureTest extends AbstractDebeziumTest {
         runOutput = task.run(runContext);
         assertThat(runOutput.getSize(), is(0));
     }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void runWithSnapshotModeSchemaOnly() throws Exception {
+        // init database
+        executeSqlScript("scripts/sqlserver.sql");
+
+        Capture task = Capture.builder()
+            .id(IdUtils.create())
+            .type(Capture.class.getName())
+            .snapshotMode(Property.ofValue(SqlServerInterface.SnapshotMode.SCHEMA_ONLY))
+            .stateName(Property.ofValue(IdUtils.create()))
+            .hostname(Property.ofValue("127.0.0.1"))
+            .port(Property.ofValue("61433"))
+            .username(Property.ofValue(getUsername()))
+            .password(Property.ofValue(getPassword()))
+            .database(Property.ofValue("deb"))
+            .maxRecords(Property.ofValue(1))
+            .maxWait(Property.ofValue(Duration.ofSeconds(5)))
+            .properties(Property.ofValue(Map.of("database.encrypt", "false")))
+            .includedTables(List.of("dbo.events"))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+        AbstractDebeziumTask.Output runOutput = task.run(runContext);
+
+        // schema only snapshot: no existing records should be captured
+        assertThat(runOutput.getSize(), is(0));
+    }
 }

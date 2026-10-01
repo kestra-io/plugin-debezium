@@ -26,7 +26,7 @@ public interface SqlServerInterface {
             "- `INITIAL`: Takes a snapshot of structure and data of captured tables; useful if topics should be populated with a complete representation of the data from the captured tables.\n"
             +
             "- `INITIAL_ONLY`: Takes a snapshot of structure and data like initial but instead does not transition into streaming changes once the snapshot has completed.\n" +
-            "- `SCHEMA_ONLY`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be propagated to topics.\n"
+            "- `SCHEMA_ONLY`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be propagated to topics. It maps to the Debezium `no_data` snapshot mode.\n"
     )
     @NotNull
     @PluginProperty(group = "main")
@@ -36,7 +36,14 @@ public interface SqlServerInterface {
         properties.put("database.names", runContext.render(sqlServer.getDatabase()).as(String.class).orElseThrow());
 
         if (sqlServer.getSnapshotMode() != null) {
-            properties.setProperty("snapshot.mode", runContext.render(sqlServer.getSnapshotMode()).as(SnapshotMode.class).orElseThrow().name().toLowerCase(Locale.ROOT));
+            SnapshotMode rSnapshotMode = runContext.render(sqlServer.getSnapshotMode()).as(SnapshotMode.class).orElseThrow();
+
+            String debeziumSnapshotMode = switch (rSnapshotMode) {
+                case SCHEMA_ONLY -> "no_data";
+                case INITIAL, INITIAL_ONLY -> rSnapshotMode.name().toLowerCase(Locale.ROOT);
+            };
+
+            properties.setProperty("snapshot.mode", debeziumSnapshotMode);
         }
     }
 
