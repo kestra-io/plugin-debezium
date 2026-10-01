@@ -35,12 +35,12 @@ public abstract class PostgresService {
 
         PostgresInterface.SnapshotMode rSnapshotMode = runContext.render(postgres.getSnapshotMode()).as(PostgresInterface.SnapshotMode.class).orElseThrow();
 
-        String deveziumSnapshotMode = switch (rSnapshotMode) {
+        String debeziumSnapshotMode = switch (rSnapshotMode) {
             case NEVER -> "no_data";
             case INITIAL, ALWAYS, INITIAL_ONLY -> rSnapshotMode.name().toLowerCase(Locale.ROOT);
         };
 
-        properties.put("snapshot.mode", deveziumSnapshotMode);
+        properties.put("snapshot.mode", debeziumSnapshotMode);
 
         if (postgres.getPublicationName() != null) {
             properties.put("publication.name", runContext.render(postgres.getPublicationName()).as(String.class).orElseThrow());
