@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import org.apache.kafka.connect.data.*;
+import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -20,6 +22,7 @@ import io.debezium.time.Year;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 
 class MapConverterTest {
     private final static Schema STRUCT_SCHEMA = SchemaBuilder.struct().field("a", Schema.STRING_SCHEMA).field("b", Schema.INT32_SCHEMA).build();
@@ -83,5 +86,21 @@ class MapConverterTest {
         Object convert = MapConverter.convert(schema, value);
 
         assertThat(convert, is(expected != null ? expected : value));
+    }
+
+    @Test
+    void convertRecordKeepsKeyWhenKeySchemaExists() {
+        Schema keySchema = SchemaBuilder.struct().field("events_id", Schema.INT32_SCHEMA).build();
+        Struct key = new Struct(keySchema).put("events_id", 1);
+
+        SourceRecord record = new SourceRecord(
+            Map.of(), Map.of(), "test.public.events", keySchema, key,
+            null, null
+        );
+
+        var result = MapConverter.convert(record);
+
+        assertThat(result.getLeft(), is(notNullValue()));
+        assertThat(result.getLeft().getProperties(), is(Map.of("events_id", 1)));
     }
 }
