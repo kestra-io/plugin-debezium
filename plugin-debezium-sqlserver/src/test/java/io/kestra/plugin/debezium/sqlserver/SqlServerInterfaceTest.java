@@ -1,15 +1,12 @@
 package io.kestra.plugin.debezium.sqlserver;
 
 import java.util.Map;
-import java.util.Properties;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
@@ -34,7 +31,7 @@ class SqlServerInterfaceTest {
         "SCHEMA_ONLY, no_data"
     })
     void mapsSnapshotModesCorrectly(SqlServerInterface.SnapshotMode snapshotMode, String expectedDebeziumMode) throws Exception {
-        Capture task = Capture.builder()
+        var task = Capture.builder()
             .id(IdUtils.create())
             .type(Capture.class.getName())
             .hostname(Property.ofValue("127.0.0.1"))
@@ -45,8 +42,8 @@ class SqlServerInterfaceTest {
             .snapshotMode(Property.ofValue(snapshotMode))
             .build();
 
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
-        Properties properties = task.properties(
+        var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+        var properties = task.properties(
             runContext,
             runContext.workingDir().path().resolve("offsets.dat"),
             runContext.workingDir().path().resolve("dbhistory.dat")
