@@ -36,9 +36,9 @@ public interface SqlServerInterface {
         properties.put("database.names", runContext.render(sqlServer.getDatabase()).as(String.class).orElseThrow());
 
         if (sqlServer.getSnapshotMode() != null) {
-            SnapshotMode rSnapshotMode = runContext.render(sqlServer.getSnapshotMode()).as(SnapshotMode.class).orElseThrow();
+            var rSnapshotMode = runContext.render(sqlServer.getSnapshotMode()).as(SnapshotMode.class).orElseThrow();
 
-            String debeziumSnapshotMode = switch (rSnapshotMode) {
+            var debeziumSnapshotMode = switch (rSnapshotMode) {
                 case SCHEMA_ONLY -> "no_data";
                 case INITIAL, INITIAL_ONLY -> rSnapshotMode.name().toLowerCase(Locale.ROOT);
             };
