@@ -23,7 +23,8 @@ public interface AbstractDebeziumInterface {
         title = "Specify how to handle deleted rows",
         description = "Possible settings are:\n" +
             "- `ADD_FIELD`: Add a deleted field as boolean.\n" +
-            "- `NULL`: Send deleted rows with the same columns but all values as null (with `RAW` format, `value` is null). Metadata, if enabled, is still added. " +
+            "- `NULL`: Send deleted rows with the columns present in the delete event but all values as null " +
+            "(with `RAW` format, `value` is null). Key fields are not added. Metadata, if enabled, is still added. " +
             "Quote it in YAML (`deleted: \"NULL\"`): unquoted `NULL` is a YAML null and falls back to the default `ADD_FIELD`.\n" +
             "- `DROP`: Don't send deleted row."
     )

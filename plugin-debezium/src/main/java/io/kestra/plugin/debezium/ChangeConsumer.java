@@ -287,6 +287,11 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
     }
 
     private void addKey(Map<String, Object> result, Pair<Message, Message> message) throws IllegalVariableEvaluationException {
+        // the key would put the nulled key columns back on a deleted row
+        if (this.isDeletedAsNull(message.getValue())) {
+            return;
+        }
+
         if (runContext.render(this.abstractDebeziumTask.getKey()).as(AbstractDebeziumTask.Key.class).orElseThrow() == AbstractDebeziumTask.Key.ADD_FIELD && message.getKey() != null) {
             result.putAll(JacksonMapper.toMap(message.getKey()));
         }
