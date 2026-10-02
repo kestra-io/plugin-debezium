@@ -215,7 +215,7 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
     private Map<String, Object> handleFormatRaw(Pair<Message, Message> message) throws IllegalVariableEvaluationException {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("key", message.getKey());
-        result.put("value", message.getValue());
+        result.put("value", this.isDeletedAsNull(message.getValue()) ? null : message.getValue());
 
         this.addDeleted(result, message);
 
@@ -247,13 +247,18 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         return result;
     }
 
-    private Map<String, Object> formatInlineWithoutAdditional(Envelope value) {
+    private Map<String, Object> formatInlineWithoutAdditional(Envelope value) throws IllegalVariableEvaluationException {
         Map<String, Object> result = new LinkedHashMap<>();
 
         if (value.getOperation() == io.debezium.data.Envelope.Operation.DELETE) {
             result.putAll(Objects.requireNonNullElse(value.getBefore(), Collections.emptyMap()));
         } else {
             result.putAll(Objects.requireNonNullElse(value.getAfter(), Collections.emptyMap()));
+        }
+
+        // keep the columns but send every value as null
+        if (this.isDeletedAsNull(value)) {
+            result.replaceAll((column, columnValue) -> null);
         }
 
         return result;
@@ -264,16 +269,29 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
             runContext.render(this.abstractDebeziumTask.getDeleted()).as(AbstractDebeziumTask.Deleted.class).orElseThrow() == AbstractDebeziumTask.Deleted.ADD_FIELD
                 && message.getValue() instanceof Envelope
         ) {
-            io.debezium.data.Envelope.Operation operation = ((Envelope) message.getValue()).getOperation();
-
             result.put(
                 runContext.render(this.abstractDebeziumTask.getDeletedFieldName()).as(String.class).orElseThrow(),
-                operation == io.debezium.data.Envelope.Operation.DELETE || operation == io.debezium.data.Envelope.Operation.TRUNCATE
+                isDeleteOperation(((Envelope) message.getValue()).getOperation())
             );
         }
     }
 
+    private boolean isDeletedAsNull(Message value) throws IllegalVariableEvaluationException {
+        return value instanceof Envelope envelope
+            && isDeleteOperation(envelope.getOperation())
+            && runContext.render(this.abstractDebeziumTask.getDeleted()).as(AbstractDebeziumTask.Deleted.class).orElseThrow() == AbstractDebeziumTask.Deleted.NULL;
+    }
+
+    private static boolean isDeleteOperation(io.debezium.data.Envelope.Operation operation) {
+        return operation == io.debezium.data.Envelope.Operation.DELETE || operation == io.debezium.data.Envelope.Operation.TRUNCATE;
+    }
+
     private void addKey(Map<String, Object> result, Pair<Message, Message> message) throws IllegalVariableEvaluationException {
+        // the key would put the nulled key columns back on a deleted row
+        if (this.isDeletedAsNull(message.getValue())) {
+            return;
+        }
+
         if (runContext.render(this.abstractDebeziumTask.getKey()).as(AbstractDebeziumTask.Key.class).orElseThrow() == AbstractDebeziumTask.Key.ADD_FIELD && message.getKey() != null) {
             result.putAll(JacksonMapper.toMap(message.getKey()));
         }
