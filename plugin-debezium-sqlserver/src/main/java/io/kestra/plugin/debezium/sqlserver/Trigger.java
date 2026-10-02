@@ -62,9 +62,6 @@ public class Trigger extends AbstractDebeziumTrigger implements SqlServerInterfa
     @Builder.Default
     private Property<SqlServerInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
-    @Schema(title = "Unique identifier for the Debezium SQL Server connector")
-    private String serverId;
-
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         RunContext runContext = conditionContext.getRunContext();
