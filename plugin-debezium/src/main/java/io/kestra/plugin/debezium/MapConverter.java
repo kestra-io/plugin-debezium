@@ -25,7 +25,9 @@ public class MapConverter {
     private static final ObjectMapper MAPPER = JacksonMapper.ofJson();
 
     public static Pair<Message, Message> convert(SourceRecord record) {
-        Object key = record.keySchema() == null ? MapConverter.convert(record.keySchema(), record.key()) : null;
+        Object key = record.key() == null
+            ? null
+            : MapConverter.convert(record.keySchema(), record.key());
         Object value = MapConverter.convert(record.valueSchema(), record.value());
 
         return Pair.of(
