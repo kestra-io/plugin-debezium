@@ -198,8 +198,15 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
             return true;
         }
 
-        if (message.getValue() == null && runContext.render(abstractDebeziumTask.getDeleted()).as(AbstractDebeziumTask.Deleted.class).orElseThrow() == AbstractDebeziumTask.Deleted.DROP) {
-            return true;
+        if (runContext.render(abstractDebeziumTask.getDeleted()).as(AbstractDebeziumTask.Deleted.class).orElseThrow() == AbstractDebeziumTask.Deleted.DROP) {
+            // tombstones are disabled (tombstones.on.delete=false), so deletes arrive as regular envelopes
+            if (message.getValue() == null) {
+                return true;
+            }
+
+            if (message.getValue() instanceof Envelope envelope && isDeleteOperation(envelope.getOperation())) {
+                return true;
+            }
         }
 
         if (

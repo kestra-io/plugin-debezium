@@ -90,6 +90,42 @@ class ChangeConsumerTest {
         assertThat(((Map<String, Object>) data.get("metadata")).get("operation"), is(Envelope.Operation.DELETE));
     }
 
+    @Test
+    void deletedDropDoesNotEmitDeletedRows() {
+        AbstractDebeziumTask task = new AbstractDebeziumTask() {
+            {
+                deleted = Property.ofValue(Deleted.DROP);
+            }
+
+            @Override
+            protected boolean needDatabaseHistory() {
+                return false;
+            }
+        };
+
+        Struct row = new Struct(ROW_SCHEMA).put("events_id", 1).put("event_title", "Machine Head");
+        Struct source = new Struct(SOURCE_SCHEMA).put("db", "postgres").put("table", "events");
+
+        SourceRecord delete = new SourceRecord(
+            Map.of(), Map.of(), "test.public.events", null,
+            null, Map.of("events_id", 1),
+            ENVELOPE.schema(), ENVELOPE.delete(row, source, Instant.now())
+        );
+        SourceRecord create = new SourceRecord(
+            Map.of(), Map.of(), "test.public.events", null,
+            null, Map.of("events_id", 1),
+            ENVELOPE.schema(), ENVELOPE.create(row, source, Instant.now())
+        );
+
+        // a deleted row must not be emitted at all
+        assertThat(this.consume(task, delete).size(), is(0));
+
+        // other operations must still go through
+        List<AbstractDebeziumRealtimeTrigger.StreamOutput> outputs = this.consume(task, create);
+        assertThat(outputs.size(), is(1));
+        assertThat(outputs.getFirst().getData().get("events_id"), is(1));
+    }
+
     private List<AbstractDebeziumRealtimeTrigger.StreamOutput> consume(AbstractDebeziumTask task, SourceRecord record) {
         RunContext runContext = runContextFactory.of();
         ChangeConsumer consumer = new ChangeConsumer(task, runContext, new AtomicInteger(), new AtomicBoolean(), ZonedDateTime.now(), Path.of("offsets"), Path.of("history"));
