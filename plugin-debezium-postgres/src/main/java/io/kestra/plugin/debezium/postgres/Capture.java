@@ -31,21 +31,21 @@ import lombok.experimental.SuperBuilder;
             title = "Capture data from PostgreSQL server.",
             full = true,
             code = """
-                 id: pg_capture
-                 namespace: company.team
+                id: pg_capture
+                namespace: company.team
 
-                 tasks:
-                   - id: capture_data
-                     type: io.kestra.plugin.debezium.postgres.Capture
-                     hostname: 127.0.0.1
-                     port: "5432"
-                     username: "{{ secret('PG_USERNAME') }}"
-                     password: "{{ secret('PG_PASSWORD') }}"
-                     maxRecords: 100
-                     database: my_database
-                     pluginName: PGOUTPUT
-                     snapshotMode: ALWAYS
-                 """
+                tasks:
+                  - id: capture_data
+                    type: io.kestra.plugin.debezium.postgres.Capture
+                    hostname: 127.0.0.1
+                    port: "5432"
+                    username: "{{ secret('PG_USERNAME') }}"
+                    password: "{{ secret('PG_PASSWORD') }}"
+                    maxRecords: 100
+                    database: my_database
+                    pluginName: PGOUTPUT
+                    snapshotMode: ALWAYS
+                """
         )
     },
     metrics = {
@@ -62,8 +62,7 @@ public class Capture extends AbstractDebeziumTask implements PostgresInterface {
     @Builder.Default
     protected Property<PluginName> pluginName = Property.ofValue(PluginName.PGOUTPUT);
 
-    @Builder.Default
-    protected Property<String> slotName = Property.ofValue("kestra");
+    protected Property<String> slotName;
 
     @Builder.Default
     protected Property<String> publicationName = Property.ofValue("kestra_publication");
@@ -93,7 +92,7 @@ public class Capture extends AbstractDebeziumTask implements PostgresInterface {
 
         props.setProperty("connector.class", PostgresConnector.class.getName());
 
-        PostgresService.handleProperties(props, runContext, this);
+        PostgresService.handleProperties(props, runContext, this, deriveConnectorId(runContext));
 
         return props;
     }

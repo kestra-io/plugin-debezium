@@ -15,3 +15,5 @@ Provide the PostgreSQL connection details (hostname, port, username, password, d
 ## Notes
 
 Debezium tracks progress with an offset and database history stored under a state name, so a restarted task resumes from the last committed position rather than re-reading the whole log from the start.
+
+Each task or trigger automatically derives a unique, isolated PostgreSQL replication slot (`kestra_<hash>`) derived from its task identity unless explicitly configured via `slotName`. For backward compatibility, tasks with pre-existing offset state continue to use the legacy default slot (`kestra`).
