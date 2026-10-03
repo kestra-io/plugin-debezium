@@ -58,9 +58,6 @@ public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements 
     @Builder.Default
     private Property<SqlServerInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
-    @Schema(title = "Unique identifier for the Debezium SQL Server connector")
-    private String serverId;
-
     @Override
     public Publisher<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         Capture task = Capture.builder()
