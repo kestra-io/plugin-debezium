@@ -57,8 +57,7 @@ public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements 
     @Builder.Default
     protected Property<PluginName> pluginName = Property.ofValue(PluginName.PGOUTPUT);
 
-    @Builder.Default
-    protected Property<String> slotName = Property.ofValue("kestra");
+    protected Property<String> slotName;
 
     @Builder.Default
     protected Property<String> publicationName = Property.ofValue("kestra_publication");
