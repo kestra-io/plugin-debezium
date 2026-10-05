@@ -1,52 +1,43 @@
 package io.kestra.plugin.debezium.sqlserver;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.utils.IdUtils;
+import io.kestra.core.models.flows.Flow;
+import io.kestra.core.serializers.YamlParser;
 
-import jakarta.inject.Inject;
-import jakarta.validation.Validator;
+import jakarta.validation.ConstraintViolationException;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
 class TriggerConfigurationTest {
-    @Inject
-    private Validator validator;
 
-    @Test
-    void triggersDoNotDeclareServerId() {
-        assertFalse(declaresField(Trigger.class, "serverId"));
-        assertFalse(declaresField(RealtimeTrigger.class, "serverId"));
-    }
+    @ParameterizedTest
+    @ValueSource(classes = {Trigger.class, RealtimeTrigger.class})
+    void serverIdIsRejected(Class<?> triggerType) {
+        var yaml = """
+            id: sqlserver_serverid
+            namespace: company.team
+            tasks:
+              - id: log
+                type: io.kestra.plugin.core.log.Log
+                message: "{{ trigger }}"
+            triggers:
+              - id: trigger
+                type: %s
+                hostname: 127.0.0.1
+                port: "1433"
+                username: sa
+                password: secret
+                database: deb
+                serverId: "123456789"
+            """.formatted(triggerType.getName());
 
-    @Test
-    void triggerWithoutServerIdPassesBeanValidation() {
-        Trigger trigger = Trigger.builder()
-            .id(IdUtils.create())
-            .type(Trigger.class.getName())
-            .hostname(Property.ofValue("127.0.0.1"))
-            .port(Property.ofValue("1433"))
-            .username(Property.ofValue("sa"))
-            .password(Property.ofValue("secret"))
-            .database(Property.ofValue("deb"))
-            .snapshotMode(Property.ofValue(SqlServerInterface.SnapshotMode.INITIAL))
-            .maxRecords(Property.ofValue(100))
-            .includedTables(List.of("dbo.events"))
-            .properties(Property.ofValue(Map.of("database.encrypt", "false")))
-            .build();
-
-        assertTrue(validator.validate(trigger).isEmpty());
-    }
-
-    private static boolean declaresField(Class<?> type, String name) {
-        return Arrays.stream(type.getDeclaredFields()).anyMatch(field -> field.getName().equals(name));
+        var exception = assertThrows(ConstraintViolationException.class, () -> YamlParser.parse(yaml, Flow.class));
+        assertThat(exception.getMessage(), containsString("Unrecognized field \"serverId\""));
     }
 }
