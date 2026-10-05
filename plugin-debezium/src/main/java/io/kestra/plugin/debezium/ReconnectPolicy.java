@@ -9,9 +9,9 @@ import java.util.Optional;
  * <p>
  * The first connection attempt is immediate. This type is only consulted after an attempt has
  * already failed. A slow failure (for example a TCP timeout that lasts longer than the current
- * delay) still increases the delay: elapsed time is not an input. The delay resets only when the
- * failed attempt had reached {@code taskStarted}, because that attempt was a new outage rather
- * than another startup failure.
+ * delay) still increases the delay. The delay resets only when the attempt stayed up for at least
+ * {@code reconnectMaxDelay}. {@code taskStarted} alone is not enough: that callback fires before
+ * polling, and a task that dies immediately afterwards must keep backing off.
  *
  * <p>
  * Not thread-safe. The publisher thread that owns the subscription is the only caller.
@@ -51,12 +51,42 @@ final class ReconnectPolicy {
         return maxReconnectAttempts;
     }
 
+    Duration maxDelay() {
+        return maxDelay;
+    }
+
     /**
-     * @param taskStarted whether this attempt reached Debezium's {@code taskStarted} callback
+     * @param taskStartedAtNanos {@code 0} when Debezium never reported {@code taskStarted}
+     * @return {@code true} only after the task has been up for at least {@code stablePeriod}
+     */
+    static boolean ranStably(long taskStartedAtNanos, long endedAtNanos, Duration stablePeriod) {
+        if (taskStartedAtNanos == 0 || stablePeriod == null || stablePeriod.isNegative() || stablePeriod.isZero()) {
+            return false;
+        }
+        return endedAtNanos - taskStartedAtNanos >= stablePeriod.toNanos();
+    }
+
+    /**
+     * @param factor fraction of {@code delay} to add, typically in {@code [-0.2, 0.2]}
+     */
+    static Duration withJitter(Duration delay, double factor) {
+        long nanos = delay.toNanos();
+        double jittered = nanos + (nanos * factor);
+        if (jittered < 1d) {
+            jittered = 1d;
+        }
+        if (jittered >= Long.MAX_VALUE) {
+            return Duration.ofNanos(Long.MAX_VALUE);
+        }
+        return Duration.ofNanos((long) jittered);
+    }
+
+    /**
+     * @param stable whether this attempt stayed up for at least {@link #maxDelay()}
      * @return the wait before the next attempt, or empty when {@code maxReconnectAttempts} is exhausted
      */
-    Optional<Retry> afterFailure(boolean taskStarted) {
-        if (taskStarted) {
+    Optional<Retry> afterFailure(boolean stable) {
+        if (stable) {
             currentDelay = initialDelay;
             reconnectsInStreak = 0;
         }

@@ -18,7 +18,7 @@ final class ReconnectLoop {
                 return;
             }
 
-            var retry = policy.afterFailure(result.taskStarted());
+            var retry = policy.afterFailure(result.stable());
             if (retry.isEmpty()) {
                 control.onAttemptsExhausted(result.error());
                 control.parkUntilStopped();
@@ -54,12 +54,12 @@ final class ReconnectLoop {
 
     static final class AttemptResult {
         private final Throwable error;
-        private final boolean taskStarted;
+        private final boolean stable;
         private final boolean stopped;
 
-        private AttemptResult(Throwable error, boolean taskStarted, boolean stopped) {
+        private AttemptResult(Throwable error, boolean stable, boolean stopped) {
             this.error = error;
-            this.taskStarted = taskStarted;
+            this.stable = stable;
             this.stopped = stopped;
         }
 
@@ -67,16 +67,16 @@ final class ReconnectLoop {
             return new AttemptResult(null, false, true);
         }
 
-        static AttemptResult failure(Throwable error, boolean taskStarted) {
-            return new AttemptResult(error, taskStarted, false);
+        static AttemptResult failure(Throwable error, boolean stable) {
+            return new AttemptResult(error, stable, false);
         }
 
         Throwable error() {
             return error;
         }
 
-        boolean taskStarted() {
-            return taskStarted;
+        boolean stable() {
+            return stable;
         }
 
         boolean wasStopped() {

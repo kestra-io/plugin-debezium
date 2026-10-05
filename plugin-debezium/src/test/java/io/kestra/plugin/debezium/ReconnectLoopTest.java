@@ -66,7 +66,7 @@ class ReconnectLoopTest {
     }
 
     @Test
-    void taskStartedResetsTheNextWait() {
+    void stableRunResetsTheNextWait() {
         var attempt = new AtomicInteger();
         var policy = ReconnectPolicy.of(Duration.ofSeconds(1), Duration.ofSeconds(60), null);
         var control = new RecordingControl(false);

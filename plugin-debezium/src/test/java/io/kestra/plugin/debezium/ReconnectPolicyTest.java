@@ -45,7 +45,7 @@ class ReconnectPolicyTest {
     }
 
     @Test
-    void taskStartedResetsTheDelayAndTheAttemptCount() {
+    void stableRunResetsTheDelayAndTheAttemptCount() {
         var policy = ReconnectPolicy.of(Duration.ofSeconds(1), Duration.ofSeconds(60), 1);
 
         var first = policy.afterFailure(false).orElseThrow();
@@ -69,6 +69,32 @@ class ReconnectPolicyTest {
         var next = continued.afterFailure(false).orElseThrow();
         assertThat(next.delay(), is(Duration.ofSeconds(2)));
         assertThat(next.firstOfStreak(), is(false));
+    }
+
+    @Test
+    void shortLivedStartKeepsBackingOff() {
+        long startedAt = 1_000L;
+        long diedImmediately = startedAt + Duration.ofMillis(50).toNanos();
+        var stablePeriod = Duration.ofSeconds(60);
+
+        assertThat(ReconnectPolicy.ranStably(0, diedImmediately, stablePeriod), is(false));
+        assertThat(ReconnectPolicy.ranStably(startedAt, diedImmediately, stablePeriod), is(false));
+        assertThat(ReconnectPolicy.ranStably(startedAt, startedAt + stablePeriod.toNanos(), stablePeriod), is(true));
+
+        var policy = ReconnectPolicy.of(Duration.ofSeconds(1), stablePeriod, 3);
+        assertThat(delays(policy, 3, false), contains(Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(4)));
+        assertThat(policy.afterFailure(false).isEmpty(), is(true));
+    }
+
+    @Test
+    void jitterSpreadsTheWaitWithoutGoingNonPositive() {
+        var delay = Duration.ofSeconds(60);
+
+        assertThat(nanosClose(ReconnectPolicy.withJitter(delay, 0.2d), Duration.ofSeconds(72)), is(true));
+        assertThat(nanosClose(ReconnectPolicy.withJitter(delay, -0.2d), Duration.ofSeconds(48)), is(true));
+        assertThat(ReconnectPolicy.withJitter(delay, 0d), is(delay));
+        assertThat(ReconnectPolicy.withJitter(Duration.ofNanos(1), -0.9d).isNegative(), is(false));
+        assertThat(ReconnectPolicy.withJitter(Duration.ofNanos(1), -0.9d).isZero(), is(false));
     }
 
     @Test
@@ -104,10 +130,14 @@ class ReconnectPolicyTest {
         assertRejectedBeforeSubscribe(Duration.ofSeconds(1), Duration.ofMinutes(1), -1, "maxReconnectAttempts");
     }
 
-    private static List<Duration> delays(ReconnectPolicy policy, int failures, boolean taskStarted) {
+    private static boolean nanosClose(Duration actual, Duration expected) {
+        return Math.abs(actual.toNanos() - expected.toNanos()) < 1_000L;
+    }
+
+    private static List<Duration> delays(ReconnectPolicy policy, int failures, boolean stable) {
         var delays = new ArrayList<Duration>();
         for (int i = 0; i < failures; i++) {
-            delays.add(policy.afterFailure(taskStarted).orElseThrow().delay());
+            delays.add(policy.afterFailure(stable).orElseThrow().delay());
         }
         return delays;
     }

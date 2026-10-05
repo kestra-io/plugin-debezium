@@ -9,9 +9,11 @@ import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.kafka.connect.source.SourceRecord;
@@ -31,7 +33,6 @@ import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Min;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
@@ -47,6 +48,9 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     private static final Duration DEFAULT_RECONNECT_INITIAL_DELAY = Duration.ofSeconds(1);
 
     private static final Duration DEFAULT_RECONNECT_MAX_DELAY = Duration.ofMinutes(1);
+
+    /** Spread simultaneous reconnects. Applied only to the wait, not to the logged base delay. */
+    private static final double JITTER_FACTOR = 0.2d;
 
     @Builder.Default
     protected Property<AbstractDebeziumTask.Format> format = Property.ofValue(AbstractDebeziumTask.Format.INLINE);
@@ -113,10 +117,11 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         description = """
             Defaults to `PT1S`. Must be positive and less than or equal to `reconnectMaxDelay`.
 
-            The first attempt connects immediately. If the Debezium task does not start, the trigger waits this long \
-            and then doubles the wait on each further failure, up to `reconnectMaxDelay`. The trigger stays running: \
-            a connection failure is logged and retried on this worker, and does not create a failed execution for each attempt. \
-            After the task has started, a later failure waits this long again.
+            The first attempt connects immediately. If the task does not stay up, the trigger waits this long \
+            and then doubles the wait on each further failure, up to `reconnectMaxDelay`. The actual wait varies by up to 20% \
+            so triggers that fail together do not reconnect at the same moment. The trigger stays running: \
+            a failure is logged and retried on this worker, and does not create a failed execution for each attempt. \
+            The wait returns to this value only after the task has stayed up for at least `reconnectMaxDelay`.
             """
     )
     @Builder.Default
@@ -136,13 +141,12 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         description = """
             Optional. Minimum `0`. Leave empty to reconnect until the database is reachable again.
 
-            How many times to reconnect after the first attempt fails before the Debezium task has started. \
+            How many times to reconnect after the first attempt fails to stay up. \
             `0` connects once. When the limit is reached, the trigger stays subscribed and waits until it is stopped. \
             Ending the stream here would make Kestra start a new worker, and this count would begin again. \
-            A task that has started resets this count.
+            A task that stays up for at least `reconnectMaxDelay` resets this count. Negative values are rejected when the trigger starts.
             """
     )
-    @Min(0)
     @PluginProperty(group = "reliability")
     private Property<Integer> maxReconnectAttempts;
 
@@ -197,7 +201,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                 ReconnectLoop.run(
                     reconnectPolicy,
                     new EngineReconnectControl(sink, runContext, reconnectPolicy),
-                    () -> runOneEngine(task, runContext, props, changeConsumer, sink, rOffsetsCommitMode, offsetFile, historyFile)
+                    () -> runOneEngine(task, runContext, props, changeConsumer, sink, rOffsetsCommitMode, offsetFile, historyFile, reconnectPolicy)
                 );
             } catch (Exception e) {
                 sink.error(e);
@@ -236,8 +240,9 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         FluxSink<StreamOutput> sink,
         OffsetCommitMode offsetsCommitMode,
         Path offsetFile,
-        Path historyFile) {
-        var taskStarted = new AtomicBoolean();
+        Path historyFile,
+        ReconnectPolicy reconnectPolicy) {
+        var taskStartedAt = new AtomicLong();
         var completionError = new AtomicReference<Throwable>();
         DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine;
         try {
@@ -258,7 +263,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                 .using(new DebeziumEngine.ConnectorCallback() {
                     @Override
                     public void taskStarted() {
-                        taskStarted.set(true);
+                        taskStartedAt.compareAndSet(0, System.nanoTime());
                     }
                 })
                 .using((success, message, error) ->
@@ -302,7 +307,8 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         if (error == null) {
             error = new IllegalStateException("Debezium engine stopped while the realtime trigger was still active");
         }
-        return ReconnectLoop.AttemptResult.failure(error, taskStarted.get());
+        boolean stable = ReconnectPolicy.ranStably(taskStartedAt.get(), System.nanoTime(), reconnectPolicy.maxDelay());
+        return ReconnectLoop.AttemptResult.failure(error, stable);
     }
 
     private void releaseEngine(DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine) {
@@ -328,7 +334,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     /**
      * @return {@code false} when the trigger was stopped or the wait was interrupted
      */
-    private boolean awaitBackoff(Duration delay) {
+    boolean awaitBackoff(Duration delay) {
         long deadline = System.nanoTime() + delay.toNanos();
         synchronized (reconnectMonitor) {
             while (isActive.get()) {
@@ -458,27 +464,28 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
         @Override
         public boolean awaitBackoff(Duration delay) {
-            return AbstractDebeziumRealtimeTrigger.this.awaitBackoff(delay);
+            double factor = ThreadLocalRandom.current().nextDouble(-JITTER_FACTOR, JITTER_FACTOR);
+            return AbstractDebeziumRealtimeTrigger.this.awaitBackoff(ReconnectPolicy.withJitter(delay, factor));
         }
 
         @Override
         public void onRetry(Throwable error, ReconnectPolicy.Retry retry) {
             if (retry.firstOfStreak() && error != null) {
                 runContext.logger().warn(
-                    "Debezium realtime trigger failed to connect (attempt {}); reconnecting in {}. The trigger stays running and retries on this worker.",
+                    "Debezium realtime trigger failed (attempt {}); reconnecting in {}. The trigger stays running and retries on this worker.",
                     retry.attempt(),
                     retry.delay(),
                     error
                 );
             } else if (retry.firstOfStreak()) {
                 runContext.logger().warn(
-                    "Debezium realtime trigger failed to connect (attempt {}); reconnecting in {}. The trigger stays running and retries on this worker.",
+                    "Debezium realtime trigger failed (attempt {}); reconnecting in {}. The trigger stays running and retries on this worker.",
                     retry.attempt(),
                     retry.delay()
                 );
             } else {
                 runContext.logger().warn(
-                    "Debezium realtime trigger failed to connect (attempt {}); reconnecting in {}: {}",
+                    "Debezium realtime trigger failed (attempt {}); reconnecting in {}: {}",
                     retry.attempt(),
                     retry.delay(),
                     error == null ? "unknown error" : error.toString()
