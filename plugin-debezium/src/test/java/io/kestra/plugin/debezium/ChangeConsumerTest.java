@@ -13,6 +13,8 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -54,6 +56,125 @@ class ChangeConsumerTest {
     @Inject
     private RunContextFactory runContextFactory;
 
+    @ParameterizedTest
+    @EnumSource(AbstractDebeziumTask.Format.class)
+    void deletedDropDoesNotEmit(AbstractDebeziumTask.Format format) {
+        TrackingCommitter committer = new TrackingCommitter();
+        SourceRecord record = deleteRecord();
+
+        List<AbstractDebeziumRealtimeTrigger.StreamOutput> outputs = this.consume(
+            task(format, AbstractDebeziumTask.Deleted.DROP), record, committer
+        );
+
+        assertTrue(outputs.isEmpty());
+        assertThat(committer.processed, is(List.of(new TestChangeEvent(record))));
+        assertThat(committer.finished, is(1));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AbstractDebeziumTask.Format.class)
+    void deletedDropDoesNotWrite(AbstractDebeziumTask.Format format) {
+        AtomicInteger count = new AtomicInteger();
+        ChangeConsumer consumer = new ChangeConsumer(
+            task(format, AbstractDebeziumTask.Deleted.DROP), runContextFactory.of(), count,
+            new AtomicBoolean(), ZonedDateTime.now(), Path.of("offsets"), Path.of("history")
+        );
+        SourceRecord record = deleteRecord();
+        TrackingCommitter committer = new TrackingCommitter();
+
+        consumer.handleBatch(List.of(new TestChangeEvent(record)), committer);
+
+        assertTrue(consumer.getRecords().isEmpty());
+        assertTrue(consumer.getRecordsCount().isEmpty());
+        assertThat(count.get(), is(0));
+        assertThat(committer.processed, is(List.of(new TestChangeEvent(record))));
+        assertThat(committer.finished, is(1));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AbstractDebeziumTask.Format.class)
+    void deletedDropKeepsNonDeleteEvents(AbstractDebeziumTask.Format format) {
+        Struct row = new Struct(ROW_SCHEMA).put("events_id", 1).put("event_title", "Machine Head");
+        Struct source = source();
+
+        for (Struct value : List.of(
+            ENVELOPE.create(row, source, Instant.now()),
+            ENVELOPE.update(row, row, source, Instant.now()),
+            ENVELOPE.read(row, source, Instant.now())
+        )) {
+            List<AbstractDebeziumRealtimeTrigger.StreamOutput> outputs = this.consume(
+                task(format, AbstractDebeziumTask.Deleted.DROP), record(value)
+            );
+            assertThat(outputs.size(), is(1));
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(AbstractDebeziumTask.Format.class)
+    void otherDeletedModesStillEmit(AbstractDebeziumTask.Format format) {
+        for (AbstractDebeziumTask.Deleted deleted : List.of(
+            AbstractDebeziumTask.Deleted.ADD_FIELD, AbstractDebeziumTask.Deleted.NULL
+        )) {
+            List<AbstractDebeziumRealtimeTrigger.StreamOutput> outputs = this.consume(task(format, deleted), deleteRecord());
+            assertThat(outputs.size(), is(1));
+            Map<String, Object> data = outputs.getFirst().getData();
+
+            if (deleted == AbstractDebeziumTask.Deleted.ADD_FIELD) {
+                assertThat(data.get("deleted"), is(true));
+            } else if (format == AbstractDebeziumTask.Format.RAW) {
+                assertThat(data.get("value"), is(nullValue()));
+            } else {
+                Map<?, ?> row = format == AbstractDebeziumTask.Format.WRAP ? (Map<?, ?>) data.get("record") : data;
+                assertTrue(row.containsKey("events_id"));
+                assertThat(row.get("events_id"), is(nullValue()));
+                assertThat(row.get("event_title"), is(nullValue()));
+            }
+        }
+    }
+
+    @Test
+    void deletedDropStillFiltersTombstones() {
+        AbstractDebeziumTask task = task(AbstractDebeziumTask.Format.RAW, AbstractDebeziumTask.Deleted.DROP);
+        task.ignoreDdl = Property.ofValue(false);
+        SourceRecord tombstone = new SourceRecord(
+            Map.of(), Map.of(), "test.public.events", null, null, Map.of("events_id", 1), null, null
+        );
+        TrackingCommitter committer = new TrackingCommitter();
+
+        assertTrue(this.consume(task, tombstone, committer).isEmpty());
+        assertThat(committer.processed, is(List.of(new TestChangeEvent(tombstone))));
+        assertThat(committer.finished, is(1));
+    }
+
+    private static AbstractDebeziumTask task(AbstractDebeziumTask.Format outputFormat, AbstractDebeziumTask.Deleted deletionMode) {
+        return new AbstractDebeziumTask() {
+            {
+                format = Property.ofValue(outputFormat);
+                deleted = Property.ofValue(deletionMode);
+            }
+
+            @Override
+            protected boolean needDatabaseHistory() {
+                return false;
+            }
+        };
+    }
+
+    private static Struct source() {
+        return new Struct(SOURCE_SCHEMA).put("db", "postgres").put("table", "events");
+    }
+
+    private static SourceRecord deleteRecord() {
+        Struct before = new Struct(ROW_SCHEMA).put("events_id", 1).put("event_title", "Machine Head");
+        return record(ENVELOPE.delete(before, source(), Instant.now()));
+    }
+
+    private static SourceRecord record(Struct value) {
+        return new SourceRecord(
+            Map.of(), Map.of(), "test.public.events", null, null, Map.of("events_id", 1), ENVELOPE.schema(), value
+        );
+    }
+
     @SuppressWarnings("unchecked")
     @Test
     void deletedNullDoesNotAddKey() {
@@ -91,12 +212,16 @@ class ChangeConsumerTest {
     }
 
     private List<AbstractDebeziumRealtimeTrigger.StreamOutput> consume(AbstractDebeziumTask task, SourceRecord record) {
+        return this.consume(task, record, new NoopCommitter());
+    }
+
+    private List<AbstractDebeziumRealtimeTrigger.StreamOutput> consume(AbstractDebeziumTask task, SourceRecord record, NoopCommitter committer) {
         RunContext runContext = runContextFactory.of();
         ChangeConsumer consumer = new ChangeConsumer(task, runContext, new AtomicInteger(), new AtomicBoolean(), ZonedDateTime.now(), Path.of("offsets"), Path.of("history"));
 
         return Flux.<AbstractDebeziumRealtimeTrigger.StreamOutput> create(sink ->
         {
-            consumer.handleBatch(List.of(new TestChangeEvent(record)), new NoopCommitter(), sink, AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_STOP);
+            consumer.handleBatch(List.of(new TestChangeEvent(record)), committer, sink, AbstractDebeziumRealtimeTrigger.OffsetCommitMode.ON_STOP);
             sink.complete();
         }).collectList().block();
     }
@@ -115,6 +240,21 @@ class ChangeConsumerTest {
         @Override
         public Integer partition() {
             return null;
+        }
+    }
+
+    private static class TrackingCommitter extends NoopCommitter {
+        private final List<ChangeEvent<SourceRecord, SourceRecord>> processed = new java.util.ArrayList<>();
+        private int finished;
+
+        @Override
+        public void markProcessed(ChangeEvent<SourceRecord, SourceRecord> record) {
+            processed.add(record);
+        }
+
+        @Override
+        public void markBatchFinished() {
+            finished++;
         }
     }
 
