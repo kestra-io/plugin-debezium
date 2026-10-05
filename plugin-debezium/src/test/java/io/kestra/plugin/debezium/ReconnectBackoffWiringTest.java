@@ -39,7 +39,7 @@ class ReconnectBackoffWiringTest {
         trigger.stop();
     }
 
-    static class FixtureTrigger extends AbstractDebeziumRealtimeTrigger {
+    public static class FixtureTrigger extends AbstractDebeziumRealtimeTrigger {
         @Override
         public Publisher<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) {
             throw new UnsupportedOperationException();
