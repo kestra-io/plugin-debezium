@@ -22,6 +22,7 @@ import io.kestra.core.utils.IdUtils;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Pure unit tests for the legacy-offset migration logic.
@@ -256,6 +257,85 @@ class OffsetMigrationTest {
         ).getBytes(StandardCharsets.UTF_8);
         assertThat("legacy key still present",
             result.keySet().stream().anyMatch(k -> Arrays.equals(k, legacyKeyBytes)));
+    }
+
+    // ---------------------------------------------------------------------------
+    // containsOffsetFor helper tests
+    // ---------------------------------------------------------------------------
+
+    @Test
+    void containsOffsetFor_matchingLegacyKey_returnsTrue(@TempDir Path tmp) throws Exception {
+        var offsetFile = tmp.resolve("offsets.dat");
+        writeOffsets(offsetFile, Map.of(
+            AbstractDebeziumTask.offsetKey(AbstractDebeziumTask.LEGACY_CONNECTOR_NAME, AbstractDebeziumTask.LEGACY_TOPIC_PREFIX),
+            "{\"lsn\":1}".getBytes(StandardCharsets.UTF_8)
+        ));
+
+        assertThat(
+            AbstractDebeziumTask.containsOffsetFor(offsetFile, "kestra_someid", "kestra_someid"),
+            is(true)
+        );
+        assertThat(
+            AbstractDebeziumTask.containsOffsetFor(Files.readAllBytes(offsetFile), "kestra_someid", "kestra_someid"),
+            is(true)
+        );
+    }
+
+    @Test
+    void containsOffsetFor_matchingTargetKey_returnsTrue(@TempDir Path tmp) throws Exception {
+        var offsetFile = tmp.resolve("offsets.dat");
+        var myConnector = "kestra_12345678";
+        writeOffsets(offsetFile, Map.of(
+            AbstractDebeziumTask.offsetKey(myConnector, myConnector),
+            "{\"lsn\":2}".getBytes(StandardCharsets.UTF_8)
+        ));
+
+        assertThat(
+            AbstractDebeziumTask.containsOffsetFor(offsetFile, myConnector, myConnector),
+            is(true)
+        );
+    }
+
+    @Test
+    void containsOffsetFor_differentConnectorKey_returnsFalse(@TempDir Path tmp) throws Exception {
+        var offsetFile = tmp.resolve("offsets.dat");
+        writeOffsets(offsetFile, Map.of(
+            AbstractDebeziumTask.offsetKey("kestra_otherid", "kestra_otherid"),
+            "{\"lsn\":3}".getBytes(StandardCharsets.UTF_8)
+        ));
+
+        assertThat(
+            AbstractDebeziumTask.containsOffsetFor(offsetFile, "kestra_myid", "kestra_myid"),
+            is(false)
+        );
+    }
+
+    @Test
+    void containsOffsetFor_nullOrEmpty_returnsFalse(@TempDir Path tmp) throws Exception {
+        var offsetFile = tmp.resolve("non_existent.dat");
+        assertThat(
+            AbstractDebeziumTask.containsOffsetFor(offsetFile, "kestra_myid", "kestra_myid"),
+            is(false)
+        );
+        assertThat(
+            AbstractDebeziumTask.containsOffsetFor((byte[]) null, "kestra_myid", "kestra_myid"),
+            is(false)
+        );
+        assertThat(
+            AbstractDebeziumTask.containsOffsetFor(new byte[0], "kestra_myid", "kestra_myid"),
+            is(false)
+        );
+    }
+
+    @Test
+    void containsOffsetFor_corruptData_throwsIOException() {
+        assertThrows(IOException.class, () ->
+            AbstractDebeziumTask.containsOffsetFor(
+                "corrupted_non_serialized_bytes".getBytes(StandardCharsets.UTF_8),
+                "kestra_myid",
+                "kestra_myid"
+            )
+        );
     }
 
     // ---------------------------------------------------------------------------

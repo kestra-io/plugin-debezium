@@ -1,12 +1,17 @@
 package io.kestra.plugin.debezium.postgres;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.PrivateKey;
 import java.security.Provider;
 import java.security.Security;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
@@ -24,10 +29,12 @@ import org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo;
 import org.bouncycastle.pkcs.PKCSException;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.exceptions.ResourceExpiredException;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.storages.StorageContext;
+import io.kestra.core.storages.kv.KVValue;
 import io.kestra.core.storages.kv.KVValueAndMetadata;
-import io.kestra.core.utils.Hashing;
+import io.kestra.plugin.debezium.AbstractDebeziumInterface;
 import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 
@@ -36,14 +43,9 @@ public abstract class PostgresService {
 
     public static void handleProperties(Properties properties, RunContext runContext, PostgresInterface postgres)
         throws IllegalVariableEvaluationException, IOException, OperatorCreationException, PKCSException {
-        handleProperties(properties, runContext, postgres, null);
-    }
-
-    public static void handleProperties(Properties properties, RunContext runContext, PostgresInterface postgres, String connectorId)
-        throws IllegalVariableEvaluationException, IOException, OperatorCreationException, PKCSException {
         properties.put("database.dbname", runContext.render(postgres.getDatabase()).as(String.class).orElseThrow());
         properties.put("plugin.name", runContext.render(postgres.getPluginName()).as(PostgresInterface.PluginName.class).orElseThrow().name().toLowerCase(Locale.ROOT));
-        properties.put("slot.name", resolveSlotName(runContext, postgres, connectorId));
+        properties.put("slot.name", resolveSlotName(runContext, postgres));
 
         PostgresInterface.SnapshotMode rSnapshotMode = runContext.render(postgres.getSnapshotMode()).as(PostgresInterface.SnapshotMode.class).orElseThrow();
 
@@ -147,96 +149,130 @@ public abstract class PostgresService {
     }
 
     public static String resolveSlotName(RunContext runContext, PostgresInterface postgres)
-        throws IllegalVariableEvaluationException {
-        return resolveSlotName(runContext, postgres, null);
-    }
-
-    public static String resolveSlotName(RunContext runContext, PostgresInterface postgres, String connectorId)
-        throws IllegalVariableEvaluationException {
+        throws IllegalVariableEvaluationException, IOException {
         if (postgres.getSlotName() != null) {
-            return runContext.render(postgres.getSlotName()).as(String.class).orElseThrow();
+            return runContext.render(postgres.getSlotName())
+                .as(String.class)
+                .filter(slot -> !slot.isBlank())
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "The 'slotName' property was specified but evaluated to an empty value. " +
+                        "Provide a valid PostgreSQL replication slot name or omit the property to use the derived default."
+                ));
         }
 
-        String effectiveConnectorId = connectorId != null ? connectorId : deriveDefaultConnectorId(runContext, postgres);
+        AbstractDebeziumTask task = null;
+        if (postgres instanceof AbstractDebeziumTask t) {
+            task = t;
+        } else if (postgres instanceof io.kestra.core.models.tasks.Task t) {
+            var builder = Capture.builder().id(t.getId());
+            if (postgres instanceof AbstractDebeziumInterface adi) {
+                builder.stateName(adi.getStateName());
+            }
+            task = builder.build();
+        } else if (postgres instanceof io.kestra.core.models.triggers.AbstractTrigger trigger) {
+            var builder = Capture.builder().id(trigger.getId());
+            if (postgres instanceof AbstractDebeziumInterface adi) {
+                builder.stateName(adi.getStateName());
+            }
+            task = builder.build();
+        }
 
+        var effectiveConnectorId = task != null ? task.deriveConnectorId(runContext) : null;
+
+        var flowInfo = runContext.flowInfo();
+        if (flowInfo == null || flowInfo.namespace() == null || effectiveConnectorId == null) {
+            return effectiveConnectorId != null ? effectiveConnectorId : LEGACY_SLOT_NAME;
+        }
+
+        var kvStore = runContext.namespaceKv(flowInfo.namespace());
+        var taskRunValue = runContext.storage().getTaskStorageContext()
+            .map(StorageContext.Task::getTaskRunValue)
+            .orElse(null);
+
+        var stateName = "debezium-state";
+        if (task.getStateName() != null) {
+            stateName = runContext.render(task.getStateName()).as(String.class).orElse("debezium-state");
+        }
+
+        var slotMetaFilename = "pg-slot-" + effectiveConnectorId + ".txt";
+        var slotMetaKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, slotMetaFilename, taskRunValue);
+
+        Optional<KVValue> existingSlot;
         try {
-            var flowInfo = runContext.flowInfo();
-            if (flowInfo != null && flowInfo.namespace() != null) {
-                var kvStore = runContext.namespaceKv(flowInfo.namespace());
-                var taskRunValue = runContext.storage().getTaskStorageContext()
-                    .map(StorageContext.Task::getTaskRunValue)
-                    .orElse(null);
+            existingSlot = kvStore.getValue(slotMetaKey);
+        } catch (ResourceExpiredException | FileNotFoundException e) {
+            existingSlot = Optional.empty();
+        }
 
-                String stateName = "debezium-state";
-                if (postgres instanceof AbstractDebeziumTask task && task.getStateName() != null) {
-                    stateName = runContext.render(task.getStateName()).as(String.class).orElse("debezium-state");
-                }
+        if (existingSlot.isPresent() && existingSlot.get().value() != null) {
+            var val = existingSlot.get().value();
+            var recordedSlot = val instanceof byte[] bytes ? new String(bytes, StandardCharsets.UTF_8) : val.toString();
+            if (!recordedSlot.isBlank()) {
+                return recordedSlot;
+            }
+        }
 
-                String slotMetaFilename = "pg-slot-" + effectiveConnectorId + ".txt";
-                String slotMetaKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, slotMetaFilename, taskRunValue);
+        var hasLegacyState = false;
+        var offsetFile = runContext.workingDir().path().resolve(AbstractDebeziumTask.OFFSETS_DATA_FILE);
+        if (Files.exists(offsetFile) && Files.size(offsetFile) > 0) {
+            hasLegacyState = task.hasLegacyOffsets(runContext, offsetFile);
+        } else {
+            var combinedKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.COMBINED_STATE_FILE, taskRunValue);
+            Optional<KVValue> combinedValue;
+            try {
+                combinedValue = kvStore.getValue(combinedKey);
+            } catch (ResourceExpiredException | FileNotFoundException e) {
+                combinedValue = Optional.empty();
+            }
 
-                var existingSlot = kvStore.getValue(slotMetaKey);
-                if (existingSlot.isPresent() && existingSlot.get().value() != null) {
-                    Object val = existingSlot.get().value();
-                    String recordedSlot = val instanceof byte[] bytes ? new String(bytes, StandardCharsets.UTF_8) : val.toString();
-                    if (!recordedSlot.isBlank()) {
-                        return recordedSlot;
+            byte[] offsetData = null;
+            if (combinedValue.isPresent() && combinedValue.get().value() != null) {
+                var val = combinedValue.get().value();
+                if (val instanceof Map<?, ?> stateMap) {
+                    var rawOffsets = stateMap.get(AbstractDebeziumTask.STATE_KEY_OFFSETS);
+                    if (rawOffsets instanceof byte[] bytes) {
+                        offsetData = bytes;
                     }
-                }
-
-                String combinedKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.COMBINED_STATE_FILE, taskRunValue);
-                String legacyOffsetKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.OFFSETS_DATA_FILE, taskRunValue);
-
-                boolean hasLegacyState = (kvStore.getValue(combinedKey).isPresent() && kvStore.getValue(combinedKey).get().value() != null)
-                    || (kvStore.getValue(legacyOffsetKey).isPresent() && kvStore.getValue(legacyOffsetKey).get().value() != null);
-
-                if (hasLegacyState) {
-                    runContext.logger().warn(
-                        "PostgreSQL CDC task is resuming from the legacy default replication slot '{}'. " +
-                            "To prevent conflicts with other tasks sharing the same database, consider explicitly configuring 'slotName'.",
-                        LEGACY_SLOT_NAME
-                    );
-                    try {
-                        kvStore.put(slotMetaKey, new KVValueAndMetadata(null, LEGACY_SLOT_NAME.getBytes(StandardCharsets.UTF_8)));
-                    } catch (Exception e) {
-                        runContext.logger().debug("Could not record legacy slot metadata: {}", e.getMessage());
-                    }
-                    return LEGACY_SLOT_NAME;
-                }
-
-                try {
-                    kvStore.put(slotMetaKey, new KVValueAndMetadata(null, effectiveConnectorId.getBytes(StandardCharsets.UTF_8)));
-                } catch (Exception e) {
-                    runContext.logger().debug("Could not record slot metadata: {}", e.getMessage());
+                } else if (val instanceof byte[] bytes) {
+                    offsetData = bytes;
                 }
             }
-        } catch (Exception e) {
-            runContext.logger().warn("Failed to check or record slot metadata from KV store: {}", e.getMessage());
+
+            if (offsetData == null) {
+                var legacyOffsetKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.OFFSETS_DATA_FILE, taskRunValue);
+                Optional<KVValue> legacyValue;
+                try {
+                    legacyValue = kvStore.getValue(legacyOffsetKey);
+                } catch (ResourceExpiredException | FileNotFoundException e) {
+                    legacyValue = Optional.empty();
+                }
+                if (legacyValue.isPresent() && legacyValue.get().value() != null) {
+                    var val = legacyValue.get().value();
+                    if (val instanceof byte[] bytes) {
+                        offsetData = bytes;
+                    }
+                }
+            }
+
+            if (offsetData != null) {
+                hasLegacyState = task.hasLegacyOffsets(runContext, offsetData);
+            }
         }
 
-        return effectiveConnectorId;
-    }
-
-    private static String deriveDefaultConnectorId(RunContext runContext, PostgresInterface postgres) {
-        var flowInfo = runContext.flowInfo();
-        var taskRunInfo = runContext.taskRunInfo();
-
-        String namespace = flowInfo != null && flowInfo.namespace() != null ? flowInfo.namespace() : "";
-        String flowId = flowInfo != null && flowInfo.id() != null ? flowInfo.id() : "";
-
-        String ownId = null;
-        if (postgres instanceof io.kestra.core.models.tasks.Task task) {
-            ownId = task.getId();
-        } else if (postgres instanceof io.kestra.core.models.triggers.AbstractTrigger trigger) {
-            ownId = trigger.getId();
+        String chosenSlot;
+        if (hasLegacyState) {
+            runContext.logger().warn(
+                "PostgreSQL CDC task is resuming from the legacy default replication slot '{}'. " +
+                    "To prevent conflicts with other tasks sharing the same database, consider explicitly configuring 'slotName'.",
+                LEGACY_SLOT_NAME
+            );
+            chosenSlot = LEGACY_SLOT_NAME;
+        } else {
+            chosenSlot = effectiveConnectorId;
         }
 
-        String taskRunTaskId = taskRunInfo != null ? taskRunInfo.taskId() : null;
-        String taskId = ownId != null ? ownId : (taskRunTaskId != null ? taskRunTaskId : "");
-        String iterationValue = taskRunInfo != null && taskRunInfo.value() != null ? taskRunInfo.value().toString() : "";
+        kvStore.put(slotMetaKey, new KVValueAndMetadata(null, chosenSlot.getBytes(StandardCharsets.UTF_8)));
 
-        String identity = namespace + "|" + flowId + "|" + taskId + "|" + iterationValue;
-        String hash = Hashing.hashToString(identity).substring(0, 8);
-        return "kestra_" + hash;
+        return chosenSlot;
     }
 }

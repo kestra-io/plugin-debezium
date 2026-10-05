@@ -1,6 +1,12 @@
 package io.kestra.plugin.debezium.postgres;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -20,6 +26,7 @@ import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @KestraTest
@@ -38,6 +45,25 @@ class PostgresSlotResolutionTest {
             .port(Property.ofValue("5432"))
             .database(Property.ofValue("postgres"))
             .stateName(Property.ofValue(stateName));
+    }
+
+    private static final String LEGACY_CONNECTOR_NAME = "engine";
+    private static final String LEGACY_TOPIC_PREFIX = "kestra_";
+
+    private static String offsetKey(String connectorName, String topicPrefix) {
+        return "[\"" + connectorName + "\",{\"server\":\"" + topicPrefix + "\"}]";
+    }
+
+    private static byte[] serializeOffsets(Map<String, byte[]> entries) throws IOException {
+        var map = new HashMap<byte[], byte[]>();
+        for (var e : entries.entrySet()) {
+            map.put(e.getKey().getBytes(StandardCharsets.UTF_8), e.getValue());
+        }
+        var baos = new ByteArrayOutputStream();
+        try (var oos = new ObjectOutputStream(baos)) {
+            oos.writeObject(map);
+        }
+        return baos.toByteArray();
     }
 
     @Test
@@ -83,51 +109,108 @@ class PostgresSlotResolutionTest {
         assertThat(slot2, startsWith("kestra_"));
     }
 
+    /**
+     * Regression test for Maintainer Review Comment 1 / Issue #235 Scenario A:
+     * Task A runs, resolves its slot, and writes state under the shared flow-level KV key.
+     * Task B resolves afterwards.
+     * Task B must derive its own distinct slot and MUST NOT fall back to 'kestra'.
+     */
     @Test
-    void legacyCapture_firstRunAfterUpgrade_fallsBackToKestraWithWarning() throws Exception {
+    void taskA_writesFlowLevelState_taskB_stillDerivesItsOwnSlot() throws Exception {
+        String stateName = "state-" + IdUtils.create();
+        Capture taskA = createCaptureBuilder("task_a", stateName).build();
+        Capture taskB = createCaptureBuilder("task_b", stateName).build();
+
+        RunContext runContextA = TestsUtils.mockRunContext(runContextFactory, taskA, Map.of());
+        RunContext runContextB = TestsUtils.mockRunContext(runContextFactory, taskB, Map.of());
+
+        // 1. Task A resolves to a derived slot
+        String slotA = PostgresService.resolveSlotName(runContextA, taskA);
+        assertThat(slotA, startsWith("kestra_"));
+
+        // 2. Task A writes state under the shared flow-level key (computeKvStoreKey does not include taskId)
+        var kvStore = runContextA.namespaceKv(runContextA.flowInfo().namespace());
+        String combinedKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContextA, stateName, AbstractDebeziumTask.COMBINED_STATE_FILE, null);
+        byte[] taskAOffsets = serializeOffsets(
+            Map.of(
+                offsetKey(slotA, slotA),
+                "{\"lsn\":12345}".getBytes(StandardCharsets.UTF_8)
+            )
+        );
+        kvStore.put(combinedKey, new KVValueAndMetadata(null, Map.of(AbstractDebeziumTask.STATE_KEY_OFFSETS, taskAOffsets)));
+
+        // 3. Task B resolves afterward
+        String slotB = PostgresService.resolveSlotName(runContextB, taskB);
+
+        // 4. Task B must derive its own slot and NOT fall back to 'kestra'
+        assertThat("Task B must NOT fall back to legacy 'kestra' slot", slotB, not(equalTo(PostgresService.LEGACY_SLOT_NAME)));
+        assertThat("Task B must NOT collide with Task A's slot", slotB, not(equalTo(slotA)));
+        assertThat(slotB, startsWith("kestra_"));
+        assertTrue(PG_SLOT_PATTERN.matcher(slotB).matches());
+    }
+
+    @Test
+    void legacyCapture_withEngineOffsets_fallsBackToKestraWithWarning() throws Exception {
         String stateName = "state-" + IdUtils.create();
         Capture task = createCaptureBuilder("task_legacy", stateName).build();
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
-        // Inject simulated legacy state: combined state exists, but pg-slot metadata is absent
+        // Pre-1.4.3 legacy state: offsets contain "engine" / "kestra_" key
         var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
         String combinedKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.COMBINED_STATE_FILE, null);
-        kvStore.put(combinedKey, new KVValueAndMetadata(null, Map.of("offsets", "legacy_offset_payload".getBytes(StandardCharsets.UTF_8))));
+        byte[] legacyOffsets = serializeOffsets(
+            Map.of(
+                offsetKey(LEGACY_CONNECTOR_NAME, LEGACY_TOPIC_PREFIX),
+                "{\"lsn\":12345}".getBytes(StandardCharsets.UTF_8)
+            )
+        );
+        kvStore.put(combinedKey, new KVValueAndMetadata(null, Map.of(AbstractDebeziumTask.STATE_KEY_OFFSETS, legacyOffsets)));
 
         String slotName = PostgresService.resolveSlotName(runContext, task);
 
         assertThat(
-            "Upgraded legacy task with pre-existing offset state must fall back to legacy 'kestra' slot",
+            "Upgraded pre-1.4.3 legacy task with 'engine' offsets must fall back to legacy 'kestra' slot",
             slotName, is(PostgresService.LEGACY_SLOT_NAME)
         );
 
-        // Verify that the fallback was recorded in KV store so future executions stay on 'kestra'
-        String connectorId = PostgresService.resolveSlotName(runContext, task, "temp_id"); // checks resolution logic
-        assertThat(connectorId, is(PostgresService.LEGACY_SLOT_NAME));
-    }
-
-    @Test
-    void legacyCapture_subsequentRun_continuesOnKestra() throws Exception {
-        String stateName = "state-" + IdUtils.create();
-        Capture task = createCaptureBuilder("task_legacy_multi", stateName).build();
-        RunContext runContext1 = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
-
-        // Seed legacy state
-        var kvStore = runContext1.namespaceKv(runContext1.flowInfo().namespace());
-        String combinedKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext1, stateName, AbstractDebeziumTask.COMBINED_STATE_FILE, null);
-        kvStore.put(combinedKey, new KVValueAndMetadata(null, Map.of("offsets", "legacy_offset_payload".getBytes(StandardCharsets.UTF_8))));
-
-        // First run after upgrade
-        String slot1 = PostgresService.resolveSlotName(runContext1, task);
-        assertThat(slot1, is(PostgresService.LEGACY_SLOT_NAME));
-
-        // Second run after upgrade
+        // Verify that subsequent run continues using 'kestra' via the recorded slot metadata
         RunContext runContext2 = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
         String slot2 = PostgresService.resolveSlotName(runContext2, task);
         assertThat(
             "Subsequent run after upgrade must continue using 'kestra'",
             slot2, is(PostgresService.LEGACY_SLOT_NAME)
         );
+    }
+
+    @Test
+    void upgradedCapture_withExistingConnectorOffsets_fallsBackToKestra() throws Exception {
+        String stateName = "state-" + IdUtils.create();
+        Capture task = createCaptureBuilder("task_upgraded_143", stateName).build();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+
+        // 1.4.3 state: connector ID was derived, but slotName defaulted to "kestra" and no slot metadata was recorded
+        String connectorId = task.deriveConnectorId(runContext);
+        var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+        String combinedKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.COMBINED_STATE_FILE, null);
+        byte[] upgradedOffsets = serializeOffsets(
+            Map.of(
+                offsetKey(connectorId, connectorId),
+                "{\"lsn\":9999}".getBytes(StandardCharsets.UTF_8)
+            )
+        );
+        kvStore.put(combinedKey, new KVValueAndMetadata(null, Map.of(AbstractDebeziumTask.STATE_KEY_OFFSETS, upgradedOffsets)));
+
+        String slotName = PostgresService.resolveSlotName(runContext, task);
+
+        assertThat(
+            "1.4.3 task with existing connector offsets but no slot metadata must fall back to 'kestra'",
+            slotName, is(PostgresService.LEGACY_SLOT_NAME)
+        );
+
+        // Verify subsequent run continues using 'kestra'
+        RunContext runContext2 = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+        String slot2 = PostgresService.resolveSlotName(runContext2, task);
+        assertThat(slot2, is(PostgresService.LEGACY_SLOT_NAME));
     }
 
     @Test
@@ -141,7 +224,13 @@ class PostgresSlotResolutionTest {
         // Even if legacy state existed, explicit slotName takes complete precedence
         var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
         String combinedKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.COMBINED_STATE_FILE, null);
-        kvStore.put(combinedKey, new KVValueAndMetadata(null, Map.of("offsets", "legacy_offset_payload".getBytes(StandardCharsets.UTF_8))));
+        byte[] legacyOffsets = serializeOffsets(
+            Map.of(
+                offsetKey(LEGACY_CONNECTOR_NAME, LEGACY_TOPIC_PREFIX),
+                "{\"lsn\":1}".getBytes(StandardCharsets.UTF_8)
+            )
+        );
+        kvStore.put(combinedKey, new KVValueAndMetadata(null, Map.of(AbstractDebeziumTask.STATE_KEY_OFFSETS, legacyOffsets)));
 
         String slotName = PostgresService.resolveSlotName(runContext, task);
         assertThat(slotName, is("my_custom_slot"));
@@ -192,9 +281,12 @@ class PostgresSlotResolutionTest {
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
-        String slotName = PostgresService.resolveSlotName(runContext, task);
-        assertThat(slotName, startsWith("kestra_"));
-        assertTrue(PG_SLOT_PATTERN.matcher(slotName).matches());
+        String triggerSlot = PostgresService.resolveSlotName(runContext, trigger);
+        String taskSlot = PostgresService.resolveSlotName(runContext, task);
+
+        assertThat(triggerSlot, equalTo(taskSlot));
+        assertThat(triggerSlot, startsWith("kestra_"));
+        assertTrue(PG_SLOT_PATTERN.matcher(triggerSlot).matches());
     }
 
     @Test
@@ -212,9 +304,26 @@ class PostgresSlotResolutionTest {
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
-        String slotName = PostgresService.resolveSlotName(runContext, task);
-        assertThat(slotName, startsWith("kestra_"));
-        assertTrue(PG_SLOT_PATTERN.matcher(slotName).matches());
+        String triggerSlot = PostgresService.resolveSlotName(runContext, trigger);
+        String taskSlot = PostgresService.resolveSlotName(runContext, task);
+
+        assertThat(triggerSlot, equalTo(taskSlot));
+        assertThat(triggerSlot, startsWith("kestra_"));
+        assertTrue(PG_SLOT_PATTERN.matcher(triggerSlot).matches());
+    }
+
+    @Test
+    void explicitBlankSlot_throwsIllegalArgumentException() {
+        Capture task = createCaptureBuilder("blank_slot_task", "state-" + IdUtils.create())
+            .slotName(Property.ofValue("   "))
+            .build();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+
+        IllegalArgumentException thrown = assertThrows(
+            IllegalArgumentException.class,
+            () -> PostgresService.resolveSlotName(runContext, task)
+        );
+        assertThat(thrown.getMessage(), containsString("The 'slotName' property was specified but evaluated to an empty value"));
     }
 
     @Test
@@ -226,7 +335,13 @@ class PostgresSlotResolutionTest {
         // Write legacy offsets in older per-file key format
         var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
         String legacyFileKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.OFFSETS_DATA_FILE, null);
-        kvStore.put(legacyFileKey, new KVValueAndMetadata(null, "legacy_binary_data".getBytes(StandardCharsets.UTF_8)));
+        byte[] legacyOffsets = serializeOffsets(
+            Map.of(
+                offsetKey(LEGACY_CONNECTOR_NAME, LEGACY_TOPIC_PREFIX),
+                "{\"lsn\":42}".getBytes(StandardCharsets.UTF_8)
+            )
+        );
+        kvStore.put(legacyFileKey, new KVValueAndMetadata(null, legacyOffsets));
 
         String slotName = PostgresService.resolveSlotName(runContext, task);
         assertThat(
@@ -234,4 +349,117 @@ class PostgresSlotResolutionTest {
             slotName, is(PostgresService.LEGACY_SLOT_NAME)
         );
     }
+
+    @Test
+    void restoredOffsetFileOnDisk_isDetected() throws Exception {
+        String stateName = "state-" + IdUtils.create();
+        Capture task = createCaptureBuilder("task_disk_compat", stateName).build();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+
+        // Place legacy offset file directly in the runContext working directory (as if restored by restoreState)
+        Path offsetFile = runContext.workingDir().path().resolve(AbstractDebeziumTask.OFFSETS_DATA_FILE);
+        byte[] legacyOffsets = serializeOffsets(
+            Map.of(
+                offsetKey(LEGACY_CONNECTOR_NAME, LEGACY_TOPIC_PREFIX),
+                "{\"lsn\":888}".getBytes(StandardCharsets.UTF_8)
+            )
+        );
+        Files.write(offsetFile, legacyOffsets);
+
+        String slotName = PostgresService.resolveSlotName(runContext, task);
+        assertThat(
+            "Legacy offsets restored on disk must trigger fallback to 'kestra'",
+            slotName, is(PostgresService.LEGACY_SLOT_NAME)
+        );
+    }
+
+    @Test
+    void kvStorePutFailure_propagatesException() throws Exception {
+        String stateName = "state-" + IdUtils.create();
+        Capture task = createCaptureBuilder("task_kv_put_fail", stateName).build();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+
+        var originalKvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+        var failingKvStore = (io.kestra.core.storages.kv.KVStore) java.lang.reflect.Proxy.newProxyInstance(
+            io.kestra.core.storages.kv.KVStore.class.getClassLoader(),
+            new Class<?>[] { io.kestra.core.storages.kv.KVStore.class },
+            (proxy, method, args) ->
+            {
+                if ("put".equals(method.getName())) {
+                    throw new IOException("Simulated KV write failure");
+                }
+                try {
+                    return method.invoke(originalKvStore, args);
+                } catch (java.lang.reflect.InvocationTargetException e) {
+                    throw e.getCause();
+                }
+            }
+        );
+
+        var failingKvService = new io.kestra.core.services.KVStoreService() {
+            @Override
+            public io.kestra.core.storages.kv.KVStore get(String tenantId, String namespace, String stateNamespace) {
+                return failingKvStore;
+            }
+        };
+
+        var field = runContext.getClass().getDeclaredField("kvStoreService");
+        field.setAccessible(true);
+        field.set(runContext, failingKvService);
+
+        IOException thrown = assertThrows(IOException.class, () -> PostgresService.resolveSlotName(runContext, task));
+        assertThat(thrown.getMessage(), containsString("Simulated KV write failure"));
+    }
+
+    @Test
+    void kvStoreReadFailure_propagatesException() throws Exception {
+        String stateName = "state-" + IdUtils.create();
+        Capture task = createCaptureBuilder("task_kv_read_fail", stateName).build();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+
+        var originalKvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+        var failingKvStore = (io.kestra.core.storages.kv.KVStore) java.lang.reflect.Proxy.newProxyInstance(
+            io.kestra.core.storages.kv.KVStore.class.getClassLoader(),
+            new Class<?>[] { io.kestra.core.storages.kv.KVStore.class },
+            (proxy, method, args) ->
+            {
+                if ("getValue".equals(method.getName())) {
+                    throw new IOException("Simulated KV read failure");
+                }
+                try {
+                    return method.invoke(originalKvStore, args);
+                } catch (java.lang.reflect.InvocationTargetException e) {
+                    throw e.getCause();
+                }
+            }
+        );
+
+        var failingKvService = new io.kestra.core.services.KVStoreService() {
+            @Override
+            public io.kestra.core.storages.kv.KVStore get(String tenantId, String namespace, String stateNamespace) {
+                return failingKvStore;
+            }
+        };
+
+        var field = runContext.getClass().getDeclaredField("kvStoreService");
+        field.setAccessible(true);
+        field.set(runContext, failingKvService);
+
+        IOException thrown = assertThrows(IOException.class, () -> PostgresService.resolveSlotName(runContext, task));
+        assertThat(thrown.getMessage(), containsString("Simulated KV read failure"));
+    }
+
+    @Test
+    void corruptOffsetData_throwsIOException() throws Exception {
+        String stateName = "state-" + IdUtils.create();
+        Capture task = createCaptureBuilder("task_corrupt", stateName).build();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+
+        var kvStore = runContext.namespaceKv(runContext.flowInfo().namespace());
+        String combinedKey = AbstractDebeziumRealtimeTrigger.computeKvStoreKey(runContext, stateName, AbstractDebeziumTask.COMBINED_STATE_FILE, null);
+        kvStore.put(combinedKey, new KVValueAndMetadata(null, Map.of(AbstractDebeziumTask.STATE_KEY_OFFSETS, "corrupted_non_serialized_bytes".getBytes(StandardCharsets.UTF_8))));
+
+        assertThrows(IOException.class, () -> PostgresService.resolveSlotName(runContext, task));
+    }
+
 }

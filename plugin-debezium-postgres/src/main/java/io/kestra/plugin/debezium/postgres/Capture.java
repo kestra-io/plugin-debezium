@@ -92,7 +92,7 @@ public class Capture extends AbstractDebeziumTask implements PostgresInterface {
 
         props.setProperty("connector.class", PostgresConnector.class.getName());
 
-        PostgresService.handleProperties(props, runContext, this, deriveConnectorId(runContext));
+        PostgresService.handleProperties(props, runContext, this);
 
         return props;
     }

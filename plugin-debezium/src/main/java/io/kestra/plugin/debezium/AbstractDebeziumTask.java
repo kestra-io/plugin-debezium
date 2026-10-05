@@ -298,7 +298,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
      * override any of these values.
      * Subclasses may reuse this identity to derive other stable connector-scoped values.
      */
-    protected String deriveConnectorId(RunContext runContext) {
+    public String deriveConnectorId(RunContext runContext) {
         var flowInfo = runContext.flowInfo();
         var taskRunInfo = runContext.taskRunInfo();
 
@@ -384,6 +384,81 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
      */
     static String offsetKey(String connectorName, String topicPrefix) {
         return "[\"" + connectorName + "\",{\"server\":\"" + topicPrefix + "\"}]";
+    }
+
+    /**
+     * Checks whether the given serialized offset data contains an entry for either:
+     * 1) this task's effective identity (connectorName / topicPrefix), or
+     * 2) the pre-1.4.3 legacy identity ("engine" / "kestra_").
+     *
+     * @return true if a matching offset entry is found; false if the data is empty or contains only offsets for other tasks.
+     * @throws IOException if the offset data is non-empty but corrupted or cannot be read.
+     */
+    public boolean hasLegacyOffsets(RunContext runContext, byte[] offsetData) throws IllegalVariableEvaluationException, IOException {
+        if (offsetData == null || offsetData.length == 0) {
+            return false;
+        }
+
+        var identity = resolveEffectiveIdentity(runContext);
+        return containsOffsetFor(offsetData, identity.name(), identity.topicPrefix());
+    }
+
+    /**
+     * Checks whether the given offset file contains an entry for this task or the pre-1.4.3 legacy identity.
+     *
+     * @return true if a matching offset entry is found; false if the file does not exist, is empty, or contains only offsets for other tasks.
+     * @throws IOException if the offset file cannot be read or is corrupted.
+     */
+    public boolean hasLegacyOffsets(RunContext runContext, Path offsetFile) throws IllegalVariableEvaluationException, IOException {
+        if (offsetFile == null || !Files.exists(offsetFile) || Files.size(offsetFile) == 0) {
+            return false;
+        }
+        return hasLegacyOffsets(runContext, Files.readAllBytes(offsetFile));
+    }
+
+    /**
+     * Checks whether the given serialized offset data contains an entry for either:
+     * 1) this connector's effective identity (connectorName / topicPrefix), or
+     * 2) the pre-1.4.3 legacy identity ("engine" / "kestra_").
+     *
+     * Package-private for unit testing within plugin-debezium.
+     */
+    static boolean containsOffsetFor(byte[] offsetData, String connectorName, String topicPrefix) throws IOException {
+        if (offsetData == null || offsetData.length == 0) {
+            return false;
+        }
+
+        var targetKey = offsetKey(connectorName, topicPrefix).getBytes(StandardCharsets.UTF_8);
+        var legacyKey = offsetKey(LEGACY_CONNECTOR_NAME, LEGACY_TOPIC_PREFIX).getBytes(StandardCharsets.UTF_8);
+
+        try (var bis = new ByteArrayInputStream(offsetData);
+             var ois = new ObjectInputStream(bis)) {
+            Object obj = ois.readObject();
+            if (obj instanceof Map<?, ?> map) {
+                for (Object k : map.keySet()) {
+                    if (k instanceof byte[] keyBytes) {
+                        if (Arrays.equals(keyBytes, targetKey) || Arrays.equals(keyBytes, legacyKey)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            throw new IOException("Unexpected content in offset data: expected Map but found " + (obj == null ? "null" : obj.getClass().getName()));
+        } catch (ClassNotFoundException e) {
+            throw new IOException("Could not deserialize offset data", e);
+        }
+    }
+
+    /**
+     * Checks whether the given offset file contains an entry for this connector or the legacy identity.
+     * Package-private for unit testing within plugin-debezium.
+     */
+    static boolean containsOffsetFor(Path offsetFile, String connectorName, String topicPrefix) throws IOException {
+        if (offsetFile == null || !Files.exists(offsetFile) || Files.size(offsetFile) == 0) {
+            return false;
+        }
+        return containsOffsetFor(Files.readAllBytes(offsetFile), connectorName, topicPrefix);
     }
 
     /**
