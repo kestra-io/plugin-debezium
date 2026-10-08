@@ -8,21 +8,25 @@ import java.util.Optional;
 
 import org.h2.tools.RunScript;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import io.kestra.core.junit.annotations.EvaluateTrigger;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.executions.Execution;
+import io.kestra.core.services.KVStoreService;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
+
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 
 @KestraTest
-@Disabled("Works locally by flaky on CI")
 class TriggerTest extends AbstractDebeziumTest {
+
+    @Inject
+    private KVStoreService kvStoreService;
 
     @Override
     protected String getUrl() {
@@ -49,6 +53,8 @@ class TriggerTest extends AbstractDebeziumTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        // Start each run from a clean offset instead of resuming a stale redo-log position.
+        cleanupFlowState(kvStoreService, "io.kestra.tests", "trigger", "someStateNameForTrigger");
         initDatabase();
     }
 
