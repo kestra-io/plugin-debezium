@@ -34,14 +34,13 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.storages.StorageContext;
 import io.kestra.core.storages.kv.KVValue;
 import io.kestra.core.storages.kv.KVValueAndMetadata;
-import io.kestra.plugin.debezium.AbstractDebeziumInterface;
 import io.kestra.plugin.debezium.AbstractDebeziumRealtimeTrigger;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 
 public abstract class PostgresService {
     public static final String LEGACY_SLOT_NAME = "kestra";
 
-    public static void handleProperties(Properties properties, RunContext runContext, PostgresInterface postgres)
+    public static void handleProperties(Properties properties, RunContext runContext, Capture postgres)
         throws IllegalVariableEvaluationException, IOException, OperatorCreationException, PKCSException {
         properties.put("database.dbname", runContext.render(postgres.getDatabase()).as(String.class).orElseThrow());
         properties.put("plugin.name", runContext.render(postgres.getPluginName()).as(PostgresInterface.PluginName.class).orElseThrow().name().toLowerCase(Locale.ROOT));
@@ -148,10 +147,10 @@ public abstract class PostgresService {
         return runContext.workingDir().createTempFile(privateKey.getEncoded(), ".der").toAbsolutePath().toString();
     }
 
-    public static String resolveSlotName(RunContext runContext, PostgresInterface postgres)
+    public static String resolveSlotName(RunContext runContext, Capture task)
         throws IllegalVariableEvaluationException, IOException {
-        if (postgres.getSlotName() != null) {
-            return runContext.render(postgres.getSlotName())
+        if (task.getSlotName() != null) {
+            return runContext.render(task.getSlotName())
                 .as(String.class)
                 .filter(slot -> !slot.isBlank())
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -160,28 +159,11 @@ public abstract class PostgresService {
                 ));
         }
 
-        AbstractDebeziumTask task = null;
-        if (postgres instanceof AbstractDebeziumTask t) {
-            task = t;
-        } else if (postgres instanceof io.kestra.core.models.tasks.Task t) {
-            var builder = Capture.builder().id(t.getId());
-            if (postgres instanceof AbstractDebeziumInterface adi) {
-                builder.stateName(adi.getStateName());
-            }
-            task = builder.build();
-        } else if (postgres instanceof io.kestra.core.models.triggers.AbstractTrigger trigger) {
-            var builder = Capture.builder().id(trigger.getId());
-            if (postgres instanceof AbstractDebeziumInterface adi) {
-                builder.stateName(adi.getStateName());
-            }
-            task = builder.build();
-        }
-
-        var effectiveConnectorId = task != null ? task.deriveConnectorId(runContext) : null;
+        var effectiveConnectorId = task.deriveConnectorId(runContext);
 
         var flowInfo = runContext.flowInfo();
-        if (flowInfo == null || flowInfo.namespace() == null || effectiveConnectorId == null) {
-            return effectiveConnectorId != null ? effectiveConnectorId : LEGACY_SLOT_NAME;
+        if (flowInfo == null || flowInfo.namespace() == null) {
+            return effectiveConnectorId;
         }
 
         var kvStore = runContext.namespaceKv(flowInfo.namespace());

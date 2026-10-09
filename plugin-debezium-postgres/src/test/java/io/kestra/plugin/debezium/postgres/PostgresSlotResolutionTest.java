@@ -267,52 +267,6 @@ class PostgresSlotResolutionTest {
     }
 
     @Test
-    void trigger_delegatesToCaptureWithIdenticalResolution() throws Exception {
-        String stateName = "state-" + IdUtils.create();
-        Trigger trigger = Trigger.builder()
-            .id("trigger_cdc")
-            .type(Trigger.class.getName())
-            .stateName(Property.ofValue(stateName))
-            .build();
-
-        Capture task = createCaptureBuilder(trigger.getId(), stateName)
-            .slotName(trigger.getSlotName())
-            .build();
-
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
-
-        String triggerSlot = PostgresService.resolveSlotName(runContext, trigger);
-        String taskSlot = PostgresService.resolveSlotName(runContext, task);
-
-        assertThat(triggerSlot, equalTo(taskSlot));
-        assertThat(triggerSlot, startsWith("kestra_"));
-        assertTrue(PG_SLOT_PATTERN.matcher(triggerSlot).matches());
-    }
-
-    @Test
-    void realtimeTrigger_delegatesToCaptureWithIdenticalResolution() throws Exception {
-        String stateName = "state-" + IdUtils.create();
-        RealtimeTrigger trigger = RealtimeTrigger.builder()
-            .id("realtime_cdc")
-            .type(RealtimeTrigger.class.getName())
-            .stateName(Property.ofValue(stateName))
-            .build();
-
-        Capture task = createCaptureBuilder(trigger.getId(), stateName)
-            .slotName(trigger.getSlotName())
-            .build();
-
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
-
-        String triggerSlot = PostgresService.resolveSlotName(runContext, trigger);
-        String taskSlot = PostgresService.resolveSlotName(runContext, task);
-
-        assertThat(triggerSlot, equalTo(taskSlot));
-        assertThat(triggerSlot, startsWith("kestra_"));
-        assertTrue(PG_SLOT_PATTERN.matcher(triggerSlot).matches());
-    }
-
-    @Test
     void explicitBlankSlot_throwsIllegalArgumentException() {
         Capture task = createCaptureBuilder("blank_slot_task", "state-" + IdUtils.create())
             .slotName(Property.ofValue("   "))

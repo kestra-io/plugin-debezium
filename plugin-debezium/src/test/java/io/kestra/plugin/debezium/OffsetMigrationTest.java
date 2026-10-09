@@ -1,13 +1,16 @@
 package io.kestra.plugin.debezium;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InvalidClassException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -324,6 +327,18 @@ class OffsetMigrationTest {
         assertThat(
             AbstractDebeziumTask.containsOffsetFor(new byte[0], "kestra_myid", "kestra_myid"),
             is(false)
+        );
+    }
+
+    @Test
+    void containsOffsetFor_disallowedClass_rejectedByFilter() throws Exception {
+        var baos = new ByteArrayOutputStream();
+        try (var oos = new ObjectOutputStream(baos)) {
+            oos.writeObject(new ArrayList<>(List.of("payload")));
+        }
+
+        assertThrows(InvalidClassException.class, () ->
+            AbstractDebeziumTask.containsOffsetFor(baos.toByteArray(), "kestra_myid", "kestra_myid")
         );
     }
 

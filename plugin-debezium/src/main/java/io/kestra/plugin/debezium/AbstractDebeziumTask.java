@@ -4,6 +4,8 @@ import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.URI;
@@ -378,6 +380,15 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     static final String LEGACY_CONNECTOR_NAME = "engine";
     static final String LEGACY_TOPIC_PREFIX = "kestra_";
 
+    // Offset bytes come from the namespace KV store, so only the HashMap<byte[], byte[]> written by FileOffsetBackingStore is accepted.
+    private static final ObjectInputFilter OFFSET_INPUT_FILTER = ObjectInputFilter.Config.createFilter("java.util.HashMap;java.util.Map$Entry;!*");
+
+    private static ObjectInputStream offsetInputStream(InputStream in) throws IOException {
+        var ois = new ObjectInputStream(in);
+        ois.setObjectInputFilter(OFFSET_INPUT_FILTER);
+        return ois;
+    }
+
     /**
      * Builds the compact JSON key that FileOffsetBackingStore stores in its HashMap.
      * Format: ["<name>",{"server":"<topicPrefix>"}] — no spaces, as written by Kafka Connect.
@@ -386,14 +397,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         return "[\"" + connectorName + "\",{\"server\":\"" + topicPrefix + "\"}]";
     }
 
-    /**
-     * Checks whether the given serialized offset data contains an entry for either:
-     * 1) this task's effective identity (connectorName / topicPrefix), or
-     * 2) the pre-1.4.3 legacy identity ("engine" / "kestra_").
-     *
-     * @return true if a matching offset entry is found; false if the data is empty or contains only offsets for other tasks.
-     * @throws IOException if the offset data is non-empty but corrupted or cannot be read.
-     */
     public boolean hasLegacyOffsets(RunContext runContext, byte[] offsetData) throws IllegalVariableEvaluationException, IOException {
         if (offsetData == null || offsetData.length == 0) {
             return false;
@@ -403,12 +406,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         return containsOffsetFor(offsetData, identity.name(), identity.topicPrefix());
     }
 
-    /**
-     * Checks whether the given offset file contains an entry for this task or the pre-1.4.3 legacy identity.
-     *
-     * @return true if a matching offset entry is found; false if the file does not exist, is empty, or contains only offsets for other tasks.
-     * @throws IOException if the offset file cannot be read or is corrupted.
-     */
     public boolean hasLegacyOffsets(RunContext runContext, Path offsetFile) throws IllegalVariableEvaluationException, IOException {
         if (offsetFile == null || !Files.exists(offsetFile) || Files.size(offsetFile) == 0) {
             return false;
@@ -416,13 +413,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         return hasLegacyOffsets(runContext, Files.readAllBytes(offsetFile));
     }
 
-    /**
-     * Checks whether the given serialized offset data contains an entry for either:
-     * 1) this connector's effective identity (connectorName / topicPrefix), or
-     * 2) the pre-1.4.3 legacy identity ("engine" / "kestra_").
-     *
-     * Package-private for unit testing within plugin-debezium.
-     */
+    /** Also matches the pre-1.4.3 "engine"/"kestra_" key: those offsets predate derived connector ids, so they belong to whichever task resumes them first. */
     static boolean containsOffsetFor(byte[] offsetData, String connectorName, String topicPrefix) throws IOException {
         if (offsetData == null || offsetData.length == 0) {
             return false;
@@ -431,8 +422,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         var targetKey = offsetKey(connectorName, topicPrefix).getBytes(StandardCharsets.UTF_8);
         var legacyKey = offsetKey(LEGACY_CONNECTOR_NAME, LEGACY_TOPIC_PREFIX).getBytes(StandardCharsets.UTF_8);
 
-        try (var bis = new ByteArrayInputStream(offsetData);
-             var ois = new ObjectInputStream(bis)) {
+        try (var ois = offsetInputStream(new ByteArrayInputStream(offsetData))) {
             Object obj = ois.readObject();
             if (obj instanceof Map<?, ?> map) {
                 for (Object k : map.keySet()) {
@@ -450,10 +440,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         }
     }
 
-    /**
-     * Checks whether the given offset file contains an entry for this connector or the legacy identity.
-     * Package-private for unit testing within plugin-debezium.
-     */
     static boolean containsOffsetFor(Path offsetFile, String connectorName, String topicPrefix) throws IOException {
         if (offsetFile == null || !Files.exists(offsetFile) || Files.size(offsetFile) == 0) {
             return false;
@@ -482,7 +468,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         try {
             HashMap<byte[], byte[]> offsets;
             try (var fis = new FileInputStream(offsetFile.toFile());
-                 var ois = new ObjectInputStream(fis)) {
+                 var ois = offsetInputStream(fis)) {
                 @SuppressWarnings("unchecked")
                 var loaded = (HashMap<byte[], byte[]>) ois.readObject();
                 offsets = loaded;
