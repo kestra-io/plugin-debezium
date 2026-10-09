@@ -4,6 +4,8 @@ import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.URI;
@@ -298,7 +300,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
      * override any of these values.
      * Subclasses may reuse this identity to derive other stable connector-scoped values.
      */
-    protected String deriveConnectorId(RunContext runContext) {
+    public String deriveConnectorId(RunContext runContext) {
         var flowInfo = runContext.flowInfo();
         var taskRunInfo = runContext.taskRunInfo();
 
@@ -378,12 +380,71 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     static final String LEGACY_CONNECTOR_NAME = "engine";
     static final String LEGACY_TOPIC_PREFIX = "kestra_";
 
+    // Offset bytes come from the namespace KV store, so only the HashMap<byte[], byte[]> written by FileOffsetBackingStore is accepted.
+    private static final ObjectInputFilter OFFSET_INPUT_FILTER = ObjectInputFilter.Config.createFilter("java.util.HashMap;java.util.Map$Entry;!*");
+
+    private static ObjectInputStream offsetInputStream(InputStream in) throws IOException {
+        var ois = new ObjectInputStream(in);
+        ois.setObjectInputFilter(OFFSET_INPUT_FILTER);
+        return ois;
+    }
+
     /**
      * Builds the compact JSON key that FileOffsetBackingStore stores in its HashMap.
      * Format: ["<name>",{"server":"<topicPrefix>"}] — no spaces, as written by Kafka Connect.
      */
     static String offsetKey(String connectorName, String topicPrefix) {
         return "[\"" + connectorName + "\",{\"server\":\"" + topicPrefix + "\"}]";
+    }
+
+    public boolean hasLegacyOffsets(RunContext runContext, byte[] offsetData) throws IllegalVariableEvaluationException, IOException {
+        if (offsetData == null || offsetData.length == 0) {
+            return false;
+        }
+
+        var identity = resolveEffectiveIdentity(runContext);
+        return containsOffsetFor(offsetData, identity.name(), identity.topicPrefix());
+    }
+
+    public boolean hasLegacyOffsets(RunContext runContext, Path offsetFile) throws IllegalVariableEvaluationException, IOException {
+        if (offsetFile == null || !Files.exists(offsetFile) || Files.size(offsetFile) == 0) {
+            return false;
+        }
+        return hasLegacyOffsets(runContext, Files.readAllBytes(offsetFile));
+    }
+
+    /** Also matches the pre-1.4.3 "engine"/"kestra_" key: those offsets predate derived connector ids, so they belong to whichever task resumes them first. */
+    static boolean containsOffsetFor(byte[] offsetData, String connectorName, String topicPrefix) throws IOException {
+        if (offsetData == null || offsetData.length == 0) {
+            return false;
+        }
+
+        var targetKey = offsetKey(connectorName, topicPrefix).getBytes(StandardCharsets.UTF_8);
+        var legacyKey = offsetKey(LEGACY_CONNECTOR_NAME, LEGACY_TOPIC_PREFIX).getBytes(StandardCharsets.UTF_8);
+
+        try (var ois = offsetInputStream(new ByteArrayInputStream(offsetData))) {
+            Object obj = ois.readObject();
+            if (obj instanceof Map<?, ?> map) {
+                for (Object k : map.keySet()) {
+                    if (k instanceof byte[] keyBytes) {
+                        if (Arrays.equals(keyBytes, targetKey) || Arrays.equals(keyBytes, legacyKey)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            throw new IOException("Unexpected content in offset data: expected Map but found " + (obj == null ? "null" : obj.getClass().getName()));
+        } catch (ClassNotFoundException e) {
+            throw new IOException("Could not deserialize offset data", e);
+        }
+    }
+
+    static boolean containsOffsetFor(Path offsetFile, String connectorName, String topicPrefix) throws IOException {
+        if (offsetFile == null || !Files.exists(offsetFile) || Files.size(offsetFile) == 0) {
+            return false;
+        }
+        return containsOffsetFor(Files.readAllBytes(offsetFile), connectorName, topicPrefix);
     }
 
     /**
@@ -407,7 +468,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         try {
             HashMap<byte[], byte[]> offsets;
             try (var fis = new FileInputStream(offsetFile.toFile());
-                 var ois = new ObjectInputStream(fis)) {
+                 var ois = offsetInputStream(fis)) {
                 @SuppressWarnings("unchecked")
                 var loaded = (HashMap<byte[], byte[]>) ois.readObject();
                 offsets = loaded;

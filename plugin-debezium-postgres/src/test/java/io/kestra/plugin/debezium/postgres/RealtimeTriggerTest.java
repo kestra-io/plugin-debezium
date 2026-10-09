@@ -61,7 +61,8 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
     @Test
     void flow() throws Exception {
         CountDownLatch queueCount = new CountDownLatch(1);
-        Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
+        Flux<Execution> receive = TestsUtils.receive(executionQueue, execution ->
+        {
             queueCount.countDown();
             assertThat(execution.getLeft().getFlowId(), is("trigger"));
         });
