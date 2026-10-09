@@ -198,7 +198,11 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
             return true;
         }
 
-        if (message.getValue() == null && runContext.render(abstractDebeziumTask.getDeleted()).as(AbstractDebeziumTask.Deleted.class).orElseThrow() == AbstractDebeziumTask.Deleted.DROP) {
+        if (
+            (message.getValue() == null
+                || message.getValue() instanceof Envelope envelope && envelope.getOperation() == io.debezium.data.Envelope.Operation.DELETE)
+                && runContext.render(abstractDebeziumTask.getDeleted()).as(AbstractDebeziumTask.Deleted.class).orElseThrow() == AbstractDebeziumTask.Deleted.DROP
+        ) {
             return true;
         }
 
