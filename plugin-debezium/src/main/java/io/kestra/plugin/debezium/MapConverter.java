@@ -73,7 +73,7 @@ public class MapConverter {
                         if (!(value instanceof Long)) {
                             throw new IllegalArgumentException("Invalid type for MicroDuration, expected Long but was " + value.getClass() + " for '" + value + "'");
                         }
-                        return Duration.ofMillis((Long) value * 1000);
+                        return Duration.ofNanos((Long) value * 1000);
 
                     case MicroTime.SCHEMA_NAME:
                         if (!(value instanceof Long)) {

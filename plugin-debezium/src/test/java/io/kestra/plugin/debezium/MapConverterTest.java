@@ -49,7 +49,7 @@ class MapConverterTest {
                 Instant.parse("2019-10-06T18:27:49Z").atZone(ZoneId.systemDefault()).toLocalDate()
             ),
             Arguments.of(SchemaBuilder.string().name(Interval.SCHEMA_NAME).build(), "P2Y", Period.parse("P2Y")),
-            Arguments.of(SchemaBuilder.int64().name(MicroDuration.SCHEMA_NAME).build(), Duration.ofSeconds(5).toSeconds(), Duration.ofSeconds(5)),
+            Arguments.of(SchemaBuilder.int64().name(MicroDuration.SCHEMA_NAME).build(), 5_000_000L, Duration.ofSeconds(5)),
             Arguments.of(
                 SchemaBuilder.int64().name(MicroTime.SCHEMA_NAME).build(), Instant.parse("2019-10-06T18:27:49Z").atZone(ZoneId.systemDefault()).toLocalTime().toNanoOfDay() / 1000,
                 Instant.parse("2019-10-06T18:27:49Z").atZone(ZoneId.systemDefault()).toLocalTime()
