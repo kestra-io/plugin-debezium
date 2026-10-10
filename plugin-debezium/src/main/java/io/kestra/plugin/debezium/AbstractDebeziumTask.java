@@ -22,14 +22,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
-
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.exceptions.ResourceExpiredException;
@@ -39,10 +40,10 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.storages.StorageContext;
 import io.kestra.core.storages.kv.KVStore;
 import io.kestra.core.storages.kv.KVValueAndMetadata;
-import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.utils.Await;
 import io.kestra.core.utils.Hashing;
 
@@ -50,6 +51,8 @@ import ch.qos.logback.classic.LoggerContext;
 import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
+import io.debezium.openlineage.ConnectorContext;
+import io.debezium.openlineage.DebeziumOpenLineageEmitter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -130,14 +133,14 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         description = "It's not a hard limit and is evaluated every second."
     )
     @PluginProperty(group = "execution")
-    private Property<Integer> maxRecords;
+    protected Property<Integer> maxRecords;
 
     @Schema(
         title = "The maximum duration waiting for new rows",
         description = "It's not a hard limit and is evaluated every second.\n It is taken into account after the snapshot if any."
     )
     @PluginProperty(group = "execution")
-    private Property<Duration> maxDuration;
+    protected Property<Duration> maxDuration;
 
     @Schema(
         title = "The maximum total processing duration",
@@ -145,7 +148,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     )
     @PluginProperty(group = "execution")
     @Builder.Default
-    private Property<Duration> maxWait = Property.ofValue(Duration.ofSeconds(10));
+    protected Property<Duration> maxWait = Property.ofValue(Duration.ofSeconds(10));
 
     @Schema(
         title = "The maximum duration waiting for the snapshot to end",
@@ -190,7 +193,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     public AbstractDebeziumTask.Output run(RunContext runContext) throws Exception {
         AtomicInteger count = new AtomicInteger();
         AtomicBoolean snapshot = new AtomicBoolean(false);
-        ZonedDateTime lastRecord = ZonedDateTime.now();
+        AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>();
+        AtomicBoolean taskStarted = new AtomicBoolean(false);
 
         Path offsetFile = runContext.workingDir().path().resolve(OFFSETS_DATA_FILE);
         Path historyFile = runContext.workingDir().path().resolve(DBHISTORY_DATA_FILE);
@@ -204,19 +208,36 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         final Properties props = this.properties(runContext, offsetFile, historyFile);
 
+        initOpenLineage(props);
+
         ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
         CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
-        ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, offsetFile, historyFile);
+        ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, taskStarted, offsetFile, historyFile);
 
-        try (
-            DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
+        AtomicBoolean stopRequested = new AtomicBoolean(false);
+        DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = null;
+        try {
+            engine = DebeziumEngine.create(Connect.class)
                 .using(this.getClass().getClassLoader())
                 .using(props)
                 .notifying(changeConsumer)
+                .using(new DebeziumEngine.ConnectorCallback() {
+                    @Override
+                    public void taskStarted() {
+                        taskStarted.set(true);
+                        lastRecord.compareAndSet(null, ZonedDateTime.now());
+                    }
+
+                    @Override
+                    public void pollingStarted() {
+                        taskStarted.set(true);
+                        lastRecord.compareAndSet(null, ZonedDateTime.now());
+                    }
+                })
                 .using(completionCallback)
-                .build()
-        ) {
+                .build();
+
             executorService.execute(engine);
 
             ZonedDateTime snapshotStarted = ZonedDateTime.now();
@@ -227,7 +248,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 Await.until(() ->
                 {
                     try {
-                        return this.ended(executorService, count, captureStarted, lastRecord, snapshot, runContext);
+                        return this.ended(executorService, count, captureStarted, lastRecord, taskStarted, snapshot, runContext);
                     } catch (IllegalVariableEvaluationException e) {
                         throw new RuntimeException(e);
                     }
@@ -235,13 +256,26 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 consumes = count.get() > previousCount;
                 // if we are still snapshotting, allow waiting for more time until snapshot wait duration is reached
             } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(runContext.render(this.maxSnapshotDuration).as(Duration.class).orElseThrow())));
+
+            if (completionCallback.getError() == null) {
+                stopRequested.set(true);
+            }
+        } finally {
+            if (engine != null) {
+                closeQuietly(engine, runContext.logger());
+            }
+            this.shutdown(runContext.logger(), executorService);
+            cleanupOpenLineage(props);
         }
 
-        if (completionCallback.getError() != null) {
-            throw new Exception(completionCallback.getError());
+        Throwable error = completionCallback.getError();
+        if (error != null) {
+            if (stopRequested.get() && isShutdownArtifact(error)) {
+                runContext.logger().debug("Ignoring expected Debezium shutdown error: {}", error.getMessage(), error);
+            } else {
+                throw new Exception(error);
+            }
         }
-
-        this.shutdown(runContext.logger(), executorService);
 
         Output.OutputBuilder outputBuilder = Output.builder();
 
@@ -348,7 +382,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     }
 
     /** Carries the effective connector name and topic prefix after applying user overrides. */
-    record ConnectorIdentity(String name, String topicPrefix) {}
+    record ConnectorIdentity(String name, String topicPrefix) {
+    }
 
     /**
      * Resolves the effective connector name and topic.prefix for this run.
@@ -467,8 +502,10 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         try {
             HashMap<byte[], byte[]> offsets;
-            try (var fis = new FileInputStream(offsetFile.toFile());
-                 var ois = offsetInputStream(fis)) {
+            try (
+                var fis = new FileInputStream(offsetFile.toFile());
+                var ois = offsetInputStream(fis)
+            ) {
                 @SuppressWarnings("unchecked")
                 var loaded = (HashMap<byte[], byte[]>) ois.readObject();
                 offsets = loaded;
@@ -536,7 +573,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
             // Idempotency: if any source.server already equals the new prefix, file is migrated.
             var mapper = JacksonMapper.ofJson();
-            boolean alreadyMigrated = lines.stream().anyMatch(line -> {
+            boolean alreadyMigrated = lines.stream().anyMatch(line ->
+            {
                 try {
                     var node = mapper.readTree(line);
                     var sourceServer = node.path("source").path("server");
@@ -727,8 +765,14 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     }
 
     @SuppressWarnings("RedundantIfStatement")
-    private boolean ended(ExecutorService executorService, AtomicInteger count, ZonedDateTime start, ZonedDateTime lastRecord, AtomicBoolean snapshot, RunContext runContext)
-        throws IllegalVariableEvaluationException {
+    boolean ended(
+        ExecutorService executorService,
+        AtomicInteger count,
+        ZonedDateTime start,
+        AtomicReference<ZonedDateTime> lastRecord,
+        AtomicBoolean taskStarted,
+        AtomicBoolean snapshot,
+        RunContext runContext) throws IllegalVariableEvaluationException {
         if (executorService.isShutdown()) {
             return true;
         }
@@ -745,11 +789,175 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         }
 
         var renderedMaxWait = runContext.render(maxWait).as(Duration.class);
-        if (renderedMaxWait.isPresent() && ZonedDateTime.now().isAfter(lastRecord.plus(renderedMaxWait.get()))) {
-            return true;
+        if (renderedMaxWait.isPresent() && taskStarted.get()) {
+            ZonedDateTime last = lastRecord.get();
+            if (last != null && ZonedDateTime.now().isAfter(last.plus(renderedMaxWait.get()))) {
+                return true;
+            }
         }
 
         return false;
+    }
+
+    public static String resolveConnectorType(Properties props) {
+        if (props == null) {
+            return null;
+        }
+        String connectorClass = props.getProperty("connector.class");
+        if (connectorClass != null) {
+            if (connectorClass.contains(".mongodb.")) {
+                return "mongodb";
+            } else if (connectorClass.contains(".postgresql.")) {
+                return "postgres";
+            } else if (connectorClass.contains(".mysql.")) {
+                return "mysql";
+            } else if (connectorClass.contains(".sqlserver.")) {
+                return "sqlserver";
+            } else if (connectorClass.contains(".oracle.")) {
+                return "oracle";
+            } else if (connectorClass.contains(".db2.")) {
+                return "db2";
+            }
+        }
+        return null;
+    }
+
+    private void initOpenLineage(Properties props) {
+        String connectorType = resolveConnectorType(props);
+        if (connectorType != null) {
+            try {
+                Map<String, String> propsMap = new HashMap<>();
+                props.forEach((k, v) ->
+                {
+                    if (k != null && v != null) {
+                        propsMap.put(k.toString(), v.toString());
+                    }
+                });
+                DebeziumOpenLineageEmitter.init(propsMap, connectorType);
+            } catch (Throwable t) {
+                // best-effort
+            }
+        }
+    }
+
+    private void cleanupOpenLineage(Properties props) {
+        String connectorType = resolveConnectorType(props);
+        if (connectorType != null) {
+            try {
+                Map<String, String> propsMap = new HashMap<>();
+                props.forEach((k, v) ->
+                {
+                    if (k != null && v != null) {
+                        propsMap.put(k.toString(), v.toString());
+                    }
+                });
+                ConnectorContext context = DebeziumOpenLineageEmitter.connectorContext(propsMap, connectorType);
+                DebeziumOpenLineageEmitter.cleanup(context);
+            } catch (Throwable t) {
+                // best-effort
+            }
+        }
+    }
+
+    public static void closeQuietly(DebeziumEngine<?> engine) {
+        closeQuietly(engine, null);
+    }
+
+    public static void closeQuietly(DebeziumEngine<?> engine, Logger logger) {
+        if (engine == null) {
+            return;
+        }
+        try {
+            engine.close();
+        } catch (IllegalStateException e) {
+            if (isEngineShutdownArtifact(e)) {
+                if (logger != null) {
+                    logger.debug("Debezium engine was already stopped or stopping: {}", e.getMessage());
+                }
+            } else {
+                if (logger != null) {
+                    logger.warn("Unexpected IllegalStateException closing Debezium engine", e);
+                }
+                throw e;
+            }
+        } catch (IOException e) {
+            if (logger != null) {
+                logger.warn("Unexpected I/O error closing Debezium engine", e);
+            }
+            throw new RuntimeException("Failed to close Debezium engine", e);
+        }
+    }
+
+    public static boolean isEngineShutdownArtifact(IllegalStateException e) {
+        if (e == null || e.getMessage() == null) {
+            return false;
+        }
+        String msg = e.getMessage();
+        return msg.contains("already shut down") || msg.contains("already being shutting down");
+    }
+
+    public static boolean isShutdownArtifact(Throwable error) {
+        if (error == null) {
+            return false;
+        }
+
+        // Direct InterruptedException
+        if (error instanceof InterruptedException) {
+            return error.getCause() == null || error.getCause() instanceof InterruptedException;
+        }
+
+        String msg = error.getMessage();
+
+        // Specific MBean registration interruption caused by shutdown
+        if (msg != null && msg.contains("Unable to register the MBean")) {
+            Throwable cause = error.getCause();
+            return cause instanceof InterruptedException ||
+                (cause != null && cause.getMessage() != null && cause.getMessage().contains("sleep interrupted"));
+        }
+
+        // Specific Debezium 3 engine shutdown state
+        if (error instanceof IllegalStateException && isEngineShutdownArtifact((IllegalStateException) error)) {
+            return true;
+        }
+
+        // Specific Debezium OpenLineage emitter teardown
+        if (
+            error instanceof IllegalStateException && msg != null &&
+                msg.contains("DebeziumOpenLineageEmitter not initialized")
+        ) {
+            return true;
+        }
+
+        // Generic wrapper wrapping ONLY the above shutdown artifacts
+        if (isGenericWrapper(error)) {
+            Throwable cause = error.getCause();
+            if (cause != null && isShutdownArtifact(cause)) {
+                return isBenignWrapperMessage(msg);
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean isGenericWrapper(Throwable t) {
+        return t instanceof RuntimeException ||
+            t.getClass().getSimpleName().equals("ConnectException");
+    }
+
+    private static boolean isBenignWrapperMessage(String msg) {
+        if (msg == null) {
+            return true;
+        }
+        String lower = msg.toLowerCase(Locale.ROOT);
+        return !lower.contains("authenticat") &&
+            !lower.contains("credential") &&
+            !lower.contains("refused") &&
+            !lower.contains("unknown host") &&
+            !lower.contains("timed out") &&
+            !lower.contains("timeout") &&
+            !lower.contains("access denied") &&
+            !lower.contains("invalid") &&
+            !lower.contains("failed to connect");
     }
 
     /**
@@ -864,7 +1072,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         if (combinedKey == null && offsetFile.toFile().exists()) {
             runContext.logger().warn(
                 "Debezium produced offsets but state was not persisted because the schema history file ({}) is missing; "
-                + "the next run will re-snapshot from scratch.",
+                    + "the next run will re-snapshot from scratch.",
                 historyFile.getFileName()
             );
         }
