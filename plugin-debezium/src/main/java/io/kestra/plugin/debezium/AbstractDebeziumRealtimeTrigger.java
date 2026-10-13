@@ -206,12 +206,12 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
             } catch (Exception e) {
                 sink.error(e);
             } finally {
-                if (rOffsetsCommitMode == OffsetCommitMode.ON_STOP) {
-                    try {
-                        task.saveFinalState(runContext, offsetFile, historyFile);
-                    } catch (IOException e) {
-                        sink.error(new RuntimeException(e));
-                    }
+                // The engine flushes its final offsets during shutdown. The file saved
+                // inside an ON_EACH_BATCH callback can still contain the previous batch.
+                try {
+                    task.saveFinalState(runContext, offsetFile, historyFile);
+                } catch (IOException e) {
+                    sink.error(new RuntimeException(e));
                 }
 
                 sink.complete();
