@@ -102,6 +102,7 @@ public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements 
             .excludedColumns(this.excludedColumns)
             .properties(this.properties)
             .stateName(this.stateName)
+            .debeziumLogLevel(this.debeziumLogLevel)
             .snapshotMode(this.snapshotMode)
             .connectionString(this.connectionString)
             .build();

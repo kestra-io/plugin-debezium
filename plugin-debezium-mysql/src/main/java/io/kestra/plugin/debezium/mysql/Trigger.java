@@ -89,6 +89,7 @@ public class Trigger extends AbstractDebeziumTrigger implements MysqlInterface, 
             .excludedColumns(this.excludedColumns)
             .properties(this.properties)
             .stateName(this.stateName)
+            .debeziumLogLevel(this.debeziumLogLevel)
             .maxRecords(this.maxRecords)
             .maxDuration(this.maxDuration)
             .maxWait(this.maxWait)

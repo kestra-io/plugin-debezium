@@ -2,6 +2,8 @@ package io.kestra.plugin.debezium;
 
 import java.util.Map;
 
+import org.slf4j.event.Level;
+
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 
@@ -171,4 +173,17 @@ public interface AbstractDebeziumInterface {
     @NotNull
     @PluginProperty(group = "main")
     Property<String> getStateName();
+
+    @Schema(
+        title = "The log level of Debezium and Kafka Connect",
+        description = """
+            Sets the level of the `io.debezium` and `org.apache.kafka.connect` loggers. It defaults to `WARN`; \
+            raise it to `INFO` or `DEBUG` to troubleshoot a connector.
+
+            These loggers are shared by the whole worker JVM, so when several Debezium tasks or triggers run \
+            on the same worker, the level of the one that started last applies to all of them."""
+    )
+    @NotNull
+    @PluginProperty(group = "advanced")
+    Property<Level> getDebeziumLogLevel();
 }

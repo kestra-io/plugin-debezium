@@ -101,6 +101,9 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     @Builder.Default
     protected Property<String> stateName = Property.ofValue("debezium-state");
 
+    @Builder.Default
+    protected Property<org.slf4j.event.Level> debeziumLogLevel = Property.ofValue(AbstractDebeziumTask.DEFAULT_LOG_LEVEL);
+
     @Schema(
         title = "When to commit the offsets to the KV Store",
         description = """
@@ -175,6 +178,8 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     private final AtomicReference<DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>>> engineReference = new AtomicReference<>();
 
     public Publisher<AbstractDebeziumRealtimeTrigger.StreamOutput> publisher(AbstractDebeziumTask task, RunContext runContext) throws IllegalVariableEvaluationException {
+        // Polling triggers get this through task.run(); the realtime trigger never calls run().
+        task.configureLogging(runContext);
 
         var rOffsetsCommitMode = runContext.render(offsetsCommitMode).as(OffsetCommitMode.class).orElse(OffsetCommitMode.ON_STOP);
         var offsetFile = runContext.workingDir().path().resolve(AbstractDebeziumTask.OFFSETS_DATA_FILE);
