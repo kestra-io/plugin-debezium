@@ -30,6 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.exceptions.ResourceExpiredException;
@@ -75,6 +76,11 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     public static final String STATE_KEY_OFFSETS = "offsets";
 
     public static final String STATE_KEY_HISTORY = "history";
+
+    public static final Level DEFAULT_LOG_LEVEL = Level.WARN;
+
+    // Loggers whose level is controlled by the `debeziumLogLevel` property.
+    static final List<String> DEBEZIUM_LOGGER_PREFIXES = List.of("org.apache.kafka.connect", "io.debezium");
 
     @Builder.Default
     protected Property<Format> format = Property.ofValue(Format.INLINE);
@@ -125,6 +131,9 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     @Builder.Default
     protected Property<String> stateName = Property.ofValue("debezium-state");
 
+    @Builder.Default
+    protected Property<Level> debeziumLogLevel = Property.ofValue(DEFAULT_LOG_LEVEL);
+
     @Schema(
         title = "The maximum number of rows to fetch before stopping",
         description = "It's not a hard limit and is evaluated every second."
@@ -168,26 +177,38 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     protected abstract boolean needDatabaseHistory();
 
-    static {
+    /**
+     * Applies the configured {@code debeziumLogLevel} to the Debezium and Kafka Connect loggers.
+     *
+     * Called at the start of every run. Logback levels are global to the JVM, so the level of the
+     * task or trigger that started last wins; nothing is restored afterwards.
+     */
+    public void configureLogging(RunContext runContext) throws IllegalVariableEvaluationException {
+        applyLogLevel(runContext.render(this.debeziumLogLevel).as(Level.class).orElse(DEFAULT_LOG_LEVEL));
+    }
+
+    /**
+     * Sets the level on every Debezium / Kafka Connect logger that already exists, not only on the two
+     * parents: a child that got an explicit level on a previous run would otherwise keep it.
+     * Exposed package-private for unit testing without a full DI context.
+     */
+    static void applyLogLevel(Level level) {
         // https://issues.redhat.com/browse/DBZ-4904
 
-        LoggerFactory.getLogger("org.apache.kafka.connect");
-        LoggerFactory.getLogger("io.debezium");
+        // make sure the parent loggers exist before we walk the logger list
+        DEBEZIUM_LOGGER_PREFIXES.forEach(LoggerFactory::getLogger);
 
-        ((LoggerContext) org.slf4j.LoggerFactory.getILoggerFactory())
+        ((LoggerContext) LoggerFactory.getILoggerFactory())
             .getLoggerList()
             .stream()
-            .filter(
-                logger -> logger.getName().startsWith("org.apache.kafka.connect") ||
-                    logger.getName().startsWith("io.debezium")
-            )
-            .forEach(
-                logger -> logger.setLevel(ch.qos.logback.classic.Level.ERROR)
-            );
+            .filter(logger -> DEBEZIUM_LOGGER_PREFIXES.stream().anyMatch(logger.getName()::startsWith))
+            .forEach(logger -> logger.setLevel(ch.qos.logback.classic.Level.toLevel(level.name())));
     }
 
     @Override
     public AbstractDebeziumTask.Output run(RunContext runContext) throws Exception {
+        this.configureLogging(runContext);
+
         AtomicInteger count = new AtomicInteger();
         AtomicBoolean snapshot = new AtomicBoolean(false);
         ZonedDateTime lastRecord = ZonedDateTime.now();

@@ -46,6 +46,26 @@ import lombok.experimental.SuperBuilder;
                     pluginName: PGOUTPUT
                     snapshotMode: ALWAYS
                 """
+        ),
+        @Example(
+            title = "Troubleshoot a connector by raising the Debezium log level.",
+            full = true,
+            code = """
+                id: pg_capture_debug
+                namespace: company.team
+
+                tasks:
+                  - id: capture_data
+                    type: io.kestra.plugin.debezium.postgres.Capture
+                    hostname: 127.0.0.1
+                    port: "5432"
+                    username: "{{ secret('PG_USERNAME') }}"
+                    password: "{{ secret('PG_PASSWORD') }}"
+                    maxRecords: 100
+                    database: my_database
+                    pluginName: PGOUTPUT
+                    debeziumLogLevel: DEBUG
+                """
         )
     },
     metrics = {

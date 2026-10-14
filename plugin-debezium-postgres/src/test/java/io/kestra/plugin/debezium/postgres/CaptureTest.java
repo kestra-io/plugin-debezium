@@ -12,6 +12,10 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.slf4j.LoggerFactory;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -162,6 +166,58 @@ class CaptureTest extends AbstractDebeziumTest {
 
         assertThat(events.size(), is(1));
         assertThat(events.getFirst().get("event_title"), is("Iron Maiden"));
+    }
+
+    private static final String SLOT_NAME = "kestra_log_level_test";
+
+    @Test
+    void appliesDebeziumLogLevel() throws Exception {
+        // init database
+        executeSqlScript("scripts/postgres.sql");
+
+        Logger debeziumLogger = (Logger) LoggerFactory.getLogger("io.debezium");
+        Level previousLevel = debeziumLogger.getLevel();
+
+        Capture task = Capture.builder()
+            .id(IdUtils.create())
+            .type(Capture.class.getName())
+            .hostname(Property.ofValue(TestUtils.hostname()))
+            .username(Property.ofValue(TestUtils.username()))
+            .password(Property.ofValue(TestUtils.password()))
+            .port(Property.ofValue("65432"))
+            .database(Property.ofValue("postgres"))
+            .pluginName(Property.ofValue(PostgresInterface.PluginName.PGOUTPUT))
+            .stateName(Property.ofValue("debezium-state-" + IdUtils.create()))
+            .snapshotMode(Property.ofValue(Capture.SnapshotMode.NEVER))
+            .maxWait(Property.ofValue(Duration.ofSeconds(5)))
+            .includedTables(List.of("public.events"))
+            .debeziumLogLevel(Property.ofValue(org.slf4j.event.Level.DEBUG))
+            // a fixed slot name, so the cleanup below drops exactly the slot this test created
+            .slotName(Property.ofValue(SLOT_NAME))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+        PostgresDebeziumTestHelper.dropReplicationArtifacts(
+            this::getConnection,
+            runContext.render(task.getSlotName()).as(String.class).orElse("kestra"),
+            runContext.render(task.getPublicationName()).as(String.class).orElse("kestra_publication")
+        );
+        PostgresDebeziumTestHelper.cleanupTaskState(runContext, task);
+
+        try {
+            task.run(runContext);
+
+            assertThat(debeziumLogger.getLevel(), is(Level.DEBUG));
+        } finally {
+            // the level is global to the JVM, do not leak it into the other tests
+            debeziumLogger.setLevel(previousLevel);
+            // do not leave the replication slot behind: the test database only allows 10
+            PostgresDebeziumTestHelper.dropReplicationArtifacts(
+                this::getConnection,
+                SLOT_NAME,
+                runContext.render(task.getPublicationName()).as(String.class).orElse("kestra_publication")
+            );
+        }
     }
 
     @SuppressWarnings("unchecked")

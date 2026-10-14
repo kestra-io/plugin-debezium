@@ -73,6 +73,9 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
     @Builder.Default
     protected Property<String> stateName = Property.ofValue("debezium-state");
 
+    @Builder.Default
+    protected Property<org.slf4j.event.Level> debeziumLogLevel = Property.ofValue(AbstractDebeziumTask.DEFAULT_LOG_LEVEL);
+
     @Schema(
         title = "The maximum number of rows to fetch before stopping",
         description = "It's not a hard limit and is evaluated every second."
