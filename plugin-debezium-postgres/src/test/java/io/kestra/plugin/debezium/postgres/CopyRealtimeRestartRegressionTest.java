@@ -81,7 +81,7 @@ class CopyRealtimeRestartRegressionTest extends AbstractDebeziumTest {
             // Keep periodic offset flushing behind record delivery so shutdown must
             // persist the checkpoint, rather than relying on favorable timer timing.
             .properties(Property.ofValue(Map.of("offset.flush.interval.ms", "60000")))
-            .maxWait(Property.ofValue(Duration.ofSeconds(5)))
+            .maxWait(Property.ofValue(Duration.ofSeconds(20)))
             .build();
         var context = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
         var counts = new ConcurrentHashMap<Integer, Integer>();
@@ -91,6 +91,8 @@ class CopyRealtimeRestartRegressionTest extends AbstractDebeziumTest {
             assertEquals(0, task.run(context).getSize());
             for (int batch = 1; batch <= 3; batch++) {
                 final int currentBatch = batch;
+                // The previous walsender can hold the slot for a short time after the engine stops.
+                awaitSlot(false, failure, "Replication slot must be released before the next engine starts");
                 RealtimeTrigger trigger = RealtimeTrigger.builder()
                     .id(task.getId())
                     .type(RealtimeTrigger.class.getName())
@@ -114,20 +116,7 @@ class CopyRealtimeRestartRegressionTest extends AbstractDebeziumTest {
                     }, terminated::countDown);
                 try {
                     if (batch == 1) {
-                        boolean active = false;
-                        for (int attempt = 0; attempt < 300 && !active && failure.get() == null; attempt++) {
-                            try (
-                                Connection connection = getConnection();
-                                Statement statement = connection.createStatement();
-                                var slot = statement.executeQuery("SELECT active, plugin FROM pg_replication_slots WHERE slot_name = '" + SLOT + "'")
-                            ) {
-                                active = slot.next() && slot.getBoolean(1) && slot.getString(2).equals("pgoutput");
-                            }
-                            if (!active) {
-                                Thread.sleep(100);
-                            }
-                        }
-                        assertTrue(active, "Realtime pgoutput slot must be active before COPY");
+                        awaitSlot(true, failure, "Realtime pgoutput slot must be active before COPY");
                         StringBuilder csv = new StringBuilder();
                         for (int id = 1; id <= EXPECTED_ROWS; id++) {
                             csv.append(id).append(",bulk-").append(id).append('\n');
@@ -152,7 +141,7 @@ class CopyRealtimeRestartRegressionTest extends AbstractDebeziumTest {
                     if (batch == 3) {
                         // An empty restart is meaningful only after its engine actually
                         // reconnects; startup time must not count as the idle window.
-                        awaitActiveSlot(failure);
+                        awaitSlot(true, failure, "Realtime pgoutput slot must be active before observing an idle restart");
                         Thread.sleep(10000);
                         trigger.stop();
                     }
@@ -172,6 +161,8 @@ class CopyRealtimeRestartRegressionTest extends AbstractDebeziumTest {
                 assertEquals(1, counts.getOrDefault(id, 0), "Realtime COPY ID " + id);
             }
         } finally {
+            // Do not let an active slot in cleanup hide the original test failure.
+            waitForSlotRelease();
             PostgresDebeziumTestHelper.cleanupTaskState(context, task);
             PostgresDebeziumTestHelper.dropReplicationArtifacts(this::getConnection, SLOT, PUBLICATION);
             try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
@@ -180,20 +171,28 @@ class CopyRealtimeRestartRegressionTest extends AbstractDebeziumTest {
         }
     }
 
-    private void awaitActiveSlot(AtomicReference<Throwable> failure) throws Exception {
-        boolean active = false;
-        for (int attempt = 0; attempt < 300 && !active && failure.get() == null; attempt++) {
-            try (
-                Connection connection = getConnection();
-                Statement statement = connection.createStatement();
-                var slot = statement.executeQuery("SELECT active, plugin FROM pg_replication_slots WHERE slot_name = '" + SLOT + "'")
-            ) {
-                active = slot.next() && slot.getBoolean(1) && slot.getString(2).equals("pgoutput");
-            }
-            if (!active) {
-                Thread.sleep(100);
-            }
+    private void awaitSlot(boolean active, AtomicReference<Throwable> failure, String message) throws Exception {
+        boolean reached = slotActive() == active;
+        for (int attempt = 0; attempt < 300 && !reached && failure.get() == null; attempt++) {
+            Thread.sleep(100);
+            reached = slotActive() == active;
         }
-        assertTrue(active, "Realtime pgoutput slot must be active before observing an idle restart");
+        assertTrue(reached, message);
+    }
+
+    private void waitForSlotRelease() throws Exception {
+        for (int attempt = 0; attempt < 300 && slotActive(); attempt++) {
+            Thread.sleep(100);
+        }
+    }
+
+    private boolean slotActive() throws Exception {
+        try (
+            Connection connection = getConnection();
+            Statement statement = connection.createStatement();
+            var slot = statement.executeQuery("SELECT active, plugin FROM pg_replication_slots WHERE slot_name = '" + SLOT + "'")
+        ) {
+            return slot.next() && slot.getBoolean(1) && slot.getString(2).equals("pgoutput");
+        }
     }
 }
