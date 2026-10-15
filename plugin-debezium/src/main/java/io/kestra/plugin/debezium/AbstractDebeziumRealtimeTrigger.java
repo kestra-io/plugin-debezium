@@ -196,7 +196,10 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                 }
 
                 final Properties props = task.properties(runContext, offsetFile, historyFile);
-                ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), null, ZonedDateTime.now(), offsetFile, historyFile);
+                AtomicBoolean snapshot = new AtomicBoolean(false);
+                AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>(ZonedDateTime.now());
+                AtomicBoolean taskStarted = new AtomicBoolean(false);
+                ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), snapshot, lastRecord, taskStarted, offsetFile, historyFile);
 
                 ReconnectLoop.run(
                     reconnectPolicy,
@@ -280,7 +283,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
         synchronized (reconnectMonitor) {
             if (!isActive.get() || sink.isCancelled()) {
-                closeQuietly(engine);
+                AbstractDebeziumTask.closeQuietly(engine, runContext.logger());
                 return ReconnectLoop.AttemptResult.stopped();
             }
             engineReference.set(engine);
@@ -317,17 +320,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
             owned = engineReference.compareAndSet(engine, null);
         }
         if (owned) {
-            closeQuietly(engine);
-        }
-    }
-
-    private static void closeQuietly(DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine) {
-        try {
-            engine.close();
-        } catch (IllegalStateException alreadyShutDown) {
-            // stop() and the attempt loop can both observe an engine that has already stopped.
-        } catch (IOException closeFailure) {
-            // Closing is best-effort. A second close must not fail the subscription.
+            AbstractDebeziumTask.closeQuietly(engine);
         }
     }
 
@@ -431,7 +424,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         // stop() also runs on the engine thread when the subscription is cancelled, and joining
         // close() from that thread deadlocks the engine shutdown.
         ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
-        executorService.execute(() -> closeQuietly(engine));
+        executorService.execute(() -> AbstractDebeziumTask.closeQuietly(engine));
         executorService.shutdown();
         if (!wait) {
             return;

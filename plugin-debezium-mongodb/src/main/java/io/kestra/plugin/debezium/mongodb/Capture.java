@@ -110,12 +110,6 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
     @Builder.Default
     private Property<MongodbInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
-    @Builder.Default
-    protected Property<String> hostname = Property.ofValue("");
-
-    @Builder.Default
-    protected Property<String> port = Property.ofValue("");
-
     @Override
     protected boolean needDatabaseHistory() {
         return false;
@@ -129,8 +123,6 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
     @Override
     protected Properties properties(RunContext runContext, Path offsetFile, Path historyFile) throws Exception {
         Properties props = super.properties(runContext, offsetFile, historyFile);
-        props.remove("database.hostname");
-        props.remove("database.port");
 
         props.setProperty("connector.class", MongoDbConnector.class.getName());
 

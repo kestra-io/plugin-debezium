@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -48,17 +49,11 @@ class DebeziumLifecycleTest {
         protected boolean needDatabaseHistory() {
             return false;
         }
-
-        public void configure(Property<Integer> maxRecords, Property<Duration> maxDuration, Property<Duration> maxWait) {
-            this.maxRecords = maxRecords;
-            this.maxDuration = maxDuration;
-            this.maxWait = maxWait;
-        }
     }
 
     @Test
     void changeConsumerUpdatesSharedLastRecordAndTaskStarted() {
-        DummyTask task = new DummyTask();
+        DummyTask task = DummyTask.builder().build();
         RunContext runContext = runContextFactory.of();
         AtomicInteger count = new AtomicInteger();
         AtomicBoolean snapshot = new AtomicBoolean(false);
@@ -86,9 +81,28 @@ class DebeziumLifecycleTest {
     }
 
     @Test
+    void changeConsumerRejectsNullLastRecordOrTaskStarted() {
+        DummyTask task = DummyTask.builder().build();
+        RunContext runContext = runContextFactory.of();
+        AtomicInteger count = new AtomicInteger();
+        AtomicBoolean snapshot = new AtomicBoolean(false);
+        AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>(ZonedDateTime.now());
+        AtomicBoolean taskStarted = new AtomicBoolean(false);
+
+        assertThrows(NullPointerException.class, () -> new ChangeConsumer(
+            task, runContext, count, snapshot, null, taskStarted, Path.of("offsets"), Path.of("history")
+        ));
+
+        assertThrows(NullPointerException.class, () -> new ChangeConsumer(
+            task, runContext, count, snapshot, lastRecord, null, Path.of("offsets"), Path.of("history")
+        ));
+    }
+
+    @Test
     void endedDoesNotTimeoutOnMaxWaitBeforeTaskStarted() throws Exception {
-        DummyTask task = new DummyTask();
-        task.configure(null, null, Property.ofValue(Duration.ofSeconds(10)));
+        DummyTask task = DummyTask.builder()
+            .maxWait(Property.ofValue(Duration.ofSeconds(10)))
+            .build();
         RunContext runContext = runContextFactory.of();
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -114,8 +128,9 @@ class DebeziumLifecycleTest {
 
     @Test
     void endedExtendsWaitWhenNewRecordsArrive() throws Exception {
-        DummyTask task = new DummyTask();
-        task.configure(null, null, Property.ofValue(Duration.ofSeconds(10)));
+        DummyTask task = DummyTask.builder()
+            .maxWait(Property.ofValue(Duration.ofSeconds(10)))
+            .build();
         RunContext runContext = runContextFactory.of();
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -136,8 +151,11 @@ class DebeziumLifecycleTest {
 
     @Test
     void endedHonorsMaxRecordsAndMaxDuration() throws Exception {
-        DummyTask task = new DummyTask();
-        task.configure(Property.ofValue(5), Property.ofValue(Duration.ofSeconds(30)), Property.ofValue(Duration.ofSeconds(10)));
+        DummyTask task = DummyTask.builder()
+            .maxRecords(Property.ofValue(5))
+            .maxDuration(Property.ofValue(Duration.ofSeconds(30)))
+            .maxWait(Property.ofValue(Duration.ofSeconds(10)))
+            .build();
         RunContext runContext = runContextFactory.of();
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -221,6 +239,9 @@ class DebeziumLifecycleTest {
         assertThat(AbstractDebeziumTask.isShutdownArtifact(new org.apache.kafka.connect.errors.ConnectException("Task failed to start")), is(false));
         assertThat(AbstractDebeziumTask.isShutdownArtifact(new RuntimeException("Connector failed", new SecurityException("Bad credentials"))), is(false));
         assertThat(AbstractDebeziumTask.isShutdownArtifact(new RuntimeException("Unexpected internal null pointer", new NullPointerException())), is(false));
+        assertThat(AbstractDebeziumTask.isShutdownArtifact(new RuntimeException("Error while processing batch", new InterruptedException("sleep interrupted"))), is(false));
+        assertThat(AbstractDebeziumTask.isShutdownArtifact(new org.apache.kafka.connect.errors.ConnectException("Failed to commit offsets", new InterruptedException("sleep interrupted"))), is(false));
+        assertThat(AbstractDebeziumTask.isShutdownArtifact(new org.apache.kafka.connect.errors.ConnectException("Error committing offsets", new InterruptedException("sleep interrupted"))), is(false));
         assertThat(AbstractDebeziumTask.isShutdownArtifact(null), is(false));
     }
 
@@ -310,6 +331,18 @@ class DebeziumLifecycleTest {
 
         // Cleanup
         assertDoesNotThrow(() -> DebeziumOpenLineageEmitter.cleanup(context));
+    }
+
+    @Test
+    void propertiesToMapConvertsNullAndValidProperties() {
+        assertThat(AbstractDebeziumTask.propertiesToMap(null), is(Map.of()));
+
+        Properties props = new Properties();
+        props.setProperty("a", "1");
+        props.setProperty("b", "2");
+        Map<String, String> map = AbstractDebeziumTask.propertiesToMap(props);
+        assertThat(map.get("a"), is("1"));
+        assertThat(map.get("b"), is("2"));
     }
 
     private record TestChangeEvent(SourceRecord value) implements ChangeEvent<SourceRecord, SourceRecord> {

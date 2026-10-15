@@ -64,42 +64,10 @@ public class ChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent
         this.runContext = runContext;
         this.count = count;
         this.snapshot = snapshot;
-        this.lastRecord = lastRecord != null ? lastRecord : new AtomicReference<>(ZonedDateTime.now());
-        this.taskStarted = taskStarted != null ? taskStarted : new AtomicBoolean(false);
+        this.lastRecord = Objects.requireNonNull(lastRecord, "lastRecord cannot be null");
+        this.taskStarted = Objects.requireNonNull(taskStarted, "taskStarted cannot be null");
         this.offsetFile = offsetFile;
         this.historyFile = historyFile;
-    }
-
-    public ChangeConsumer(
-        AbstractDebeziumTask abstractDebeziumTask,
-        RunContext runContext,
-        AtomicInteger count,
-        AtomicBoolean snapshot,
-        AtomicReference<ZonedDateTime> lastRecord,
-        Path offsetFile,
-        Path historyFile) {
-        this(abstractDebeziumTask, runContext, count, snapshot, lastRecord, new AtomicBoolean(false), offsetFile, historyFile);
-    }
-
-    @Deprecated
-    public ChangeConsumer(
-        AbstractDebeziumTask abstractDebeziumTask,
-        RunContext runContext,
-        AtomicInteger count,
-        AtomicBoolean snapshot,
-        ZonedDateTime lastRecord,
-        Path offsetFile,
-        Path historyFile) {
-        this(
-            abstractDebeziumTask,
-            runContext,
-            count,
-            snapshot,
-            new AtomicReference<>(lastRecord != null ? lastRecord : ZonedDateTime.now()),
-            new AtomicBoolean(false),
-            offsetFile,
-            historyFile
-        );
     }
 
     @SneakyThrows

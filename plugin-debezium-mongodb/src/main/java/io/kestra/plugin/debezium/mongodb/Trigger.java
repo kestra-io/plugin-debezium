@@ -106,12 +106,6 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @NotNull
     private Property<String> connectionString;
 
-    @Builder.Default
-    protected Property<String> hostname = Property.ofValue("");
-
-    @Builder.Default
-    protected Property<String> port = Property.ofValue("");
-
     protected Property<String> username;
 
     protected Property<String> password;

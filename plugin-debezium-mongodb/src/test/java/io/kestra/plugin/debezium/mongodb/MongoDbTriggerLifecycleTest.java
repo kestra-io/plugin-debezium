@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import io.kestra.core.junit.annotations.KestraTest;
@@ -26,6 +27,7 @@ import jakarta.inject.Inject;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 
 @KestraTest
 class MongoDbTriggerLifecycleTest {
@@ -63,37 +65,36 @@ class MongoDbTriggerLifecycleTest {
     }
 
     @Test
-    void triggerReturnsEmptyOnZeroMessages() throws Exception {
+    void triggerDoesNotExposeOrRequireHostnameAndPort() {
         Trigger trigger = Trigger.builder()
             .id("test_cdc_trigger")
             .type(Trigger.class.getName())
             .snapshotMode(Property.ofValue(MongodbInterface.SnapshotMode.NO_DATA))
             .connectionString(Property.ofValue("mongodb://localhost:27017/?replicaSet=rs0"))
-            .includedCollections(List.of("test.encounters"))
-            .maxWait(Property.ofValue(Duration.ofSeconds(10)))
             .build();
 
-        // Subclass trigger to mock task execution returning 0 messages
-        Trigger mockTrigger = new Trigger() {
-            @Override
-            public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
-                AbstractDebeziumTask.Output output = AbstractDebeziumTask.Output.builder()
-                    .size(0)
-                    .uris(Map.of())
-                    .build();
+        assertThat(trigger.getHostname(), nullValue());
+        assertThat(trigger.getPort(), nullValue());
+        assertThat(trigger.getConnectionString(), notNullValue());
+    }
 
-                if (output.getSize() == 0) {
-                    return Optional.empty();
-                }
-                return super.evaluate(conditionContext, context);
-            }
-        };
+    @Test
+    @Disabled("Requires a running MongoDB replica set from docker-compose")
+    void triggerReturnsEmptyOnZeroMessages() throws Exception {
+        Trigger trigger = Trigger.builder()
+            .id("test_cdc_trigger")
+            .type(Trigger.class.getName())
+            .snapshotMode(Property.ofValue(MongodbInterface.SnapshotMode.NO_DATA))
+            .connectionString(Property.ofValue("mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/?replicaSet=rs0"))
+            .includedCollections(List.of("test.empty_collection"))
+            .maxWait(Property.ofValue(Duration.ofSeconds(2)))
+            .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
         ConditionContext conditionContext = ConditionContext.builder().runContext(runContext).build();
         TriggerContext triggerContext = TriggerContext.builder().build();
 
-        Optional<Execution> result = mockTrigger.evaluate(conditionContext, triggerContext);
+        Optional<Execution> result = trigger.evaluate(conditionContext, triggerContext);
         assertThat(result.isEmpty(), is(true));
     }
 

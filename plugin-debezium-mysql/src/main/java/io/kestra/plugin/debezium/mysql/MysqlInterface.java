@@ -41,6 +41,12 @@ public interface MysqlInterface {
     @PluginProperty(dynamic = true, group = "advanced")
     Property<String> getServerId();
 
+    @NotNull
+    Property<String> getHostname();
+
+    @NotNull
+    Property<String> getPort();
+
     public enum SnapshotMode {
         INITIAL,
         INITIAL_ONLY,
