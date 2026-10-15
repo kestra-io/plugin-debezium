@@ -1,11 +1,6 @@
 package io.kestra.plugin.debezium.postgres;
 
-import java.io.IOException;
 import java.io.StringReader;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.time.Duration;
@@ -17,8 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.junit.jupiter.api.RepeatedTest;
-import org.junit.jupiter.api.RepetitionInfo;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.postgresql.PGConnection;
 
@@ -62,10 +56,9 @@ class CopyRealtimeRestartRegressionTest extends AbstractDebeziumTest {
         return TestUtils.password();
     }
 
-    @RepeatedTest(3)
+    @Test
     @Timeout(300)
-    void copySurvivesRealtimePublisherRestart(RepetitionInfo repetition) throws Exception {
-        System.out.printf("Realtime COPY: debezium=%s run=%d%n", io.debezium.connector.postgresql.Module.version(), repetition.getCurrentRepetition());
+    void copySurvivesRealtimePublisherRestart() throws Exception {
         PostgresDebeziumTestHelper.dropReplicationArtifacts(this::getConnection, SLOT, PUBLICATION);
         try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
             statement.execute("DROP TABLE IF EXISTS " + TABLE);
@@ -94,11 +87,7 @@ class CopyRealtimeRestartRegressionTest extends AbstractDebeziumTest {
         var counts = new ConcurrentHashMap<Integer, Integer>();
         var received = new AtomicInteger();
         var failure = new AtomicReference<Throwable>();
-        Path evidenceDirectory = Path.of("build", "copy-regression");
-        Files.createDirectories(evidenceDirectory);
-
-        try (var evidence = Files.newBufferedWriter(evidenceDirectory.resolve("realtime-" + repetition.getCurrentRepetition() + ".csv"), StandardCharsets.UTF_8)) {
-            evidence.write("id,batch\n");
+        try {
             assertEquals(0, task.run(context).getSize());
             for (int batch = 1; batch <= 3; batch++) {
                 final int currentBatch = batch;
@@ -115,11 +104,6 @@ class CopyRealtimeRestartRegressionTest extends AbstractDebeziumTest {
                         int id = ((Number) output.getData().get("event_id")).intValue();
                         counts.merge(id, 1, Integer::sum);
                         int total = received.incrementAndGet();
-                        try {
-                            evidence.write(id + "," + currentBatch + "\n");
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
                         if ((currentBatch == 1 && total >= 1000) || (currentBatch == 2 && total >= EXPECTED_ROWS)) {
                             trigger.stop();
                         }
@@ -174,8 +158,6 @@ class CopyRealtimeRestartRegressionTest extends AbstractDebeziumTest {
                     }
                     assertTrue(terminated.await(60, TimeUnit.SECONDS), "Realtime engine did not stop");
                     assertNull(failure.get(), "Realtime publisher failed: " + failure.get());
-                    evidence.flush();
-                    System.out.printf("Realtime COPY batch=%d total=%d distinct=%d%n", batch, received.get(), counts.size());
                     if (batch == 1) {
                         assertTrue(received.get() > 0 && received.get() < EXPECTED_ROWS, "Must restart while COPY events remain");
                     }

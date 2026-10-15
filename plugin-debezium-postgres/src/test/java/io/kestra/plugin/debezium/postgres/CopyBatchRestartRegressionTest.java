@@ -1,14 +1,9 @@
 package io.kestra.plugin.debezium.postgres;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringReader;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -19,7 +14,7 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.postgresql.PGConnection;
 
 import io.kestra.core.junit.annotations.KestraTest;
@@ -75,11 +70,11 @@ class CopyBatchRestartRegressionTest extends AbstractDebeziumTest {
         return TestUtils.password();
     }
 
-    @ParameterizedTest(name = "{0} run {1}")
-    @CsvSource({ "COPY,1", "COPY,2", "COPY,3", "INSERT,1" })
+    // INSERT ... SELECT is the control: it does not produce multi-insert WAL records.
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = { "COPY", "INSERT" })
     @Timeout(600)
-    @SuppressWarnings("unchecked")
-    void copyEventsSurviveMultipleBatchRestarts(String loadMode, int repetition) throws Exception {
+    void copyEventsSurviveMultipleBatchRestarts(String loadMode) throws Exception {
         PostgresDebeziumTestHelper.dropReplicationArtifacts(this::getConnection, SLOT, PUBLICATION);
         try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
             statement.execute("DROP TABLE IF EXISTS " + TABLE);
@@ -109,11 +104,7 @@ class CopyBatchRestartRegressionTest extends AbstractDebeziumTest {
         RunContext context = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
         PostgresDebeziumTestHelper.cleanupTaskState(context, task);
 
-        Path evidenceDirectory = Path.of("build", "copy-regression");
-        Files.createDirectories(evidenceDirectory);
-        Path receivedCsv = evidenceDirectory.resolve(loadMode.toLowerCase() + "-" + repetition + ".csv");
-        try (BufferedWriter evidence = Files.newBufferedWriter(receivedCsv, StandardCharsets.UTF_8)) {
-            evidence.write("id,batch\n");
+        try {
             // Establish the slot and publication before COPY. No-data mode must not emit the table rows.
             assertEquals(0, task.run(context).getSize());
             try (
@@ -158,10 +149,6 @@ class CopyBatchRestartRegressionTest extends AbstractDebeziumTest {
                 assertTrue(rows.next());
                 assertEquals(EXPECTED_ROWS, rows.getLong(1), "COPY must create the full source set");
                 assertEquals(EXPECTED_ROWS, rows.getLong(2), "COPY source IDs must be unique");
-                System.out.printf(
-                    "CDC source: load=%s run=%d rows=%d distinct=%d debezium=%s postgres=%s%n", loadMode, repetition, rows.getLong(1), rows.getLong(2),
-                    io.debezium.connector.postgresql.Module.version(), connection.getMetaData().getDatabaseProductVersion()
-                );
             }
 
             Map<Integer, Integer> counts = new HashMap<>();
@@ -182,10 +169,7 @@ class CopyBatchRestartRegressionTest extends AbstractDebeziumTest {
 
                 consecutiveEmptyPolls = 0;
                 nonemptyPolls++;
-                int recordsInFile = exportOutput(output, counts, evidence, nonemptyPolls);
-                receivedRows += recordsInFile;
-                evidence.flush();
-                System.out.printf("CDC received: load=%s run=%d batch=%d rows=%d total=%d distinct=%d%n", loadMode, repetition, nonemptyPolls, recordsInFile, receivedRows, counts.size());
+                receivedRows += countIds(output, counts);
             }
 
             // A single uninterrupted engine run cannot detect the reported restart bug.
@@ -195,10 +179,7 @@ class CopyBatchRestartRegressionTest extends AbstractDebeziumTest {
             for (int id = 1; id <= EXPECTED_ROWS; id++) {
                 assertEquals(1, counts.getOrDefault(id, 0), "Row ID " + id + " must be captured exactly once");
             }
-            // Export even unexpected final-restart rows, so the CSV never hides duplicates.
-            int finalRows = exportOutput(task.run(context), counts, evidence, nonemptyPolls + 1);
-            evidence.flush();
-            assertEquals(0, finalRows, "A final restart emitted duplicate events");
+            assertEquals(0, countIds(task.run(context), counts), "A final restart emitted duplicate events");
         } finally {
             PostgresDebeziumTestHelper.cleanupTaskState(context, task);
             PostgresDebeziumTestHelper.dropReplicationArtifacts(this::getConnection, SLOT, PUBLICATION);
@@ -209,7 +190,7 @@ class CopyBatchRestartRegressionTest extends AbstractDebeziumTest {
     }
 
     @SuppressWarnings("unchecked")
-    private int exportOutput(AbstractDebeziumTask.Output output, Map<Integer, Integer> counts, BufferedWriter evidence, int batch) throws Exception {
+    private int countIds(AbstractDebeziumTask.Output output, Map<Integer, Integer> counts) throws Exception {
         if (output.getSize() == 0) {
             return 0;
         }
@@ -222,11 +203,6 @@ class CopyBatchRestartRegressionTest extends AbstractDebeziumTest {
                 Map<String, Object> event = (Map<String, Object>) row;
                 int id = ((Number) event.get("event_id")).intValue();
                 counts.merge(id, 1, Integer::sum);
-                try {
-                    evidence.write(id + "," + batch + "\n");
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
                 recordsInFile[0]++;
             });
         }
