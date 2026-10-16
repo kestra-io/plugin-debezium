@@ -15,7 +15,7 @@ public interface MysqlInterface {
             +
             "- `WHEN_NEEDED`: The connector runs a snapshot upon startup whenever it deems it necessary. That is, when no offsets are available, or when a previously recorded offset specifies a binlog location or GTID that is not available in the server.\n"
             +
-            "- `NEVER`: The connector never uses snapshots. Upon first startup with a logical server name, the connector reads from the beginning of the binlog. Configure this behavior with care. It is valid only when the binlog is guaranteed to contain the entire history of the database.\n"
+            "- `NEVER`: The connector never uses snapshots. Upon first startup with a logical server name, the connector reads from the beginning of the binlog. Configure this behavior with care. It is valid only when the binlog is guaranteed to contain the entire history of the database. It maps to the Debezium `configuration_based` snapshot mode with schema and data snapshots disabled.\n"
             +
             "- `SCHEMA_ONLY` (**deprecated**): The connector runs a snapshot of the schemas and not the data. This setting is useful when you do not need the topics to contain a consistent snapshot of the data but need them to have only the changes since the connector was started. Use `NO_DATA` instead.\n"
             +
