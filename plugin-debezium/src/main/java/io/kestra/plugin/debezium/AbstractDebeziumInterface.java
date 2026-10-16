@@ -181,12 +181,12 @@ public interface AbstractDebeziumInterface {
             this task or trigger runs. It defaults to `ERROR`; raise it to `WARN`, `INFO` or `DEBUG` to \
             troubleshoot a connector. This controls the worker log only, not the execution logs.
 
-            `io.debezium.embedded` and `io.debezium.openlineage` never go below `INFO`: at `DEBUG` they print \
-            the raw connector configuration, including the database password.
+            `io.debezium.embedded`, `io.debezium.jdbc` and `io.debezium.openlineage` never go below `INFO`: at \
+            `DEBUG` they print connection settings, secrets included.
 
             These loggers are shared by the whole worker JVM. When several Debezium tasks or triggers run on \
-            the same worker, the most verbose level among them applies, and the loggers go back to `ERROR` \
-            once the last one has finished."""
+            the same worker, whatever their connector, the most verbose level among them applies, and the \
+            loggers go back to `ERROR` once the last one has finished."""
     )
     @NotNull
     @PluginProperty(group = "advanced")

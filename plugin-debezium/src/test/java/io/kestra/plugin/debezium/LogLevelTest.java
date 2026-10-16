@@ -1,5 +1,7 @@
 package io.kestra.plugin.debezium;
 
+import java.io.IOException;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,9 +21,10 @@ class LogLevelTest {
     @BeforeEach
     @AfterEach
     void noRunActive() {
-        // the levels are global to the JVM, so every test starts and ends with no lease held
-        assertThat(DebeziumLogLevels.activeLeases(), is(0));
+        // the levels are global to the JVM, so every test starts and ends with no lease held, which
+        // means the loggers are at the baseline
         DebeziumLogLevels.applyBaseline();
+        assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.ERROR));
     }
 
     private static ch.qos.logback.classic.Level level(String loggerName) {
@@ -64,6 +67,8 @@ class LogLevelTest {
         try (var ignored = DebeziumLogLevels.acquire(requested)) {
             assertThat(level("io.debezium"), is(logback(requested)));
             assertThat(level("io.debezium.embedded"), is(ch.qos.logback.classic.Level.INFO));
+            assertThat(level("io.debezium.jdbc"), is(ch.qos.logback.classic.Level.INFO));
+            assertThat(effectiveLevel("io.debezium.jdbc.JdbcConnection"), is(ch.qos.logback.classic.Level.INFO));
             assertThat(effectiveLevel("io.debezium.embedded.async.AsyncEmbeddedEngine"), is(ch.qos.logback.classic.Level.INFO));
             assertThat(level("io.debezium.openlineage"), is(ch.qos.logback.classic.Level.INFO));
             assertThat(effectiveLevel("io.debezium.openlineage.DebeziumOpenLineageEmitter"), is(ch.qos.logback.classic.Level.INFO));
@@ -75,6 +80,7 @@ class LogLevelTest {
     void levelsAtOrAboveInfoAreNotCapped(Level requested) {
         try (var ignored = DebeziumLogLevels.acquire(requested)) {
             assertThat(level("io.debezium.embedded"), is(logback(requested)));
+            assertThat(level("io.debezium.jdbc"), is(logback(requested)));
             assertThat(level("io.debezium.openlineage"), is(logback(requested)));
         }
     }
@@ -104,7 +110,6 @@ class LogLevelTest {
         assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.INFO));
 
         first.close();
-        assertThat(DebeziumLogLevels.activeLeases(), is(0));
         assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.ERROR));
         assertThat(level("io.debezium.embedded"), is(ch.qos.logback.classic.Level.ERROR));
     }
@@ -118,7 +123,6 @@ class LogLevelTest {
             debugRun.close();
 
             // the second close must not release the INFO run
-            assertThat(DebeziumLogLevels.activeLeases(), is(1));
             assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.INFO));
         } finally {
             infoRun.close();
@@ -149,5 +153,58 @@ class LogLevelTest {
             assertThat(level("io.kestra.plugin.debezium.test.unrelated"), is(nullValue()));
             assertThat(level("io.debeziumx.test"), is(nullValue()));
         }
+    }
+
+    /**
+     * Every connector JAR ships its own copy of this plugin's classes, each in its own class loader, while
+     * logback is shared. Loads a second, independent copy of {@link DebeziumLogLevels} the same way.
+     */
+    private static Class<?> copyFromAnotherConnector() throws ClassNotFoundException {
+        String name = DebeziumLogLevels.class.getName();
+        ClassLoader isolated = new ClassLoader(LogLevelTest.class.getClassLoader()) {
+            @Override
+            protected Class<?> loadClass(String className, boolean resolve) throws ClassNotFoundException {
+                if (!className.equals(name) && !className.startsWith(name + "$")) {
+                    return super.loadClass(className, resolve);
+                }
+                synchronized (getClassLoadingLock(className)) {
+                    Class<?> loaded = findLoadedClass(className);
+                    if (loaded == null) {
+                        try (var in = getParent().getResourceAsStream(className.replace('.', '/') + ".class")) {
+                            byte[] bytes = in.readAllBytes();
+                            loaded = defineClass(className, bytes, 0, bytes.length);
+                        } catch (IOException e) {
+                            throw new ClassNotFoundException(className, e);
+                        }
+                    }
+                    return loaded;
+                }
+            }
+        };
+        return isolated.loadClass(name);
+    }
+
+    @Test
+    void runsOfOtherConnectorsShareTheSameLeases() throws Exception {
+        Class<?> otherConnector = copyFromAnotherConnector();
+        var acquire = otherConnector.getDeclaredMethod("acquire", Level.class);
+        acquire.setAccessible(true);
+        var applyBaseline = otherConnector.getDeclaredMethod("applyBaseline");
+        applyBaseline.setAccessible(true);
+
+        // e.g. a PostgreSQL realtime trigger at DEBUG ...
+        try (var postgresTrigger = DebeziumLogLevels.acquire(Level.DEBUG)) {
+            // ... while a MySQL capture runs at WARN and finishes
+            try (var mysqlCapture = (AutoCloseable) acquire.invoke(null, Level.WARN)) {
+                assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.DEBUG));
+            }
+            assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.DEBUG));
+
+            // ... and the MySQL task class initialising must not reset it either
+            applyBaseline.invoke(null);
+            assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.DEBUG));
+        }
+
+        assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.ERROR));
     }
 }

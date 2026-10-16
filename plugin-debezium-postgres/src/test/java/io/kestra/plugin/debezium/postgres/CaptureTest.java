@@ -11,6 +11,7 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -172,9 +173,16 @@ class CaptureTest extends AbstractDebeziumTest {
 
     private static final String SLOT_NAME = "kestra_log_level_test";
 
+    // every way a secret reaches Debezium besides the password: the SSL key password and `properties`
+    enum SecretSource {
+        SSL_KEY_PASSWORD,
+        PROPERTIES
+    }
+
     @ParameterizedTest
-    @EnumSource(value = Level.class, names = {"DEBUG", "TRACE"})
-    void appliesDebeziumLogLevel(Level level) throws Exception {
+    @CsvSource({"DEBUG, SSL_KEY_PASSWORD", "DEBUG, PROPERTIES", "TRACE, SSL_KEY_PASSWORD", "TRACE, PROPERTIES"})
+    void appliesDebeziumLogLevel(Level level, SecretSource secretSource) throws Exception {
+        String secret = "leak-check-" + secretSource.name().toLowerCase();
         // init database
         executeSqlScript("scripts/postgres.sql");
 
@@ -184,7 +192,7 @@ class CaptureTest extends AbstractDebeziumTest {
         Logger root = (Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
         root.addAppender(logs);
 
-        Capture task = Capture.builder()
+        var builder = Capture.builder()
             .id(IdUtils.create())
             .type(Capture.class.getName())
             .hostname(Property.ofValue(TestUtils.hostname()))
@@ -199,8 +207,14 @@ class CaptureTest extends AbstractDebeziumTest {
             .includedTables(List.of("public.events"))
             .debeziumLogLevel(Property.ofValue(level))
             // a fixed slot name, so the cleanup below drops exactly the slot this test created
-            .slotName(Property.ofValue(SLOT_NAME))
-            .build();
+            .slotName(Property.ofValue(SLOT_NAME));
+        if (secretSource == SecretSource.SSL_KEY_PASSWORD) {
+            builder.sslKeyPassword(Property.ofValue(secret));
+        } else {
+            // `database.*` entries are passed as-is to the JDBC driver
+            builder.properties(Property.ofValue(Map.of("database.sslpassword", secret)));
+        }
+        Capture task = builder.build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
         PostgresDebeziumTestHelper.dropReplicationArtifacts(
@@ -229,10 +243,12 @@ class CaptureTest extends AbstractDebeziumTest {
             "expected Debezium " + level + " output while the capture ran"
         );
 
-        // DEBUG and TRACE must not print the connector configuration with the password in it
+        // DEBUG and TRACE must not print any secret given to the connector
+        var secrets = List.of(TestUtils.password(), secret);
         var leaks = logs.list.stream()
-            .filter(event -> event.getFormattedMessage() != null && event.getFormattedMessage().contains(TestUtils.password()))
+            .filter(event -> event.getFormattedMessage() != null && secrets.stream().anyMatch(event.getFormattedMessage()::contains))
             .map(ILoggingEvent::getLoggerName)
+            .distinct()
             .toList();
         assertThat(leaks, is(List.of()));
 
