@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.kafka.connect.source.SourceRecord;
 import org.reactivestreams.Publisher;
+import org.slf4j.event.Level;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -102,7 +103,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     protected Property<String> stateName = Property.ofValue("debezium-state");
 
     @Builder.Default
-    protected Property<org.slf4j.event.Level> debeziumLogLevel = Property.ofValue(AbstractDebeziumTask.DEFAULT_LOG_LEVEL);
+    protected Property<Level> debeziumLogLevel = Property.ofValue(AbstractDebeziumTask.DEFAULT_LOG_LEVEL);
 
     @Schema(
         title = "When to commit the offsets to the KV Store",
@@ -178,9 +179,6 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     private final AtomicReference<DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>>> engineReference = new AtomicReference<>();
 
     public Publisher<AbstractDebeziumRealtimeTrigger.StreamOutput> publisher(AbstractDebeziumTask task, RunContext runContext) throws IllegalVariableEvaluationException {
-        // Polling triggers get this through task.run(); the realtime trigger never calls run().
-        task.configureLogging(runContext);
-
         var rOffsetsCommitMode = runContext.render(offsetsCommitMode).as(OffsetCommitMode.class).orElse(OffsetCommitMode.ON_STOP);
         var offsetFile = runContext.workingDir().path().resolve(AbstractDebeziumTask.OFFSETS_DATA_FILE);
         var historyFile = runContext.workingDir().path().resolve(AbstractDebeziumTask.DBHISTORY_DATA_FILE);
@@ -191,7 +189,11 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         return Flux.create(sink ->
         {
             sink.onCancel(this::cancelPublisher);
+            // Polling triggers get this through task.run(); the realtime trigger never calls run(), so it
+            // holds the log level lease for as long as the stream is running.
+            DebeziumLogLevels.Lease logLevelLease = null;
             try {
+                logLevelLease = task.configureLogging(runContext);
                 task.restoreState(runContext, offsetFile, historyFile);
 
                 var identity = task.resolveEffectiveIdentity(runContext);
@@ -217,6 +219,10 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                     task.saveFinalState(runContext, offsetFile, historyFile);
                 } catch (IOException e) {
                     sink.error(new RuntimeException(e));
+                }
+
+                if (logLevelLease != null) {
+                    logLevelLease.close();
                 }
 
                 sink.complete();

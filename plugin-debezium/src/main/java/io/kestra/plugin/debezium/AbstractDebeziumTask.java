@@ -47,7 +47,6 @@ import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.utils.Await;
 import io.kestra.core.utils.Hashing;
 
-import ch.qos.logback.classic.LoggerContext;
 import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
@@ -77,10 +76,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     public static final String STATE_KEY_HISTORY = "history";
 
-    public static final Level DEFAULT_LOG_LEVEL = Level.WARN;
-
-    // Loggers whose level is controlled by the `debeziumLogLevel` property.
-    static final List<String> DEBEZIUM_LOGGER_PREFIXES = List.of("org.apache.kafka.connect", "io.debezium");
+    public static final Level DEFAULT_LOG_LEVEL = Level.ERROR;
 
     @Builder.Default
     protected Property<Format> format = Property.ofValue(Format.INLINE);
@@ -177,38 +173,27 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
     protected abstract boolean needDatabaseHistory();
 
-    /**
-     * Applies the configured {@code debeziumLogLevel} to the Debezium and Kafka Connect loggers.
-     *
-     * Called at the start of every run. Logback levels are global to the JVM, so the level of the
-     * task or trigger that started last wins; nothing is restored afterwards.
-     */
-    public void configureLogging(RunContext runContext) throws IllegalVariableEvaluationException {
-        applyLogLevel(runContext.render(this.debeziumLogLevel).as(Level.class).orElse(DEFAULT_LOG_LEVEL));
+    static {
+        // https://issues.redhat.com/browse/DBZ-4904: Debezium stays at ERROR unless a run asks for more
+        DebeziumLogLevels.applyBaseline();
     }
 
     /**
-     * Sets the level on every Debezium / Kafka Connect logger that already exists, not only on the two
-     * parents: a child that got an explicit level on a previous run would otherwise keep it.
-     * Exposed package-private for unit testing without a full DI context.
+     * Applies the configured {@code debeziumLogLevel} to the Debezium and Kafka Connect loggers for as
+     * long as the returned lease is open. Close it when the run ends.
      */
-    static void applyLogLevel(Level level) {
-        // https://issues.redhat.com/browse/DBZ-4904
-
-        // make sure the parent loggers exist before we walk the logger list
-        DEBEZIUM_LOGGER_PREFIXES.forEach(LoggerFactory::getLogger);
-
-        ((LoggerContext) LoggerFactory.getILoggerFactory())
-            .getLoggerList()
-            .stream()
-            .filter(logger -> DEBEZIUM_LOGGER_PREFIXES.stream().anyMatch(logger.getName()::startsWith))
-            .forEach(logger -> logger.setLevel(ch.qos.logback.classic.Level.toLevel(level.name())));
+    DebeziumLogLevels.Lease configureLogging(RunContext runContext) throws IllegalVariableEvaluationException {
+        return DebeziumLogLevels.acquire(runContext.render(this.debeziumLogLevel).as(Level.class).orElse(DEFAULT_LOG_LEVEL));
     }
 
     @Override
     public AbstractDebeziumTask.Output run(RunContext runContext) throws Exception {
-        this.configureLogging(runContext);
+        try (var ignored = this.configureLogging(runContext)) {
+            return this.capture(runContext);
+        }
+    }
 
+    private AbstractDebeziumTask.Output capture(RunContext runContext) throws Exception {
         AtomicInteger count = new AtomicInteger();
         AtomicBoolean snapshot = new AtomicBoolean(false);
         ZonedDateTime lastRecord = ZonedDateTime.now();

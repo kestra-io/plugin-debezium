@@ -13,9 +13,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
-import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -170,13 +172,17 @@ class CaptureTest extends AbstractDebeziumTest {
 
     private static final String SLOT_NAME = "kestra_log_level_test";
 
-    @Test
-    void appliesDebeziumLogLevel() throws Exception {
+    @ParameterizedTest
+    @EnumSource(value = Level.class, names = {"DEBUG", "TRACE"})
+    void appliesDebeziumLogLevel(Level level) throws Exception {
         // init database
         executeSqlScript("scripts/postgres.sql");
 
-        Logger debeziumLogger = (Logger) LoggerFactory.getLogger("io.debezium");
-        Level previousLevel = debeziumLogger.getLevel();
+        // record everything logged while the capture runs
+        var logs = new ListAppender<ILoggingEvent>();
+        logs.start();
+        Logger root = (Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        root.addAppender(logs);
 
         Capture task = Capture.builder()
             .id(IdUtils.create())
@@ -191,7 +197,7 @@ class CaptureTest extends AbstractDebeziumTest {
             .snapshotMode(Property.ofValue(Capture.SnapshotMode.NEVER))
             .maxWait(Property.ofValue(Duration.ofSeconds(5)))
             .includedTables(List.of("public.events"))
-            .debeziumLogLevel(Property.ofValue(org.slf4j.event.Level.DEBUG))
+            .debeziumLogLevel(Property.ofValue(level))
             // a fixed slot name, so the cleanup below drops exactly the slot this test created
             .slotName(Property.ofValue(SLOT_NAME))
             .build();
@@ -206,11 +212,8 @@ class CaptureTest extends AbstractDebeziumTest {
 
         try {
             task.run(runContext);
-
-            assertThat(debeziumLogger.getLevel(), is(Level.DEBUG));
         } finally {
-            // the level is global to the JVM, do not leak it into the other tests
-            debeziumLogger.setLevel(previousLevel);
+            root.detachAppender(logs);
             // do not leave the replication slot behind: the test database only allows 10
             PostgresDebeziumTestHelper.dropReplicationArtifacts(
                 this::getConnection,
@@ -218,6 +221,23 @@ class CaptureTest extends AbstractDebeziumTest {
                 runContext.render(task.getPublicationName()).as(String.class).orElse("kestra_publication")
             );
         }
+
+        // the requested level was applied while the capture ran
+        assertTrue(
+            logs.list.stream().anyMatch(event -> event.getLoggerName().startsWith("io.debezium.")
+                && event.getLevel().toInt() <= ch.qos.logback.classic.Level.DEBUG.toInt()),
+            "expected Debezium " + level + " output while the capture ran"
+        );
+
+        // DEBUG and TRACE must not print the connector configuration with the password in it
+        var leaks = logs.list.stream()
+            .filter(event -> event.getFormattedMessage() != null && event.getFormattedMessage().contains(TestUtils.password()))
+            .map(ILoggingEvent::getLoggerName)
+            .toList();
+        assertThat(leaks, is(List.of()));
+
+        // once the run is over, the loggers are back to ERROR
+        assertThat(((Logger) LoggerFactory.getLogger("io.debezium")).getLevel(), is(ch.qos.logback.classic.Level.ERROR));
     }
 
     @SuppressWarnings("unchecked")
