@@ -3,6 +3,8 @@ package io.kestra.plugin.debezium;
 import java.time.Duration;
 import java.util.Map;
 
+import org.slf4j.event.Level;
+
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.models.triggers.PollingTriggerInterface;
@@ -72,6 +74,9 @@ public abstract class AbstractDebeziumTrigger extends AbstractTrigger implements
 
     @Builder.Default
     protected Property<String> stateName = Property.ofValue("debezium-state");
+
+    @Builder.Default
+    protected Property<Level> debeziumLogLevel = Property.ofValue(AbstractDebeziumTask.DEFAULT_LOG_LEVEL);
 
     @Schema(
         title = "The maximum number of rows to fetch before stopping",

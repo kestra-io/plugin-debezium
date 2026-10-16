@@ -2,6 +2,8 @@ package io.kestra.plugin.debezium;
 
 import java.util.Map;
 
+import org.slf4j.event.Level;
+
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 
@@ -171,4 +173,24 @@ public interface AbstractDebeziumInterface {
     @NotNull
     @PluginProperty(group = "main")
     Property<String> getStateName();
+
+    @Schema(
+        title = "The log level of Debezium and Kafka Connect in the worker log",
+        description = """
+            Sets the level of the `io.debezium` and `org.apache.kafka.connect` loggers in the worker log while \
+            this task or trigger runs. It defaults to `ERROR`; raise it to `WARN`, `INFO` or `DEBUG` to \
+            troubleshoot a connector. This controls the worker log only, not the execution logs.
+
+            Loggers that print connection settings, secrets included, are capped: `io.debezium.embedded`, \
+            `io.debezium.jdbc` and `io.debezium.openlineage` never go below `INFO`, and \
+            `io.debezium.connector.common.BaseSourceTask`, which lists the whole connector configuration at \
+            `INFO`, never goes below `WARN`.
+
+            These loggers are shared by the whole worker JVM. When several Debezium tasks or triggers run on \
+            the same worker, whatever their connector, the most verbose level among them applies, and the \
+            loggers go back to `ERROR` once the last one has finished."""
+    )
+    @NotNull
+    @PluginProperty(group = "advanced")
+    Property<Level> getDebeziumLogLevel();
 }

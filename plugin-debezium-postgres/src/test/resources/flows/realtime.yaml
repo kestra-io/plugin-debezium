@@ -12,6 +12,7 @@ triggers:
     stateName: "debezium-state-{{ now() | date('yyyyMMddHHmmssSSS') }}"
     includedTables:
       - public.events
+    debeziumLogLevel: INFO
 
 tasks:
   - id: end
