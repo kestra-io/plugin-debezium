@@ -1,17 +1,13 @@
 package io.kestra.plugin.debezium;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
-import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -20,80 +16,138 @@ import static org.hamcrest.Matchers.nullValue;
 
 class LogLevelTest {
 
-    private static final List<String> NAMES = List.of(
-        "io.debezium",
-        "org.apache.kafka.connect",
-        "io.debezium.test.child",
-        "org.apache.kafka.connect.test.child",
-        "io.kestra.plugin.debezium.test.unrelated"
-    );
-
-    // The levels are global to the JVM, so put back whatever other tests had.
-    private final Map<String, Level> previous = new HashMap<>();
-
     @BeforeEach
-    void rememberLevels() {
-        NAMES.forEach(name -> previous.put(name, logger(name).getLevel()));
-    }
-
     @AfterEach
-    void restoreLevels() {
-        NAMES.forEach(name -> logger(name).setLevel(previous.get(name)));
+    void noRunActive() {
+        // the levels are global to the JVM, so every test starts and ends with no lease held
+        assertThat(DebeziumLogLevels.activeLeases(), is(0));
+        DebeziumLogLevels.applyBaseline();
     }
 
-    private static Logger logger(String name) {
-        return (Logger) LoggerFactory.getLogger(name);
+    private static ch.qos.logback.classic.Level level(String loggerName) {
+        return ((Logger) LoggerFactory.getLogger(loggerName)).getLevel();
+    }
+
+    // the level a logger actually logs at, inherited from its parents when it has none of its own
+    private static ch.qos.logback.classic.Level effectiveLevel(String loggerName) {
+        return ((Logger) LoggerFactory.getLogger(loggerName)).getEffectiveLevel();
+    }
+
+    private static ch.qos.logback.classic.Level logback(Level level) {
+        return ch.qos.logback.classic.Level.toLevel(level.name());
     }
 
     @Test
-    void defaultIsWarn() {
-        // Per the issue: ERROR hides too much, WARN is the out-of-the-box level.
-        assertThat(AbstractDebeziumTask.DEFAULT_LOG_LEVEL, is(org.slf4j.event.Level.WARN));
+    void defaultIsError() {
+        // existing flows keep the ERROR level they always had; users opt in to more
+        assertThat(AbstractDebeziumTask.DEFAULT_LOG_LEVEL, is(Level.ERROR));
+    }
+
+    @Test
+    void baselineIsErrorWhenNoRunIsActive() {
+        assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.ERROR));
+        assertThat(level("org.apache.kafka.connect"), is(ch.qos.logback.classic.Level.ERROR));
     }
 
     @ParameterizedTest
-    @EnumSource(org.slf4j.event.Level.class)
-    void everyLevelSetsTheLogbackLevelOfTheSameName(org.slf4j.event.Level level) {
-        AbstractDebeziumTask.applyLogLevel(level);
+    @EnumSource(Level.class)
+    void everyLevelIsAppliedWhileTheRunIsActive(Level requested) {
+        try (var ignored = DebeziumLogLevels.acquire(requested)) {
+            assertThat(level("io.debezium"), is(logback(requested)));
+            assertThat(level("org.apache.kafka.connect"), is(logback(requested)));
+        }
+    }
 
-        assertThat(logger("io.debezium").getLevel().toString(), is(level.name()));
+    @ParameterizedTest
+    @EnumSource(value = Level.class, names = {"DEBUG", "TRACE"})
+    void loggersThatPrintTheConnectorConfigNeverGoBelowInfo(Level requested) {
+        try (var ignored = DebeziumLogLevels.acquire(requested)) {
+            assertThat(level("io.debezium"), is(logback(requested)));
+            assertThat(level("io.debezium.embedded"), is(ch.qos.logback.classic.Level.INFO));
+            assertThat(effectiveLevel("io.debezium.embedded.async.AsyncEmbeddedEngine"), is(ch.qos.logback.classic.Level.INFO));
+            assertThat(level("io.debezium.openlineage"), is(ch.qos.logback.classic.Level.INFO));
+            assertThat(effectiveLevel("io.debezium.openlineage.DebeziumOpenLineageEmitter"), is(ch.qos.logback.classic.Level.INFO));
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Level.class, names = {"ERROR", "WARN", "INFO"})
+    void levelsAtOrAboveInfoAreNotCapped(Level requested) {
+        try (var ignored = DebeziumLogLevels.acquire(requested)) {
+            assertThat(level("io.debezium.embedded"), is(logback(requested)));
+            assertThat(level("io.debezium.openlineage"), is(logback(requested)));
+        }
     }
 
     @Test
-    void appliesTheLevelToDebeziumAndKafkaConnectLoggers() {
-        AbstractDebeziumTask.applyLogLevel(org.slf4j.event.Level.DEBUG);
+    void theMostVerboseActiveRunWins() {
+        var debugRun = DebeziumLogLevels.acquire(Level.DEBUG);
+        var warnRun = DebeziumLogLevels.acquire(Level.WARN);
+        try {
+            // the WARN run starting after the DEBUG one does not silence it
+            assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.DEBUG));
 
-        assertThat(logger("io.debezium").getLevel(), is(Level.DEBUG));
-        assertThat(logger("org.apache.kafka.connect").getLevel(), is(Level.DEBUG));
+            debugRun.close();
+            assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.WARN));
+        } finally {
+            debugRun.close();
+            warnRun.close();
+        }
     }
 
     @Test
-    void childLoggersThatAlreadyExistFollowTheNewLevel() {
-        // A child that got an explicit level on a previous run would not inherit the parent's new level.
-        AbstractDebeziumTask.applyLogLevel(org.slf4j.event.Level.ERROR);
-        assertThat(logger("io.debezium.test.child").getLevel(), is(Level.ERROR));
-        assertThat(logger("org.apache.kafka.connect.test.child").getLevel(), is(Level.ERROR));
+    void theBaselineIsRestoredWhenTheLastRunEnds() {
+        var first = DebeziumLogLevels.acquire(Level.INFO);
+        var second = DebeziumLogLevels.acquire(Level.DEBUG);
 
-        AbstractDebeziumTask.applyLogLevel(org.slf4j.event.Level.INFO);
-        assertThat(logger("io.debezium.test.child").getLevel(), is(Level.INFO));
-        assertThat(logger("org.apache.kafka.connect.test.child").getLevel(), is(Level.INFO));
+        second.close();
+        assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.INFO));
+
+        first.close();
+        assertThat(DebeziumLogLevels.activeLeases(), is(0));
+        assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.ERROR));
+        assertThat(level("io.debezium.embedded"), is(ch.qos.logback.classic.Level.ERROR));
     }
 
     @Test
-    void lastAppliedLevelWins() {
-        AbstractDebeziumTask.applyLogLevel(org.slf4j.event.Level.DEBUG);
-        AbstractDebeziumTask.applyLogLevel(org.slf4j.event.Level.WARN);
+    void closingALeaseTwiceIsANoOp() {
+        var debugRun = DebeziumLogLevels.acquire(Level.DEBUG);
+        var infoRun = DebeziumLogLevels.acquire(Level.INFO);
+        try {
+            debugRun.close();
+            debugRun.close();
 
-        assertThat(logger("io.debezium").getLevel(), is(Level.WARN));
+            // the second close must not release the INFO run
+            assertThat(DebeziumLogLevels.activeLeases(), is(1));
+            assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.INFO));
+        } finally {
+            infoRun.close();
+        }
+    }
+
+    @Test
+    void childLoggersThatAlreadyExistFollowTheLevel() {
+        LoggerFactory.getLogger("io.debezium.test.child");
+        LoggerFactory.getLogger("org.apache.kafka.connect.test.child");
+
+        try (var ignored = DebeziumLogLevels.acquire(Level.DEBUG)) {
+            assertThat(level("io.debezium.test.child"), is(ch.qos.logback.classic.Level.DEBUG));
+            assertThat(level("org.apache.kafka.connect.test.child"), is(ch.qos.logback.classic.Level.DEBUG));
+        }
+
+        assertThat(level("io.debezium.test.child"), is(ch.qos.logback.classic.Level.ERROR));
     }
 
     @Test
     void doesNotTouchUnrelatedLoggers() {
-        logger("io.kestra.plugin.debezium.test.unrelated").setLevel(null);
+        // `io.kestra.plugin.debezium` contains "debezium" and `io.debeziumx` shares the prefix, but neither
+        // is under `io.debezium`
+        ((Logger) LoggerFactory.getLogger("io.kestra.plugin.debezium.test.unrelated")).setLevel(null);
+        ((Logger) LoggerFactory.getLogger("io.debeziumx.test")).setLevel(null);
 
-        AbstractDebeziumTask.applyLogLevel(org.slf4j.event.Level.TRACE);
-
-        // `io.kestra.plugin.debezium...` is not under `io.debezium`, so it keeps inheriting.
-        assertThat(logger("io.kestra.plugin.debezium.test.unrelated").getLevel(), is(nullValue()));
+        try (var ignored = DebeziumLogLevels.acquire(Level.TRACE)) {
+            assertThat(level("io.kestra.plugin.debezium.test.unrelated"), is(nullValue()));
+            assertThat(level("io.debeziumx.test"), is(nullValue()));
+        }
     }
 }

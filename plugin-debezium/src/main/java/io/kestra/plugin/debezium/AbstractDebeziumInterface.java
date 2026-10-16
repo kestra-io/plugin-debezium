@@ -175,13 +175,18 @@ public interface AbstractDebeziumInterface {
     Property<String> getStateName();
 
     @Schema(
-        title = "The log level of Debezium and Kafka Connect",
+        title = "The log level of Debezium and Kafka Connect in the worker log",
         description = """
-            Sets the level of the `io.debezium` and `org.apache.kafka.connect` loggers. It defaults to `WARN`; \
-            raise it to `INFO` or `DEBUG` to troubleshoot a connector.
+            Sets the level of the `io.debezium` and `org.apache.kafka.connect` loggers in the worker log while \
+            this task or trigger runs. It defaults to `ERROR`; raise it to `WARN`, `INFO` or `DEBUG` to \
+            troubleshoot a connector. This controls the worker log only, not the execution logs.
 
-            These loggers are shared by the whole worker JVM, so when several Debezium tasks or triggers run \
-            on the same worker, the level of the one that started last applies to all of them."""
+            `io.debezium.embedded` and `io.debezium.openlineage` never go below `INFO`: at `DEBUG` they print \
+            the raw connector configuration, including the database password.
+
+            These loggers are shared by the whole worker JVM. When several Debezium tasks or triggers run on \
+            the same worker, the most verbose level among them applies, and the loggers go back to `ERROR` \
+            once the last one has finished."""
     )
     @NotNull
     @PluginProperty(group = "advanced")
