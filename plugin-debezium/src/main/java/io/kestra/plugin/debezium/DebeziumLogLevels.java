@@ -27,13 +27,20 @@ final class DebeziumLogLevels {
     // Loggers controlled by the `debeziumLogLevel` property.
     static final List<String> LOGGER_PREFIXES = List.of("org.apache.kafka.connect", "io.debezium");
 
-    // Below INFO these loggers print connection settings, secrets included:
-    // - AsyncEmbeddedEngine logs "Config #0: {...}" with the database password,
-    // - DebeziumOpenLineageEmitter logs the configuration it is initialised with,
+    // These loggers print connection settings, secrets included, so they never go below the level given
+    // here, whatever level is requested:
+    // - AsyncEmbeddedEngine logs "Config #0: {...}" with the database password (DEBUG),
     // - JdbcConnection logs "Connected to ... with {...}" (DEBUG) and "Config: {...}" (TRACE) with the
-    //   SSL key password and any secret passed through `properties`.
-    // They never go below INFO, whatever level is requested.
-    static final List<String> CAPPED_LOGGER_PREFIXES = List.of("io.debezium.embedded", "io.debezium.jdbc", "io.debezium.openlineage");
+    //   SSL key password and any secret passed through `properties`,
+    // - DebeziumOpenLineageEmitter logs the configuration it is initialised with (DEBUG),
+    // - BaseSourceTask logs every connector setting when a task starts (INFO); it masks the keys it knows
+    //   as passwords but not others, such as SQL Server's `database.trustStorePassword`.
+    static final Map<String, Level> CAPPED_LOGGERS = Map.of(
+        "io.debezium.embedded", Level.INFO,
+        "io.debezium.jdbc", Level.INFO,
+        "io.debezium.openlineage", Level.INFO,
+        "io.debezium.connector.common.BaseSourceTask", Level.WARN
+    );
 
     // Level of the loggers while no Debezium run is active, the same as the static block it replaces.
     static final Level BASELINE = Level.ERROR;
@@ -51,8 +58,9 @@ final class DebeziumLogLevels {
         var registry = registry();
         var lease = new Lease(registry);
         synchronized (registry) {
+            var before = effectiveLevel(registry);
             registry.put(lease, level.toInt());
-            apply(effectiveLevel(registry));
+            applyIfChanged(before, registry);
         }
         return lease;
     }
@@ -73,10 +81,12 @@ final class DebeziumLogLevels {
      * The level a given logger gets when {@code requested} is the effective level.
      */
     static Level levelFor(String loggerName, Level requested) {
-        if (matches(loggerName, CAPPED_LOGGER_PREFIXES) && isMoreVerbose(requested, Level.INFO)) {
-            return Level.INFO;
-        }
-        return requested;
+        return CAPPED_LOGGERS.entrySet().stream()
+            .filter(cap -> matches(loggerName, cap.getKey()))
+            .map(Map.Entry::getValue)
+            .filter(cap -> isMoreVerbose(requested, cap))
+            .findFirst()
+            .orElse(requested);
     }
 
     private static LoggerContext loggerContext() {
@@ -106,22 +116,31 @@ final class DebeziumLogLevels {
             .orElse(BASELINE);
     }
 
+    // must be called while holding the registry's lock; walking every logger is only worth it when the
+    // effective level changed, which most acquires and releases at the default level don't do
+    private static void applyIfChanged(Level before, Map<Object, Integer> registry) {
+        var after = effectiveLevel(registry);
+        if (after != before) {
+            apply(after);
+        }
+    }
+
     // must be called while holding the registry's lock
     private static void apply(Level level) {
         // make sure the parent loggers exist, so loggers created later inherit the right level
-        Stream.concat(LOGGER_PREFIXES.stream(), CAPPED_LOGGER_PREFIXES.stream()).forEach(LoggerFactory::getLogger);
+        Stream.concat(LOGGER_PREFIXES.stream(), CAPPED_LOGGERS.keySet().stream()).forEach(LoggerFactory::getLogger);
 
         // set it on every existing logger, not only on the parents: a child that got an explicit level
         // earlier would otherwise keep it
         loggerContext()
             .getLoggerList()
             .stream()
-            .filter(logger -> matches(logger.getName(), LOGGER_PREFIXES))
+            .filter(logger -> LOGGER_PREFIXES.stream().anyMatch(prefix -> matches(logger.getName(), prefix)))
             .forEach(logger -> logger.setLevel(ch.qos.logback.classic.Level.toLevel(levelFor(logger.getName(), level).name())));
     }
 
-    private static boolean matches(String loggerName, List<String> prefixes) {
-        return prefixes.stream().anyMatch(prefix -> loggerName.equals(prefix) || loggerName.startsWith(prefix + "."));
+    private static boolean matches(String loggerName, String prefix) {
+        return loggerName.equals(prefix) || loggerName.startsWith(prefix + ".");
     }
 
     private static boolean isMoreVerbose(Level level, Level than) {
@@ -141,8 +160,9 @@ final class DebeziumLogLevels {
         @Override
         public void close() {
             synchronized (registry) {
+                var before = effectiveLevel(registry);
                 if (registry.remove(this) != null) {
-                    apply(effectiveLevel(registry));
+                    applyIfChanged(before, registry);
                 }
             }
         }

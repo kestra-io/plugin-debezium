@@ -11,6 +11,7 @@ import org.slf4j.event.Level;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.spi.ThrowableProxyUtil;
 import ch.qos.logback.core.read.ListAppender;
 
 import io.kestra.core.junit.annotations.KestraTest;
@@ -50,8 +51,12 @@ class DebeziumLogLevelTest extends AbstractDebeziumTest {
         return "mysql_passwd";
     }
 
+    private static String fullText(ILoggingEvent event) {
+        return event.getFormattedMessage() + (event.getThrowableProxy() == null ? "" : ThrowableProxyUtil.asString(event.getThrowableProxy()));
+    }
+
     @ParameterizedTest
-    @EnumSource(value = Level.class, names = {"DEBUG", "TRACE"})
+    @EnumSource(value = Level.class, names = {"INFO", "DEBUG", "TRACE"})
     void verboseLevelsDoNotPrintSecrets(Level level) throws Exception {
         executeSqlScript("scripts/mysql.sql");
 
@@ -87,14 +92,14 @@ class DebeziumLogLevelTest extends AbstractDebeziumTest {
         // the requested level was applied while the capture ran
         assertTrue(
             logs.list.stream().anyMatch(event -> event.getLoggerName().startsWith("io.debezium.")
-                && event.getLevel().toInt() <= ch.qos.logback.classic.Level.DEBUG.toInt()),
+                && event.getLevel().toInt() <= ch.qos.logback.classic.Level.toLevel(level.name()).toInt()),
             "expected Debezium " + level + " output while the capture ran"
         );
 
-        // DEBUG and TRACE must not print any secret given to the connector
+        // no level may print a secret given to the connector, in the message or in an exception
         var secrets = List.of(getPassword(), KEYSTORE_PASSWORD);
         var leaks = logs.list.stream()
-            .filter(event -> event.getFormattedMessage() != null && secrets.stream().anyMatch(event.getFormattedMessage()::contains))
+            .filter(event -> secrets.stream().anyMatch(fullText(event)::contains))
             .map(ILoggingEvent::getLoggerName)
             .distinct()
             .toList();
