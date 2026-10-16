@@ -85,6 +85,24 @@ class LogLevelTest {
         }
     }
 
+    @ParameterizedTest
+    @EnumSource(value = Level.class, names = {"INFO", "DEBUG", "TRACE"})
+    void theTaskConfigurationDumpNeverGoesBelowWarn(Level requested) {
+        // BaseSourceTask logs every connector setting at INFO, and only masks the keys it knows as passwords
+        try (var ignored = DebeziumLogLevels.acquire(requested)) {
+            assertThat(level("io.debezium"), is(logback(requested)));
+            assertThat(effectiveLevel("io.debezium.connector.common.BaseSourceTask"), is(ch.qos.logback.classic.Level.WARN));
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Level.class, names = {"ERROR", "WARN"})
+    void theTaskConfigurationDumpFollowsLessVerboseLevels(Level requested) {
+        try (var ignored = DebeziumLogLevels.acquire(requested)) {
+            assertThat(effectiveLevel("io.debezium.connector.common.BaseSourceTask"), is(logback(requested)));
+        }
+    }
+
     @Test
     void theMostVerboseActiveRunWins() {
         var debugRun = DebeziumLogLevels.acquire(Level.DEBUG);

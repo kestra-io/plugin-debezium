@@ -18,6 +18,7 @@ import org.slf4j.event.Level;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.spi.ThrowableProxyUtil;
 import ch.qos.logback.core.read.ListAppender;
 
 import io.kestra.core.junit.annotations.KestraTest;
@@ -173,6 +174,10 @@ class CaptureTest extends AbstractDebeziumTest {
 
     private static final String SLOT_NAME = "kestra_log_level_test";
 
+    private static String fullText(ILoggingEvent event) {
+        return event.getFormattedMessage() + (event.getThrowableProxy() == null ? "" : ThrowableProxyUtil.asString(event.getThrowableProxy()));
+    }
+
     // every way a secret reaches Debezium besides the password: the SSL key password and `properties`
     enum SecretSource {
         SSL_KEY_PASSWORD,
@@ -180,7 +185,7 @@ class CaptureTest extends AbstractDebeziumTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"DEBUG, SSL_KEY_PASSWORD", "DEBUG, PROPERTIES", "TRACE, SSL_KEY_PASSWORD", "TRACE, PROPERTIES"})
+    @CsvSource({"INFO, SSL_KEY_PASSWORD", "INFO, PROPERTIES", "DEBUG, SSL_KEY_PASSWORD", "DEBUG, PROPERTIES", "TRACE, SSL_KEY_PASSWORD", "TRACE, PROPERTIES"})
     void appliesDebeziumLogLevel(Level level, SecretSource secretSource) throws Exception {
         String secret = "leak-check-" + secretSource.name().toLowerCase();
         // init database
@@ -239,14 +244,14 @@ class CaptureTest extends AbstractDebeziumTest {
         // the requested level was applied while the capture ran
         assertTrue(
             logs.list.stream().anyMatch(event -> event.getLoggerName().startsWith("io.debezium.")
-                && event.getLevel().toInt() <= ch.qos.logback.classic.Level.DEBUG.toInt()),
+                && event.getLevel().toInt() <= ch.qos.logback.classic.Level.toLevel(level.name()).toInt()),
             "expected Debezium " + level + " output while the capture ran"
         );
 
-        // DEBUG and TRACE must not print any secret given to the connector
+        // no level may print a secret given to the connector, in the message or in an exception
         var secrets = List.of(TestUtils.password(), secret);
         var leaks = logs.list.stream()
-            .filter(event -> event.getFormattedMessage() != null && secrets.stream().anyMatch(event.getFormattedMessage()::contains))
+            .filter(event -> secrets.stream().anyMatch(fullText(event)::contains))
             .map(ILoggingEvent::getLoggerName)
             .distinct()
             .toList();
