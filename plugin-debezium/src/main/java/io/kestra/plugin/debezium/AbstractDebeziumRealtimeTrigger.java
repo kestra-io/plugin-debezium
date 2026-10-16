@@ -213,19 +213,22 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
             } catch (Exception e) {
                 sink.error(e);
             } finally {
-                // The engine flushes its final offsets during shutdown. The file saved
-                // inside an ON_EACH_BATCH callback can still contain the previous batch.
                 try {
-                    task.saveFinalState(runContext, offsetFile, historyFile);
-                } catch (IOException e) {
-                    sink.error(new RuntimeException(e));
-                }
+                    // The engine flushes its final offsets during shutdown. The file saved
+                    // inside an ON_EACH_BATCH callback can still contain the previous batch.
+                    try {
+                        task.saveFinalState(runContext, offsetFile, historyFile);
+                    } catch (IOException e) {
+                        sink.error(new RuntimeException(e));
+                    }
+                } finally {
+                    // released even if saving the state throws, or the level would stay raised for good
+                    if (logLevelLease != null) {
+                        logLevelLease.close();
+                    }
 
-                if (logLevelLease != null) {
-                    logLevelLease.close();
+                    sink.complete();
                 }
-
-                sink.complete();
             }
         });
     }
