@@ -77,7 +77,8 @@ public class Capture extends AbstractDebeziumTask implements MysqlInterface {
         props.setProperty("connector.class", MySqlConnector.class.getName());
         props.setProperty(
             "database.server.id",
-            runContext.render(this.serverId).as(String.class).orElseGet(() -> {
+            runContext.render(this.serverId).as(String.class).orElseGet(() ->
+            {
                 int defaultServerId = DEFAULT_SERVER_ID_MIN
                     + Math.floorMod(
                         deriveConnectorId(runContext).hashCode(),
@@ -91,14 +92,21 @@ public class Capture extends AbstractDebeziumTask implements MysqlInterface {
         if (this.snapshotMode != null) {
             SnapshotMode rSnapshotMode = runContext.render(this.snapshotMode).as(SnapshotMode.class).orElseThrow();
 
-            // we map here for backward compatibility
-            if (rSnapshotMode == SnapshotMode.SCHEMA_ONLY) {
-                rSnapshotMode = SnapshotMode.NO_DATA;
-            } else if (rSnapshotMode == SnapshotMode.SCHEMA_ONLY_RECOVERY) {
-                rSnapshotMode = SnapshotMode.RECOVERY;
+            // Debezium 3.7 removed `never`, `schema_only` and `schema_only_recovery` for MySQL.
+            // Map them so existing flows keep working.
+            switch (rSnapshotMode) {
+                case SCHEMA_ONLY -> props.setProperty("snapshot.mode", "no_data");
+                case SCHEMA_ONLY_RECOVERY -> props.setProperty("snapshot.mode", "recovery");
+                case NEVER -> {
+                    // Same as the removed `never` snapshotter: no schema or data snapshot, stream only.
+                    // `no_data` is different, because it captures the schema when no offset is stored.
+                    props.setProperty("snapshot.mode", "configuration_based");
+                    props.setProperty("snapshot.mode.configuration.based.snapshot.schema", "false");
+                    props.setProperty("snapshot.mode.configuration.based.snapshot.data", "false");
+                    props.setProperty("snapshot.mode.configuration.based.start.stream", "true");
+                }
+                default -> props.setProperty("snapshot.mode", rSnapshotMode.name().toLowerCase(Locale.ROOT));
             }
-
-            props.setProperty("snapshot.mode", rSnapshotMode.name().toLowerCase(Locale.ROOT));
         }
 
         return props;

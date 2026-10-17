@@ -9,7 +9,7 @@ tasks:
     username: c##dbzuser
     password: dbz
     sid: XE
-    snapshotMode: INITIAL_ONLY
+    snapshotMode: INITIAL
     maxRecords: 5
     maxWait: PT30S
     includedTables: KESTRA.EVENTS
