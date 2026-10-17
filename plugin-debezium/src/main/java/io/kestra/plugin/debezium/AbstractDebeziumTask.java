@@ -25,12 +25,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.exceptions.ResourceExpiredException;
@@ -40,10 +40,10 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.storages.StorageContext;
 import io.kestra.core.storages.kv.KVStore;
 import io.kestra.core.storages.kv.KVValueAndMetadata;
+import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.utils.Await;
 import io.kestra.core.utils.Hashing;
 
@@ -249,7 +249,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             do {
                 int previousCount = count.get();
                 ZonedDateTime captureStarted = ZonedDateTime.now();
-                Await.until(() -> {
+                Await.until(() ->
+                {
                     try {
                         return this.ended(executorService, count, captureStarted, lastRecord, taskStarted, snapshot, runContext);
                     } catch (IllegalVariableEvaluationException e) {
@@ -541,10 +542,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         try {
             HashMap<byte[], byte[]> offsets;
-            try (
-                var fis = new FileInputStream(offsetFile.toFile());
-                var ois = offsetInputStream(fis)
-            ) {
+            try (var fis = new FileInputStream(offsetFile.toFile());
+                 var ois = offsetInputStream(fis)) {
                 @SuppressWarnings("unchecked")
                 var loaded = (HashMap<byte[], byte[]>) ois.readObject();
                 offsets = loaded;
@@ -934,6 +933,22 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         }
     }
 
+    public static void closeBestEffort(DebeziumEngine<?> engine, Logger logger) {
+        if (engine == null) {
+            return;
+        }
+        try {
+            closeQuietly(engine, logger);
+        } catch (Exception e) {
+            if (logger != null) {
+                logger.warn("Best-effort close of Debezium engine failed: {}", e.getMessage(), e);
+            } else {
+                LoggerFactory.getLogger(AbstractDebeziumTask.class)
+                    .warn("Best-effort close of Debezium engine failed: {}", e.getMessage(), e);
+            }
+        }
+    }
+
     public static boolean isEngineShutdownArtifact(IllegalStateException e) {
         if (e == null || e.getMessage() == null) {
             return false;
@@ -972,22 +987,18 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             return false;
         }
 
-        // Direct InterruptedException
         if (error instanceof InterruptedException) {
             return error.getCause() == null || error.getCause() instanceof InterruptedException;
         }
 
-        // Specific MBean registration interruption caused by shutdown
         if (isMbeanRegistrationInterruption(error)) {
             return true;
         }
 
-        // Specific Debezium 3 engine shutdown state (direct or wrapped)
         if (findCause(error, IllegalStateException.class).filter(AbstractDebeziumTask::isEngineShutdownArtifact).isPresent()) {
             return true;
         }
 
-        // Specific Debezium OpenLineage emitter teardown (direct or wrapped)
         if (findCause(error, IllegalStateException.class).filter(AbstractDebeziumTask::isOpenLineageShutdownArtifact).isPresent()) {
             return true;
         }

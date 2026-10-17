@@ -124,6 +124,9 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
     protected Properties properties(RunContext runContext, Path offsetFile, Path historyFile) throws Exception {
         Properties props = super.properties(runContext, offsetFile, historyFile);
 
+        props.remove("database.hostname");
+        props.remove("database.port");
+
         props.setProperty("connector.class", MongoDbConnector.class.getName());
 
         String renderedConnectionString = runContext.render(this.connectionString).as(String.class).orElse(null);

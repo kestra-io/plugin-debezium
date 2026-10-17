@@ -291,6 +291,40 @@ class DebeziumLifecycleTest {
     }
 
     @Test
+    void closeBestEffortSwallowsUnexpectedErrorsAndLogs() {
+        DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> unexpectedFailEngine = new DebeziumEngine<>() {
+            @Override
+            public void run() {
+            }
+
+            @Override
+            public void close() {
+                throw new IllegalStateException("Unexpected internal failure");
+            }
+        };
+
+        // Best effort close must NOT throw on unexpected IllegalStateException
+        assertDoesNotThrow(() -> AbstractDebeziumTask.closeBestEffort(unexpectedFailEngine, null));
+
+        DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> ioFailEngine = new DebeziumEngine<>() {
+            @Override
+            public void run() {
+            }
+
+            @Override
+            public void close() throws IOException {
+                throw new IOException("I/O failure during close");
+            }
+        };
+
+        // Best effort close must NOT throw on IOException
+        assertDoesNotThrow(() -> AbstractDebeziumTask.closeBestEffort(ioFailEngine, null));
+
+        // Best effort close must handle null engine safely
+        assertDoesNotThrow(() -> AbstractDebeziumTask.closeBestEffort(null, null));
+    }
+
+    @Test
     void resolveConnectorTypeResolvesAllSupportedConnectors() {
         java.util.Properties props = new java.util.Properties();
         assertThat(AbstractDebeziumTask.resolveConnectorType(props), nullValue());
