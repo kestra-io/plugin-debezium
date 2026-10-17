@@ -1,7 +1,5 @@
 package io.kestra.plugin.debezium.mongodb;
 
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -9,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 
+import org.bson.Document;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
@@ -16,6 +15,8 @@ import com.mongodb.MongoCredential;
 import com.mongodb.MongoSecurityException;
 import com.mongodb.MongoSocketOpenException;
 import com.mongodb.ServerAddress;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.conditions.ConditionContext;
@@ -42,10 +43,11 @@ class MongoDbTriggerLifecycleTest {
     @Inject
     private RunContextFactory runContextFactory;
 
-    private static boolean isMongoReachable() {
-        try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress("127.0.0.1", 27017), 1000);
-            return true;
+    private static boolean isMongoReplicaSetReady() {
+        String connectionString = "mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/admin?replicaSet=rs0&serverSelectionTimeoutMS=2000&connectTimeoutMS=2000";
+        try (MongoClient mongoClient = MongoClients.create(connectionString)) {
+            Document response = mongoClient.getDatabase("admin").runCommand(new Document("ping", 1));
+            return response != null && response.get("ok") instanceof Number n && n.intValue() == 1;
         } catch (Exception e) {
             return false;
         }
@@ -117,15 +119,15 @@ class MongoDbTriggerLifecycleTest {
     @Test
     void triggerReturnsEmptyOnZeroMessages() throws Exception {
         Assumptions.assumeTrue(
-            isMongoReachable(),
-            "Requires running MongoDB replica set at 127.0.0.1:27017 (docker-compose-ci.yml)"
+            isMongoReplicaSetReady(),
+            "Requires running and initialized MongoDB replica set rs0 at 127.0.0.1:27017 (docker-compose-ci.yml)"
         );
 
         Trigger trigger = Trigger.builder()
             .id("test_cdc_trigger")
             .type(Trigger.class.getName())
             .snapshotMode(Property.ofValue(MongodbInterface.SnapshotMode.NO_DATA))
-            .connectionString(Property.ofValue("mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/?replicaSet=rs0"))
+            .connectionString(Property.ofValue("mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/admin?replicaSet=rs0"))
             .includedCollections(List.of("test.empty_collection"))
             .maxWait(Property.ofValue(Duration.ofSeconds(2)))
             .build();

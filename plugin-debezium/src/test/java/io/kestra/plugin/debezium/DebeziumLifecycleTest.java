@@ -206,20 +206,16 @@ class DebeziumLifecycleTest {
 
     @Test
     void isShutdownArtifactIdentifiesExpectedShutdownExceptions() {
-        // InterruptedException from thread interruption
         assertThat(AbstractDebeziumTask.isShutdownArtifact(new InterruptedException("sleep interrupted")), is(true));
 
-        // ConnectException wrapping InterruptedException
         Exception mbeanInterruption = new RuntimeException("Unable to register the MBean", new InterruptedException("sleep interrupted"));
         assertThat(AbstractDebeziumTask.isShutdownArtifact(mbeanInterruption), is(true));
 
-        // IllegalStateException: DebeziumOpenLineageEmitter not initialized
         Exception openLineageError = new RuntimeException(
             "Error emitting lineage", new IllegalStateException("DebeziumOpenLineageEmitter not initialized for connector 'test'! Call init() first.")
         );
         assertThat(AbstractDebeziumTask.isShutdownArtifact(openLineageError), is(true));
 
-        // IllegalStateException: Engine has been already shut down / already being shutting down
         Exception alreadyShutDown = new IllegalStateException("Engine has been already shut down");
         assertThat(AbstractDebeziumTask.isShutdownArtifact(alreadyShutDown), is(true));
         assertThat(AbstractDebeziumTask.isShutdownArtifact(new IllegalStateException("Engine is already being shutting down.")), is(true));
