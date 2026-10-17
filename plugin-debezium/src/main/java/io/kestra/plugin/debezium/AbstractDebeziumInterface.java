@@ -84,16 +84,18 @@ public interface AbstractDebeziumInterface {
     @Schema(
         title = "Hostname of the remote server"
     )
-    @NotNull
     @PluginProperty(group = "main")
-    Property<String> getHostname();
+    default Property<String> getHostname() {
+        return null;
+    }
 
     @Schema(
         title = "Port of the remote server"
     )
-    @NotNull
     @PluginProperty(group = "main")
-    Property<String> getPort();
+    default Property<String> getPort() {
+        return null;
+    }
 
     @Schema(
         title = "Username on the remote server"

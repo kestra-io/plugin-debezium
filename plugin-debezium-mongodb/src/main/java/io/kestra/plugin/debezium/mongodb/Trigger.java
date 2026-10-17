@@ -106,9 +106,19 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @NotNull
     private Property<String> connectionString;
 
+    @Deprecated
+    @Schema(
+        title = "Deprecated hostname property",
+        description = "Ignored for MongoDB; use 'connectionString' instead."
+    )
     @Builder.Default
     protected Property<String> hostname = Property.ofValue("");
 
+    @Deprecated
+    @Schema(
+        title = "Deprecated port property",
+        description = "Ignored for MongoDB; use 'connectionString' instead."
+    )
     @Builder.Default
     protected Property<String> port = Property.ofValue("");
 
@@ -190,6 +200,8 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             .offsetsCommitMode(this.offsetsCommitMode)
             .snapshotMode(this.snapshotMode)
             .connectionString(this.connectionString)
+            .hostname(this.hostname)
+            .port(this.port)
             .build();
         AbstractDebeziumTask.Output run = task.run(runContext);
 

@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.kafka.connect.source.SourceRecord;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -196,7 +197,10 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                 }
 
                 final Properties props = task.properties(runContext, offsetFile, historyFile);
-                ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), null, ZonedDateTime.now(), offsetFile, historyFile);
+                var snapshot = new AtomicBoolean(false);
+                AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>(ZonedDateTime.now());
+                var taskStarted = new AtomicBoolean(false);
+                var changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), snapshot, lastRecord, taskStarted, offsetFile, historyFile);
 
                 ReconnectLoop.run(
                     reconnectPolicy,
@@ -274,20 +278,20 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                 })
                 .build();
         } catch (Exception e) {
-            Throwable error = completionError.get();
+            var error = completionError.get();
             return ReconnectLoop.AttemptResult.failure(error != null ? error : e, false);
         }
 
         synchronized (reconnectMonitor) {
             if (!isActive.get() || sink.isCancelled()) {
-                closeQuietly(engine);
+                AbstractDebeziumTask.closeBestEffort(engine, runContext.logger());
                 return ReconnectLoop.AttemptResult.stopped();
             }
             engineReference.set(engine);
         }
 
         if (!isActive.get() || sink.isCancelled()) {
-            releaseEngine(engine);
+            releaseEngine(engine, runContext.logger());
             return ReconnectLoop.AttemptResult.stopped();
         }
 
@@ -296,38 +300,28 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         } catch (Exception e) {
             completionError.compareAndSet(null, e);
         } finally {
-            releaseEngine(engine);
+            releaseEngine(engine, runContext.logger());
         }
 
         if (!isActive.get() || sink.isCancelled()) {
             return ReconnectLoop.AttemptResult.stopped();
         }
 
-        Throwable error = completionError.get();
+        var error = completionError.get();
         if (error == null) {
             error = new IllegalStateException("Debezium engine stopped while the realtime trigger was still active");
         }
-        boolean stable = ReconnectPolicy.ranStably(taskStartedAt.get(), System.nanoTime(), reconnectPolicy.maxDelay());
+        var stable = ReconnectPolicy.ranStably(taskStartedAt.get(), System.nanoTime(), reconnectPolicy.maxDelay());
         return ReconnectLoop.AttemptResult.failure(error, stable);
     }
 
-    private void releaseEngine(DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine) {
+    private void releaseEngine(DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine, Logger logger) {
         boolean owned;
         synchronized (reconnectMonitor) {
             owned = engineReference.compareAndSet(engine, null);
         }
         if (owned) {
-            closeQuietly(engine);
-        }
-    }
-
-    private static void closeQuietly(DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine) {
-        try {
-            engine.close();
-        } catch (IllegalStateException alreadyShutDown) {
-            // stop() and the attempt loop can both observe an engine that has already stopped.
-        } catch (IOException closeFailure) {
-            // Closing is best-effort. A second close must not fail the subscription.
+            AbstractDebeziumTask.closeBestEffort(engine, logger);
         }
     }
 
@@ -430,8 +424,8 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         // Do not use try-with-resources: ExecutorService.close() waits for the task.
         // stop() also runs on the engine thread when the subscription is cancelled, and joining
         // close() from that thread deadlocks the engine shutdown.
-        ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
-        executorService.execute(() -> closeQuietly(engine));
+        var executorService = Executors.newVirtualThreadPerTaskExecutor();
+        executorService.execute(() -> AbstractDebeziumTask.closeBestEffort(engine, null));
         executorService.shutdown();
         if (!wait) {
             return;
