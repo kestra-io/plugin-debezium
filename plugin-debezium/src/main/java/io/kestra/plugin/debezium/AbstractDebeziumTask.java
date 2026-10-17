@@ -51,8 +51,6 @@ import ch.qos.logback.classic.LoggerContext;
 import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
-import io.debezium.openlineage.ConnectorContext;
-import io.debezium.openlineage.DebeziumOpenLineageEmitter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -194,7 +192,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         AtomicInteger count = new AtomicInteger();
         AtomicBoolean snapshot = new AtomicBoolean(false);
         AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>();
-        AtomicBoolean taskStarted = new AtomicBoolean(false);
+        var taskStarted = new AtomicBoolean(false);
 
         Path offsetFile = runContext.workingDir().path().resolve(OFFSETS_DATA_FILE);
         Path historyFile = runContext.workingDir().path().resolve(DBHISTORY_DATA_FILE);
@@ -208,16 +206,12 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         final Properties props = this.properties(runContext, offsetFile, historyFile);
 
-        final String connectorType = resolveConnectorType(props);
-        final Map<String, String> propsMap = propertiesToMap(props);
-        initOpenLineage(propsMap, connectorType, runContext.logger());
-
         ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
         CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
         ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, taskStarted, offsetFile, historyFile);
 
-        AtomicBoolean stopRequested = new AtomicBoolean(false);
+        var stopRequested = new AtomicBoolean(false);
         DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = null;
         Throwable primaryException = null;
         boolean thrownFromTry = false;
@@ -273,6 +267,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 try {
                     closeQuietly(engine, runContext.logger());
                 } catch (Throwable t) {
+                    runContext.logger().warn("Failed to close Debezium engine: {}", t.getMessage(), t);
                     if (primaryException != null) {
                         primaryException.addSuppressed(t);
                     } else {
@@ -282,15 +277,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             }
             try {
                 this.shutdown(runContext.logger(), executorService);
-            } catch (Throwable t) {
-                if (primaryException != null) {
-                    primaryException.addSuppressed(t);
-                } else {
-                    primaryException = t;
-                }
-            }
-            try {
-                cleanupOpenLineage(propsMap, connectorType, runContext.logger());
             } catch (Throwable t) {
                 if (primaryException != null) {
                     primaryException.addSuppressed(t);
@@ -309,7 +295,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             }
         }
 
-        Throwable error = completionCallback.getError();
+        var error = completionCallback.getError();
         if (error != null) {
             if (stopRequested.get() && isShutdownArtifact(error)) {
                 runContext.logger().debug("Ignoring expected Debezium shutdown error: {}", error.getMessage(), error);
@@ -863,45 +849,13 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         if (props == null) {
             return Map.of();
         }
-        Map<String, String> map = new HashMap<>();
+        var map = new HashMap<String, String>();
         props.forEach((k, v) -> {
             if (k != null && v != null) {
                 map.put(k.toString(), v.toString());
             }
         });
         return Collections.unmodifiableMap(map);
-    }
-
-    /**
-     * Eagerly initializes {@link DebeziumOpenLineageEmitter} before starting the engine.
-     * In Debezium 3.3.1, {@code BaseSourceTask.start()} initializes the emitter lazily, but if the engine
-     * stops early or encounters an initial connection failure, early lifecycle callbacks and engine teardown
-     * attempt to emit lineage and throw an unexpected {@link IllegalStateException} ("DebeziumOpenLineageEmitter
-     * not initialized"). Pre-initializing guarantees the emitter context is present.
-     */
-    private void initOpenLineage(Map<String, String> propsMap, String connectorType, Logger logger) {
-        if (connectorType != null && propsMap != null && !propsMap.isEmpty()) {
-            try {
-                DebeziumOpenLineageEmitter.init(propsMap, connectorType);
-            } catch (Exception e) {
-                if (logger != null) {
-                    logger.debug("Failed to eagerly initialize Debezium OpenLineage emitter for {}: {}", connectorType, e.getMessage(), e);
-                }
-            }
-        }
-    }
-
-    private void cleanupOpenLineage(Map<String, String> propsMap, String connectorType, Logger logger) {
-        if (connectorType != null && propsMap != null && !propsMap.isEmpty()) {
-            try {
-                ConnectorContext context = DebeziumOpenLineageEmitter.connectorContext(propsMap, connectorType);
-                DebeziumOpenLineageEmitter.cleanup(context);
-            } catch (Exception e) {
-                if (logger != null) {
-                    logger.debug("Failed to clean up Debezium OpenLineage emitter for {}: {}", connectorType, e.getMessage(), e);
-                }
-            }
-        }
     }
 
     public static void closeQuietly(DebeziumEngine<?> engine) {
@@ -920,15 +874,9 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                     logger.debug("Debezium engine was already stopped or stopping: {}", e.getMessage());
                 }
             } else {
-                if (logger != null) {
-                    logger.warn("Unexpected IllegalStateException closing Debezium engine", e);
-                }
                 throw e;
             }
         } catch (IOException e) {
-            if (logger != null) {
-                logger.warn("Unexpected I/O error closing Debezium engine", e);
-            }
             throw new RuntimeException("Failed to close Debezium engine", e);
         }
     }
@@ -957,15 +905,11 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         return msg.contains("already shut down") || msg.contains("already being shutting down");
     }
 
-    public static boolean isOpenLineageShutdownArtifact(IllegalStateException e) {
-        return e != null && e.getMessage() != null && e.getMessage().contains("DebeziumOpenLineageEmitter not initialized");
-    }
-
     private static boolean isMbeanRegistrationInterruption(Throwable error) {
         for (Throwable current = error; current != null; current = current.getCause()) {
-            String msg = current.getMessage();
+            var msg = current.getMessage();
             if (msg != null && msg.contains("Unable to register the MBean")) {
-                Throwable cause = current.getCause();
+                var cause = current.getCause();
                 return cause instanceof InterruptedException ||
                     (cause != null && cause.getMessage() != null && cause.getMessage().contains("sleep interrupted"));
             }
@@ -996,10 +940,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         }
 
         if (findCause(error, IllegalStateException.class).filter(AbstractDebeziumTask::isEngineShutdownArtifact).isPresent()) {
-            return true;
-        }
-
-        if (findCause(error, IllegalStateException.class).filter(AbstractDebeziumTask::isOpenLineageShutdownArtifact).isPresent()) {
             return true;
         }
 

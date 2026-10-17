@@ -78,7 +78,7 @@ class ChangeConsumerTest {
         AtomicInteger count = new AtomicInteger();
         ChangeConsumer consumer = new ChangeConsumer(
             task(format, AbstractDebeziumTask.Deleted.DROP), runContextFactory.of(), count,
-            new AtomicBoolean(), ZonedDateTime.now(), Path.of("offsets"), Path.of("history")
+            new AtomicBoolean(), new AtomicReference<>(ZonedDateTime.now()), new AtomicBoolean(false), Path.of("offsets"), Path.of("history")
         );
         SourceRecord record = deleteRecord();
         TrackingCommitter committer = new TrackingCommitter();

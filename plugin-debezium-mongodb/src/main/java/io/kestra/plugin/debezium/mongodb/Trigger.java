@@ -200,6 +200,8 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             .offsetsCommitMode(this.offsetsCommitMode)
             .snapshotMode(this.snapshotMode)
             .connectionString(this.connectionString)
+            .hostname(this.hostname)
+            .port(this.port)
             .build();
         AbstractDebeziumTask.Output run = task.run(runContext);
 

@@ -81,6 +81,26 @@ public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements 
     @NotNull
     private Property<String> connectionString;
 
+    @Deprecated
+    @Schema(
+        title = "Deprecated hostname property",
+        description = "Ignored for MongoDB; use 'connectionString' instead."
+    )
+    @Override
+    public Property<String> getHostname() {
+        return super.getHostname();
+    }
+
+    @Deprecated
+    @Schema(
+        title = "Deprecated port property",
+        description = "Ignored for MongoDB; use 'connectionString' instead."
+    )
+    @Override
+    public Property<String> getPort() {
+        return super.getPort();
+    }
+
     @Override
     public Publisher<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         Capture task = Capture.builder()
@@ -104,6 +124,8 @@ public class RealtimeTrigger extends AbstractDebeziumRealtimeTrigger implements 
             .stateName(this.stateName)
             .snapshotMode(this.snapshotMode)
             .connectionString(this.connectionString)
+            .hostname(this.hostname)
+            .port(this.port)
             .build();
 
         return Flux.from(publisher(task, conditionContext.getRunContext()))

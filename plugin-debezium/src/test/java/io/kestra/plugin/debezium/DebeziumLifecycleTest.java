@@ -26,8 +26,6 @@ import io.kestra.core.runners.RunContextFactory;
 
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
-import io.debezium.openlineage.ConnectorContext;
-import io.debezium.openlineage.DebeziumOpenLineageEmitter;
 import jakarta.inject.Inject;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -113,11 +111,9 @@ class DebeziumLifecycleTest {
             AtomicBoolean taskStarted = new AtomicBoolean(false);
             AtomicBoolean snapshot = new AtomicBoolean(false);
 
-            // taskStarted is false: maxWait must NOT trigger even though 20s > maxWait (10s)
             boolean ended = task.ended(executor, count, start, lastRecord, taskStarted, snapshot, runContext);
             assertThat(ended, is(false));
 
-            // Once taskStarted is true, maxWait should trigger because 20s > maxWait (10s)
             taskStarted.set(true);
             ended = task.ended(executor, count, start, lastRecord, taskStarted, snapshot, runContext);
             assertThat(ended, is(true));
@@ -137,7 +133,6 @@ class DebeziumLifecycleTest {
         try {
             AtomicInteger count = new AtomicInteger(1);
             ZonedDateTime start = ZonedDateTime.now().minusSeconds(25);
-            // Last record just arrived now (0 seconds ago)
             AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>(ZonedDateTime.now());
             AtomicBoolean taskStarted = new AtomicBoolean(true);
             AtomicBoolean snapshot = new AtomicBoolean(false);
@@ -166,15 +161,12 @@ class DebeziumLifecycleTest {
             AtomicBoolean taskStarted = new AtomicBoolean(true);
             AtomicBoolean snapshot = new AtomicBoolean(false);
 
-            // Reached maxRecords (5 >= 5)
             assertThat(task.ended(executor, count, start, lastRecord, taskStarted, snapshot, runContext), is(true));
 
-            // Snapshot mode ignores maxRecords
             snapshot.set(true);
             assertThat(task.ended(executor, count, start, lastRecord, taskStarted, snapshot, runContext), is(false));
             snapshot.set(false);
 
-            // Reached maxDuration (35s > 30s) even if records < maxRecords
             count.set(2);
             ZonedDateTime oldStart = ZonedDateTime.now().minusSeconds(35);
             assertThat(task.ended(executor, count, oldStart, lastRecord, taskStarted, snapshot, runContext), is(true));
@@ -211,17 +203,10 @@ class DebeziumLifecycleTest {
         Exception mbeanInterruption = new RuntimeException("Unable to register the MBean", new InterruptedException("sleep interrupted"));
         assertThat(AbstractDebeziumTask.isShutdownArtifact(mbeanInterruption), is(true));
 
-        Exception openLineageError = new RuntimeException(
-            "Error emitting lineage", new IllegalStateException("DebeziumOpenLineageEmitter not initialized for connector 'test'! Call init() first.")
-        );
-        assertThat(AbstractDebeziumTask.isShutdownArtifact(openLineageError), is(true));
-
         Exception alreadyShutDown = new IllegalStateException("Engine has been already shut down");
         assertThat(AbstractDebeziumTask.isShutdownArtifact(alreadyShutDown), is(true));
         assertThat(AbstractDebeziumTask.isShutdownArtifact(new IllegalStateException("Engine is already being shutting down.")), is(true));
 
-        // Genuine runtime / connection / auth failures must NOT be treated as shutdown artifacts,
-        // even if an InterruptedException or sleep interrupted message appears in the cause chain
         assertThat(AbstractDebeziumTask.isShutdownArtifact(new RuntimeException("Generic unhandled error")), is(false));
         assertThat(AbstractDebeziumTask.isShutdownArtifact(new IllegalStateException("Table not found")), is(false));
         assertThat(AbstractDebeziumTask.isShutdownArtifact(new IllegalArgumentException("Invalid configuration property")), is(false));
@@ -254,7 +239,6 @@ class DebeziumLifecycleTest {
             }
         };
 
-        // Must not throw IllegalStateException
         assertDoesNotThrow(() -> AbstractDebeziumTask.closeQuietly(mockEngine));
 
         DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> unexpectedFailEngine = new DebeziumEngine<>() {
@@ -268,7 +252,6 @@ class DebeziumLifecycleTest {
             }
         };
 
-        // Must rethrow unexpected IllegalStateException
         assertThrows(IllegalStateException.class, () -> AbstractDebeziumTask.closeQuietly(unexpectedFailEngine));
 
         DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> ioFailEngine = new DebeziumEngine<>() {
@@ -282,7 +265,6 @@ class DebeziumLifecycleTest {
             }
         };
 
-        // Must rethrow unexpected IOException wrapped in RuntimeException rather than silently swallowing
         assertThrows(RuntimeException.class, () -> AbstractDebeziumTask.closeQuietly(ioFailEngine));
     }
 
@@ -299,7 +281,6 @@ class DebeziumLifecycleTest {
             }
         };
 
-        // Best effort close must NOT throw on unexpected IllegalStateException
         assertDoesNotThrow(() -> AbstractDebeziumTask.closeBestEffort(unexpectedFailEngine, null));
 
         DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> ioFailEngine = new DebeziumEngine<>() {
@@ -313,16 +294,13 @@ class DebeziumLifecycleTest {
             }
         };
 
-        // Best effort close must NOT throw on IOException
         assertDoesNotThrow(() -> AbstractDebeziumTask.closeBestEffort(ioFailEngine, null));
-
-        // Best effort close must handle null engine safely
         assertDoesNotThrow(() -> AbstractDebeziumTask.closeBestEffort(null, null));
     }
 
     @Test
     void resolveConnectorTypeResolvesAllSupportedConnectors() {
-        java.util.Properties props = new java.util.Properties();
+        Properties props = new Properties();
         assertThat(AbstractDebeziumTask.resolveConnectorType(props), nullValue());
 
         props.setProperty("connector.class", "io.debezium.connector.mongodb.MongoDbConnector");
@@ -342,25 +320,6 @@ class DebeziumLifecycleTest {
 
         props.setProperty("connector.class", "io.debezium.connector.db2.Db2Connector");
         assertThat(AbstractDebeziumTask.resolveConnectorType(props), is("db2"));
-    }
-
-    @Test
-    void openLineageLifecycleInitializesAndCleansUp() {
-        Map<String, String> config = Map.of(
-            "name", "test-connector",
-            "topic.prefix", "test-prefix"
-        );
-
-        ConnectorContext context = DebeziumOpenLineageEmitter.connectorContext(config, "mongodb");
-
-        // Initialize emitter
-        DebeziumOpenLineageEmitter.init(config, "mongodb");
-
-        // Emitting should not throw
-        assertDoesNotThrow(() -> DebeziumOpenLineageEmitter.emit(context, io.debezium.connector.common.DebeziumTaskState.RUNNING));
-
-        // Cleanup
-        assertDoesNotThrow(() -> DebeziumOpenLineageEmitter.cleanup(context));
     }
 
     @Test

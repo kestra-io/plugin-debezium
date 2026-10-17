@@ -110,6 +110,26 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
     @Builder.Default
     private Property<MongodbInterface.SnapshotMode> snapshotMode = Property.ofValue(SnapshotMode.INITIAL);
 
+    @Deprecated
+    @Schema(
+        title = "Deprecated hostname property",
+        description = "Ignored for MongoDB; use 'connectionString' instead."
+    )
+    @Override
+    public Property<String> getHostname() {
+        return super.getHostname();
+    }
+
+    @Deprecated
+    @Schema(
+        title = "Deprecated port property",
+        description = "Ignored for MongoDB; use 'connectionString' instead."
+    )
+    @Override
+    public Property<String> getPort() {
+        return super.getPort();
+    }
+
     @Override
     protected boolean needDatabaseHistory() {
         return false;

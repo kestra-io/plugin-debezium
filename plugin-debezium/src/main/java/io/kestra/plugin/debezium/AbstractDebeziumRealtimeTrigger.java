@@ -197,10 +197,10 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                 }
 
                 final Properties props = task.properties(runContext, offsetFile, historyFile);
-                AtomicBoolean snapshot = new AtomicBoolean(false);
+                var snapshot = new AtomicBoolean(false);
                 AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>(ZonedDateTime.now());
-                AtomicBoolean taskStarted = new AtomicBoolean(false);
-                ChangeConsumer changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), snapshot, lastRecord, taskStarted, offsetFile, historyFile);
+                var taskStarted = new AtomicBoolean(false);
+                var changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), snapshot, lastRecord, taskStarted, offsetFile, historyFile);
 
                 ReconnectLoop.run(
                     reconnectPolicy,
@@ -278,7 +278,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
                 })
                 .build();
         } catch (Exception e) {
-            Throwable error = completionError.get();
+            var error = completionError.get();
             return ReconnectLoop.AttemptResult.failure(error != null ? error : e, false);
         }
 
@@ -307,11 +307,11 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
             return ReconnectLoop.AttemptResult.stopped();
         }
 
-        Throwable error = completionError.get();
+        var error = completionError.get();
         if (error == null) {
             error = new IllegalStateException("Debezium engine stopped while the realtime trigger was still active");
         }
-        boolean stable = ReconnectPolicy.ranStably(taskStartedAt.get(), System.nanoTime(), reconnectPolicy.maxDelay());
+        var stable = ReconnectPolicy.ranStably(taskStartedAt.get(), System.nanoTime(), reconnectPolicy.maxDelay());
         return ReconnectLoop.AttemptResult.failure(error, stable);
     }
 
@@ -424,7 +424,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         // Do not use try-with-resources: ExecutorService.close() waits for the task.
         // stop() also runs on the engine thread when the subscription is cancelled, and joining
         // close() from that thread deadlocks the engine shutdown.
-        ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
+        var executorService = Executors.newVirtualThreadPerTaskExecutor();
         executorService.execute(() -> AbstractDebeziumTask.closeBestEffort(engine, null));
         executorService.shutdown();
         if (!wait) {
