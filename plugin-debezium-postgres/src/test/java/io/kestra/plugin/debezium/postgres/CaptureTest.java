@@ -17,9 +17,6 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.classic.spi.ThrowableProxyUtil;
-import ch.qos.logback.core.read.ListAppender;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -32,6 +29,7 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
+import io.kestra.plugin.debezium.LogCapture;
 
 import jakarta.inject.Inject;
 
@@ -174,10 +172,6 @@ class CaptureTest extends AbstractDebeziumTest {
 
     private static final String SLOT_NAME = "kestra_log_level_test";
 
-    private static String fullText(ILoggingEvent event) {
-        return event.getFormattedMessage() + (event.getThrowableProxy() == null ? "" : ThrowableProxyUtil.asString(event.getThrowableProxy()));
-    }
-
     // every way a secret reaches Debezium besides the password: the SSL key password and `properties`
     enum SecretSource {
         SSL_KEY_PASSWORD,
@@ -187,15 +181,9 @@ class CaptureTest extends AbstractDebeziumTest {
     @ParameterizedTest
     @CsvSource({"INFO, SSL_KEY_PASSWORD", "INFO, PROPERTIES", "DEBUG, SSL_KEY_PASSWORD", "DEBUG, PROPERTIES", "TRACE, SSL_KEY_PASSWORD", "TRACE, PROPERTIES"})
     void appliesDebeziumLogLevel(Level level, SecretSource secretSource) throws Exception {
-        String secret = "leak-check-" + secretSource.name().toLowerCase();
+        var secret = "leak-check-" + secretSource.name().toLowerCase();
         // init database
         executeSqlScript("scripts/postgres.sql");
-
-        // record everything logged while the capture runs
-        var logs = new ListAppender<ILoggingEvent>();
-        logs.start();
-        Logger root = (Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
-        root.addAppender(logs);
 
         var builder = Capture.builder()
             .id(IdUtils.create())
@@ -219,9 +207,9 @@ class CaptureTest extends AbstractDebeziumTest {
             // `database.*` entries are passed as-is to the JDBC driver
             builder.properties(Property.ofValue(Map.of("database.sslpassword", secret)));
         }
-        Capture task = builder.build();
+        var task = builder.build();
 
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+        var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
         PostgresDebeziumTestHelper.dropReplicationArtifacts(
             this::getConnection,
             runContext.render(task.getSlotName()).as(String.class).orElse("kestra"),
@@ -229,10 +217,11 @@ class CaptureTest extends AbstractDebeziumTest {
         );
         PostgresDebeziumTestHelper.cleanupTaskState(runContext, task);
 
-        try {
+        // record everything logged while the capture runs
+        var logs = LogCapture.record();
+        try (logs) {
             task.run(runContext);
         } finally {
-            root.detachAppender(logs);
             // do not leave the replication slot behind: the test database only allows 10
             PostgresDebeziumTestHelper.dropReplicationArtifacts(
                 this::getConnection,
@@ -242,20 +231,10 @@ class CaptureTest extends AbstractDebeziumTest {
         }
 
         // the requested level was applied while the capture ran
-        assertTrue(
-            logs.list.stream().anyMatch(event -> event.getLoggerName().startsWith("io.debezium.")
-                && event.getLevel().toInt() <= ch.qos.logback.classic.Level.toLevel(level.name()).toInt()),
-            "expected Debezium " + level + " output while the capture ran"
-        );
+        assertTrue(logs.hasDebeziumOutputAtOrBelow(level), "expected Debezium " + level + " output while the capture ran");
 
-        // no level may print a secret given to the connector, in the message or in an exception
-        var secrets = List.of(TestUtils.password(), secret);
-        var leaks = logs.list.stream()
-            .filter(event -> secrets.stream().anyMatch(fullText(event)::contains))
-            .map(ILoggingEvent::getLoggerName)
-            .distinct()
-            .toList();
-        assertThat(leaks, is(List.of()));
+        // no level may print a secret given to the connector
+        assertThat(logs.loggersPrinting(List.of(TestUtils.password(), secret)), is(List.of()));
 
         // once the run is over, the loggers are back to ERROR
         assertThat(((Logger) LoggerFactory.getLogger("io.debezium")).getLevel(), is(ch.qos.logback.classic.Level.ERROR));

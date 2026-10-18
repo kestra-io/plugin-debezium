@@ -104,6 +104,18 @@ class LogLevelTest {
     }
 
     @Test
+    void theOracleJdbcUrlIsNeverLoggedAtTrace() {
+        // OracleConnection logs the raw `database.url` at TRACE, and it can hold the user and password
+        try (var ignored = DebeziumLogLevels.acquire(Level.TRACE)) {
+            assertThat(level("io.debezium"), is(ch.qos.logback.classic.Level.TRACE));
+            assertThat(effectiveLevel("io.debezium.connector.oracle.OracleConnection"), is(ch.qos.logback.classic.Level.DEBUG));
+        }
+        try (var ignored = DebeziumLogLevels.acquire(Level.DEBUG)) {
+            assertThat(effectiveLevel("io.debezium.connector.oracle.OracleConnection"), is(ch.qos.logback.classic.Level.DEBUG));
+        }
+    }
+
+    @Test
     void theMostVerboseActiveRunWins() {
         var debugRun = DebeziumLogLevels.acquire(Level.DEBUG);
         var warnRun = DebeziumLogLevels.acquire(Level.WARN);
@@ -178,8 +190,8 @@ class LogLevelTest {
      * logback is shared. Loads a second, independent copy of {@link DebeziumLogLevels} the same way.
      */
     private static Class<?> copyFromAnotherConnector() throws ClassNotFoundException {
-        String name = DebeziumLogLevels.class.getName();
-        ClassLoader isolated = new ClassLoader(LogLevelTest.class.getClassLoader()) {
+        var name = DebeziumLogLevels.class.getName();
+        var isolated = new ClassLoader(LogLevelTest.class.getClassLoader()) {
             @Override
             protected Class<?> loadClass(String className, boolean resolve) throws ClassNotFoundException {
                 if (!className.equals(name) && !className.startsWith(name + "$")) {
@@ -189,7 +201,7 @@ class LogLevelTest {
                     Class<?> loaded = findLoadedClass(className);
                     if (loaded == null) {
                         try (var in = getParent().getResourceAsStream(className.replace('.', '/') + ".class")) {
-                            byte[] bytes = in.readAllBytes();
+                            var bytes = in.readAllBytes();
                             loaded = defineClass(className, bytes, 0, bytes.length);
                         } catch (IOException e) {
                             throw new ClassNotFoundException(className, e);
@@ -204,7 +216,7 @@ class LogLevelTest {
 
     @Test
     void runsOfOtherConnectorsShareTheSameLeases() throws Exception {
-        Class<?> otherConnector = copyFromAnotherConnector();
+        var otherConnector = copyFromAnotherConnector();
         var acquire = otherConnector.getDeclaredMethod("acquire", Level.class);
         acquire.setAccessible(true);
         var applyBaseline = otherConnector.getDeclaredMethod("applyBaseline");

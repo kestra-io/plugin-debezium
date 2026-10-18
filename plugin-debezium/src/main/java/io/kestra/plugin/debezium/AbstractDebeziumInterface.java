@@ -178,13 +178,14 @@ public interface AbstractDebeziumInterface {
         title = "The log level of Debezium and Kafka Connect in the worker log",
         description = """
             Sets the level of the `io.debezium` and `org.apache.kafka.connect` loggers in the worker log while \
-            this task or trigger runs. It defaults to `ERROR`; raise it to `WARN`, `INFO` or `DEBUG` to \
-            troubleshoot a connector. This controls the worker log only, not the execution logs.
+            this task or trigger runs. It defaults to `ERROR`; raise it to `WARN`, `INFO`, `DEBUG` or \
+            `TRACE` to troubleshoot a connector. This controls the worker log only, not the execution logs.
 
             Loggers that print connection settings, secrets included, are capped: `io.debezium.embedded`, \
             `io.debezium.jdbc` and `io.debezium.openlineage` never go below `INFO`, and \
             `io.debezium.connector.common.BaseSourceTask`, which lists the whole connector configuration at \
-            `INFO`, never goes below `WARN`.
+            `INFO`, never goes below `WARN`. `io.debezium.connector.oracle.OracleConnection`, which logs the JDBC \
+            URL at `TRACE`, never goes below `DEBUG`.
 
             These loggers are shared by the whole worker JVM. When several Debezium tasks or triggers run on \
             the same worker, whatever their connector, the most verbose level among them applies, and the \

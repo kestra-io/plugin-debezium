@@ -6,21 +6,15 @@ import java.util.Map;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
-
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.classic.spi.ThrowableProxyUtil;
-import ch.qos.logback.core.read.ListAppender;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
+import io.kestra.plugin.debezium.LogCapture;
 
 import jakarta.inject.Inject;
 
@@ -51,22 +45,12 @@ class DebeziumLogLevelTest extends AbstractDebeziumTest {
         return "mysql_passwd";
     }
 
-    private static String fullText(ILoggingEvent event) {
-        return event.getFormattedMessage() + (event.getThrowableProxy() == null ? "" : ThrowableProxyUtil.asString(event.getThrowableProxy()));
-    }
-
     @ParameterizedTest
     @EnumSource(value = Level.class, names = {"INFO", "DEBUG", "TRACE"})
     void verboseLevelsDoNotPrintSecrets(Level level) throws Exception {
         executeSqlScript("scripts/mysql.sql");
 
-        // record everything logged while the capture runs
-        var logs = new ListAppender<ILoggingEvent>();
-        logs.start();
-        Logger root = (Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
-        root.addAppender(logs);
-
-        Capture task = Capture.builder()
+        var task = Capture.builder()
             .id(IdUtils.create())
             .type(Capture.class.getName())
             .serverId(Property.ofValue("123456790"))
@@ -82,27 +66,17 @@ class DebeziumLogLevelTest extends AbstractDebeziumTest {
             .properties(Property.ofValue(Map.of("database.ssl.keystore.password", KEYSTORE_PASSWORD)))
             .build();
 
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
-        try {
+        var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+        // record everything logged while the capture runs
+        var logs = LogCapture.record();
+        try (logs) {
             task.run(runContext);
-        } finally {
-            root.detachAppender(logs);
         }
 
         // the requested level was applied while the capture ran
-        assertTrue(
-            logs.list.stream().anyMatch(event -> event.getLoggerName().startsWith("io.debezium.")
-                && event.getLevel().toInt() <= ch.qos.logback.classic.Level.toLevel(level.name()).toInt()),
-            "expected Debezium " + level + " output while the capture ran"
-        );
+        assertTrue(logs.hasDebeziumOutputAtOrBelow(level), "expected Debezium " + level + " output while the capture ran");
 
-        // no level may print a secret given to the connector, in the message or in an exception
-        var secrets = List.of(getPassword(), KEYSTORE_PASSWORD);
-        var leaks = logs.list.stream()
-            .filter(event -> secrets.stream().anyMatch(fullText(event)::contains))
-            .map(ILoggingEvent::getLoggerName)
-            .distinct()
-            .toList();
-        assertThat(leaks, is(List.of()));
+        // no level may print a secret given to the connector
+        assertThat(logs.loggersPrinting(List.of(getPassword(), KEYSTORE_PASSWORD)), is(List.of()));
     }
 }
