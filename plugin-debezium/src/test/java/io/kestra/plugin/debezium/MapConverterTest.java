@@ -68,7 +68,7 @@ class MapConverterTest {
             Arguments
                 .of(SchemaBuilder.int64().name(NanoTimestamp.SCHEMA_NAME).build(), Instant.parse("2019-10-06T18:27:49Z").toEpochMilli() * 1000 * 1000, Instant.parse("2019-10-06T18:27:49Z")),
             Arguments.of(
-                SchemaBuilder.int32().name(Time.SCHEMA_NAME).build(), Instant.parse("2019-10-06T18:27:49Z").atZone(ZoneId.systemDefault()).toLocalTime().toNanoOfDay() / 1000 / 1000,
+                SchemaBuilder.int32().name(Time.SCHEMA_NAME).build(), Long.valueOf(Instant.parse("2019-10-06T18:27:49Z").atZone(ZoneId.systemDefault()).toLocalTime().toNanoOfDay() / 1000 / 1000).intValue(),
                 Instant.parse("2019-10-06T18:27:49Z").atZone(ZoneId.systemDefault()).toLocalTime()
             ),
             Arguments.of(SchemaBuilder.int32().name(Timestamp.SCHEMA_NAME).build(), Instant.parse("2019-10-06T18:27:49Z").toEpochMilli(), Instant.parse("2019-10-06T18:27:49Z")),
