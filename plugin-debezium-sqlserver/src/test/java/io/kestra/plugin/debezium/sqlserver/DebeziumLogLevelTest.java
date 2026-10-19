@@ -69,16 +69,13 @@ class DebeziumLogLevelTest extends AbstractDebeziumTest {
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
-        // record everything logged while the capture runs
         var logs = LogCapture.record();
         try (logs) {
             task.run(runContext);
         }
 
-        // the requested level was applied while the capture ran
         assertTrue(logs.hasDebeziumOutputAtOrBelow(level), "expected Debezium " + level + " output while the capture ran");
 
-        // no level may print a secret given to the connector
         assertThat(logs.loggersPrinting(List.of(getPassword(), TRUST_STORE_PASSWORD)), is(List.of()));
     }
 }

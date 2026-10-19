@@ -43,22 +43,20 @@ class DebeziumLogLevelTest {
             .hostname(Property.ofValue("127.0.0.1"))
             .port(Property.ofValue("27017"))
             .stateName(Property.ofValue("debezium-state-" + IdUtils.create()))
-            .maxWait(Property.ofValue(Duration.ofSeconds(5)))
+            // the engine refuses to stop while its task is still starting, which takes longer on CI runners
+            .maxWait(Property.ofValue(Duration.ofSeconds(30)))
             .debeziumLogLevel(Property.ofValue(level))
             .properties(Property.ofValue(Map.of("mongodb.ssl.keystore.password", KEYSTORE_PASSWORD)))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
-        // record everything logged while the capture runs
         var logs = LogCapture.record();
         try (logs) {
             task.run(runContext);
         }
 
-        // the requested level was applied while the capture ran
         assertTrue(logs.hasDebeziumOutputAtOrBelow(level), "expected Debezium " + level + " output while the capture ran");
 
-        // no level may print a secret given to the connector
         assertThat(logs.loggersPrinting(List.of(PASSWORD, KEYSTORE_PASSWORD)), is(List.of()));
     }
 }

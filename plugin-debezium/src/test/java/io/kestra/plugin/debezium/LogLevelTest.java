@@ -115,6 +115,17 @@ class LogLevelTest {
         }
     }
 
+    @ParameterizedTest
+    @EnumSource(value = Level.class, names = {"DEBUG", "TRACE"})
+    void theOracleSecondaryConnectionSettingsAreNeverLoggedBelowInfo(Level requested) {
+        // OracleConnectionFactoryProvider logs the secondary connection settings at DEBUG, only masking known password keys
+        try (var ignored = DebeziumLogLevels.acquire(requested)) {
+            assertThat(level("io.debezium"), is(logback(requested)));
+            assertThat(effectiveLevel("io.debezium.connector.oracle.jdbc.OracleConnectionFactoryProvider"), is(ch.qos.logback.classic.Level.INFO));
+            assertThat(effectiveLevel("io.debezium.connector.oracle.logminer.LogMinerHelper"), is(logback(requested)));
+        }
+    }
+
     @Test
     void theMostVerboseActiveRunWins() {
         var debugRun = DebeziumLogLevels.acquire(Level.DEBUG);

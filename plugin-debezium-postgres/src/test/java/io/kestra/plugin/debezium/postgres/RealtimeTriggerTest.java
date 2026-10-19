@@ -64,8 +64,8 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
 
     @Test
     void flow() throws Exception {
-        Logger debeziumLogger = (Logger) LoggerFactory.getLogger("io.debezium");
-        Level previousLevel = debeziumLogger.getLevel();
+        var debeziumLogger = (Logger) LoggerFactory.getLogger("io.debezium");
+        var previousLevel = debeziumLogger.getLevel();
 
         try {
             runFlow();

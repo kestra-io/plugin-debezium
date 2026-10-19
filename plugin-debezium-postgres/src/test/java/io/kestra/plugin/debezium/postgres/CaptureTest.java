@@ -182,7 +182,6 @@ class CaptureTest extends AbstractDebeziumTest {
     @CsvSource({"INFO, SSL_KEY_PASSWORD", "INFO, PROPERTIES", "DEBUG, SSL_KEY_PASSWORD", "DEBUG, PROPERTIES", "TRACE, SSL_KEY_PASSWORD", "TRACE, PROPERTIES"})
     void appliesDebeziumLogLevel(Level level, SecretSource secretSource) throws Exception {
         var secret = "leak-check-" + secretSource.name().toLowerCase();
-        // init database
         executeSqlScript("scripts/postgres.sql");
 
         var builder = Capture.builder()
@@ -217,7 +216,6 @@ class CaptureTest extends AbstractDebeziumTest {
         );
         PostgresDebeziumTestHelper.cleanupTaskState(runContext, task);
 
-        // record everything logged while the capture runs
         var logs = LogCapture.record();
         try (logs) {
             task.run(runContext);
@@ -230,13 +228,10 @@ class CaptureTest extends AbstractDebeziumTest {
             );
         }
 
-        // the requested level was applied while the capture ran
         assertTrue(logs.hasDebeziumOutputAtOrBelow(level), "expected Debezium " + level + " output while the capture ran");
 
-        // no level may print a secret given to the connector
         assertThat(logs.loggersPrinting(List.of(TestUtils.password(), secret)), is(List.of()));
 
-        // once the run is over, the loggers are back to ERROR
         assertThat(((Logger) LoggerFactory.getLogger("io.debezium")).getLevel(), is(ch.qos.logback.classic.Level.ERROR));
     }
 

@@ -25,13 +25,16 @@ final class DebeziumLogLevels {
     // - DebeziumOpenLineageEmitter logs the configuration it is initialised with (DEBUG),
     // - BaseSourceTask logs every connector setting when a task starts (INFO); it masks the keys it knows
     //   as passwords but not others, such as SQL Server's `database.trustStorePassword`,
-    // - OracleConnection logs the raw `database.url`, which can hold the user and password (TRACE).
+    // - OracleConnection logs the raw `database.url`, which can hold the user and password (TRACE),
+    // - OracleConnectionFactoryProvider logs the secondary connection settings with only the known password
+    //   keys masked, so a `database.url` holding credentials stays readable (DEBUG).
     static final Map<String, Level> CAPPED_LOGGERS = Map.of(
         "io.debezium.embedded", Level.INFO,
         "io.debezium.jdbc", Level.INFO,
         "io.debezium.openlineage", Level.INFO,
         "io.debezium.connector.common.BaseSourceTask", Level.WARN,
-        "io.debezium.connector.oracle.OracleConnection", Level.DEBUG
+        "io.debezium.connector.oracle.OracleConnection", Level.DEBUG,
+        "io.debezium.connector.oracle.jdbc", Level.INFO
     );
 
     static final Level BASELINE = Level.ERROR;

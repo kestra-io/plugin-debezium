@@ -182,10 +182,10 @@ public interface AbstractDebeziumInterface {
             `TRACE` to troubleshoot a connector. This controls the worker log only, not the execution logs.
 
             Loggers that print connection settings, secrets included, are capped: `io.debezium.embedded`, \
-            `io.debezium.jdbc` and `io.debezium.openlineage` never go below `INFO`, and \
-            `io.debezium.connector.common.BaseSourceTask`, which lists the whole connector configuration at \
-            `INFO`, never goes below `WARN`. `io.debezium.connector.oracle.OracleConnection`, which logs the JDBC \
-            URL at `TRACE`, never goes below `DEBUG`.
+            `io.debezium.jdbc`, `io.debezium.openlineage` and `io.debezium.connector.oracle.jdbc` never go below \
+            `INFO`, `io.debezium.connector.common.BaseSourceTask`, which lists the whole connector configuration \
+            at `INFO`, never goes below `WARN`, and `io.debezium.connector.oracle.OracleConnection`, which logs \
+            the JDBC URL at `TRACE`, never goes below `DEBUG`.
 
             These loggers are shared by the whole worker JVM. When several Debezium tasks or triggers run on \
             the same worker, whatever their connector, the most verbose level among them applies, and the \
