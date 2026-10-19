@@ -198,7 +198,7 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
 
                 final Properties props = task.properties(runContext, offsetFile, historyFile);
                 var snapshot = new AtomicBoolean(false);
-                AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>(ZonedDateTime.now());
+                var lastRecord = new AtomicReference<>(ZonedDateTime.now());
                 var taskStarted = new AtomicBoolean(false);
                 var changeConsumer = new ChangeConsumer(task, runContext, new AtomicInteger(), snapshot, lastRecord, taskStarted, offsetFile, historyFile);
 

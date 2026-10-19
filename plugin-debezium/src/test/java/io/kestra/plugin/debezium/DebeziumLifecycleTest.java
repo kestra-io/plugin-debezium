@@ -298,41 +298,7 @@ class DebeziumLifecycleTest {
         assertDoesNotThrow(() -> AbstractDebeziumTask.closeBestEffort(null, null));
     }
 
-    @Test
-    void resolveConnectorTypeResolvesAllSupportedConnectors() {
-        Properties props = new Properties();
-        assertThat(AbstractDebeziumTask.resolveConnectorType(props), nullValue());
 
-        props.setProperty("connector.class", "io.debezium.connector.mongodb.MongoDbConnector");
-        assertThat(AbstractDebeziumTask.resolveConnectorType(props), is("mongodb"));
-
-        props.setProperty("connector.class", "io.debezium.connector.postgresql.PostgresConnector");
-        assertThat(AbstractDebeziumTask.resolveConnectorType(props), is("postgres"));
-
-        props.setProperty("connector.class", "io.debezium.connector.mysql.MySqlConnector");
-        assertThat(AbstractDebeziumTask.resolveConnectorType(props), is("mysql"));
-
-        props.setProperty("connector.class", "io.debezium.connector.sqlserver.SqlServerConnector");
-        assertThat(AbstractDebeziumTask.resolveConnectorType(props), is("sqlserver"));
-
-        props.setProperty("connector.class", "io.debezium.connector.oracle.OracleConnector");
-        assertThat(AbstractDebeziumTask.resolveConnectorType(props), is("oracle"));
-
-        props.setProperty("connector.class", "io.debezium.connector.db2.Db2Connector");
-        assertThat(AbstractDebeziumTask.resolveConnectorType(props), is("db2"));
-    }
-
-    @Test
-    void propertiesToMapConvertsNullAndValidProperties() {
-        assertThat(AbstractDebeziumTask.propertiesToMap(null), is(Map.of()));
-
-        Properties props = new Properties();
-        props.setProperty("a", "1");
-        props.setProperty("b", "2");
-        Map<String, String> map = AbstractDebeziumTask.propertiesToMap(props);
-        assertThat(map.get("a"), is("1"));
-        assertThat(map.get("b"), is("2"));
-    }
 
     private record TestChangeEvent(SourceRecord value) implements ChangeEvent<SourceRecord, SourceRecord> {
         @Override

@@ -109,7 +109,9 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @Deprecated
     @Schema(
         title = "Deprecated hostname property",
-        description = "Ignored for MongoDB; use 'connectionString' instead."
+        description = """
+            Ignored for MongoDB; use 'connectionString' instead.
+            """
     )
     @Builder.Default
     protected Property<String> hostname = Property.ofValue("");
@@ -117,7 +119,9 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @Deprecated
     @Schema(
         title = "Deprecated port property",
-        description = "Ignored for MongoDB; use 'connectionString' instead."
+        description = """
+            Ignored for MongoDB; use 'connectionString' instead.
+            """
     )
     @Builder.Default
     protected Property<String> port = Property.ofValue("");

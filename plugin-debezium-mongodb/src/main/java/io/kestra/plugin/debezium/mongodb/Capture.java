@@ -113,7 +113,9 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
     @Deprecated
     @Schema(
         title = "Deprecated hostname property",
-        description = "Ignored for MongoDB; use 'connectionString' instead."
+        description = """
+            Ignored for MongoDB; use 'connectionString' instead.
+            """
     )
     @Override
     public Property<String> getHostname() {
@@ -123,7 +125,9 @@ public class Capture extends AbstractDebeziumTask implements MongodbInterface {
     @Deprecated
     @Schema(
         title = "Deprecated port property",
-        description = "Ignored for MongoDB; use 'connectionString' instead."
+        description = """
+            Ignored for MongoDB; use 'connectionString' instead.
+            """
     )
     @Override
     public Property<String> getPort() {

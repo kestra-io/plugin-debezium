@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
-
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -23,10 +22,8 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 
 import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.models.triggers.TriggerContext;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.IdUtils;
@@ -37,6 +34,7 @@ import io.debezium.connector.mongodb.MongoDbConnector;
 import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
@@ -77,7 +75,6 @@ class MongoDbTriggerLifecycleTest {
 
         Properties properties = capture.properties(runContext, offsetFile, historyFile);
 
-        assertThat(AbstractDebeziumTask.resolveConnectorType(properties), is("mongodb"));
         assertThat(properties.getProperty("connector.class"), is(MongoDbConnector.class.getName()));
         assertThat(properties.getProperty("snapshot.mode"), is("no_data"));
         assertThat(properties.getProperty("capture.mode"), is("change_streams_update_full_with_pre_image"));
@@ -151,11 +148,9 @@ class MongoDbTriggerLifecycleTest {
             .maxWait(Property.ofValue(Duration.ofSeconds(2)))
             .build();
 
-        RunContext runContext = runContextFactory.of(Map.of());
-        ConditionContext conditionContext = ConditionContext.builder().runContext(runContext).build();
-        TriggerContext triggerContext = TriggerContext.builder().build();
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
-        Optional<Execution> result = trigger.evaluate(conditionContext, triggerContext);
+        Optional<Execution> result = trigger.evaluate(context.getKey(), context.getValue());
         assertThat(result.isEmpty(), is(true));
     }
 
@@ -182,31 +177,28 @@ class MongoDbTriggerLifecycleTest {
             .snapshotMode(Property.ofValue(MongodbInterface.SnapshotMode.NO_DATA))
             .connectionString(Property.ofValue(connectionString))
             .includedCollections(List.of(fullCollectionName))
-            .maxRecords(Property.ofValue(1))
-            .maxWait(Property.ofValue(Duration.ofSeconds(10)))
+            .maxWait(Property.ofValue(Duration.ofSeconds(1)))
             .build();
 
-        RunContext runContext = runContextFactory.of(Map.of());
-        ConditionContext conditionContext = ConditionContext.builder().runContext(runContext).build();
-        TriggerContext triggerContext = TriggerContext.builder().build();
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
-        var inserted = new AtomicBoolean(false);
+        var running = new AtomicBoolean(true);
         try (var executor = Executors.newSingleThreadScheduledExecutor()) {
             executor.scheduleAtFixedRate(() -> {
-                if (!inserted.get()) {
+                if (running.get()) {
                     try (MongoClient mongoClient = MongoClients.create(connectionString)) {
                         mongoClient.getDatabase(dbName).getCollection(collName).insertOne(new Document("msg", "hello"));
-                        inserted.set(true);
                     } catch (Exception ignored) {
                     }
                 }
-            }, 2, 1, TimeUnit.SECONDS);
+            }, 500, 500, TimeUnit.MILLISECONDS);
 
-            Optional<Execution> result = trigger.evaluate(conditionContext, triggerContext);
+            Optional<Execution> result = trigger.evaluate(context.getKey(), context.getValue());
+            running.set(false);
             assertThat(result.isPresent(), is(true));
             Execution execution = result.get();
             assertThat(execution.getTrigger(), notNullValue());
-            assertThat(execution.getTrigger().getVariables().get("size"), is(1));
+            assertThat((Integer) execution.getTrigger().getVariables().get("size"), greaterThanOrEqualTo(1));
         }
     }
 

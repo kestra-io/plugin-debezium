@@ -208,13 +208,13 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
-        CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
-        ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, taskStarted, offsetFile, historyFile);
+        var completionCallback = new CompletionCallback(runContext, executorService);
+        var changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, taskStarted, offsetFile, historyFile);
 
         var stopRequested = new AtomicBoolean(false);
         DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = null;
         Throwable primaryException = null;
-        boolean thrownFromTry = false;
+        var thrownFromTry = false;
         try {
             engine = DebeziumEngine.create(Connect.class)
                 .using(this.getClass().getClassLoader())
@@ -813,49 +813,13 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         var renderedMaxWait = runContext.render(maxWait).as(Duration.class);
         if (renderedMaxWait.isPresent() && taskStarted.get()) {
-            ZonedDateTime last = lastRecord.get();
+            var last = lastRecord.get();
             if (last != null && ZonedDateTime.now().isAfter(last.plus(renderedMaxWait.get()))) {
                 return true;
             }
         }
 
         return false;
-    }
-
-    public static String resolveConnectorType(Properties props) {
-        if (props == null) {
-            return null;
-        }
-        String connectorClass = props.getProperty("connector.class");
-        if (connectorClass != null) {
-            if (connectorClass.contains(".mongodb.")) {
-                return "mongodb";
-            } else if (connectorClass.contains(".postgresql.")) {
-                return "postgres";
-            } else if (connectorClass.contains(".mysql.")) {
-                return "mysql";
-            } else if (connectorClass.contains(".sqlserver.")) {
-                return "sqlserver";
-            } else if (connectorClass.contains(".oracle.")) {
-                return "oracle";
-            } else if (connectorClass.contains(".db2.")) {
-                return "db2";
-            }
-        }
-        return null;
-    }
-
-    public static Map<String, String> propertiesToMap(Properties props) {
-        if (props == null) {
-            return Map.of();
-        }
-        var map = new HashMap<String, String>();
-        props.forEach((k, v) -> {
-            if (k != null && v != null) {
-                map.put(k.toString(), v.toString());
-            }
-        });
-        return Collections.unmodifiableMap(map);
     }
 
     public static void closeQuietly(DebeziumEngine<?> engine) {
@@ -901,7 +865,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         if (e == null || e.getMessage() == null) {
             return false;
         }
-        String msg = e.getMessage();
+        var msg = e.getMessage();
         return msg.contains("already shut down") || msg.contains("already being shutting down");
     }
 
