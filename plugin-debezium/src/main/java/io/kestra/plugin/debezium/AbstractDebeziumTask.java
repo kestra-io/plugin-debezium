@@ -31,6 +31,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.exceptions.ResourceExpiredException;
@@ -47,7 +48,6 @@ import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.utils.Await;
 import io.kestra.core.utils.Hashing;
 
-import ch.qos.logback.classic.LoggerContext;
 import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
@@ -76,6 +76,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     public static final String STATE_KEY_OFFSETS = "offsets";
 
     public static final String STATE_KEY_HISTORY = "history";
+
+    public static final Level DEFAULT_LOG_LEVEL = Level.ERROR;
 
     @Builder.Default
     protected Property<Format> format = Property.ofValue(Format.INLINE);
@@ -126,6 +128,9 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     @Builder.Default
     protected Property<String> stateName = Property.ofValue("debezium-state");
 
+    @Builder.Default
+    protected Property<Level> debeziumLogLevel = Property.ofValue(DEFAULT_LOG_LEVEL);
+
     @Schema(
         title = "The maximum number of rows to fetch before stopping",
         description = "It's not a hard limit and is evaluated every second."
@@ -170,25 +175,26 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     protected abstract boolean needDatabaseHistory();
 
     static {
-        // https://issues.redhat.com/browse/DBZ-4904
+        // https://issues.redhat.com/browse/DBZ-4904: Debezium stays at ERROR unless a run asks for more
+        DebeziumLogLevels.applyBaseline();
+    }
 
-        LoggerFactory.getLogger("org.apache.kafka.connect");
-        LoggerFactory.getLogger("io.debezium");
-
-        ((LoggerContext) org.slf4j.LoggerFactory.getILoggerFactory())
-            .getLoggerList()
-            .stream()
-            .filter(
-                logger -> logger.getName().startsWith("org.apache.kafka.connect") ||
-                    logger.getName().startsWith("io.debezium")
-            )
-            .forEach(
-                logger -> logger.setLevel(ch.qos.logback.classic.Level.ERROR)
-            );
+    /**
+     * Applies the configured {@code debeziumLogLevel} to the Debezium and Kafka Connect loggers for as
+     * long as the returned lease is open. Close it when the run ends.
+     */
+    DebeziumLogLevels.Lease configureLogging(RunContext runContext) throws IllegalVariableEvaluationException {
+        return DebeziumLogLevels.acquire(runContext.render(this.debeziumLogLevel).as(Level.class).orElse(DEFAULT_LOG_LEVEL));
     }
 
     @Override
     public AbstractDebeziumTask.Output run(RunContext runContext) throws Exception {
+        try (var ignored = this.configureLogging(runContext)) {
+            return this.capture(runContext);
+        }
+    }
+
+    private AbstractDebeziumTask.Output capture(RunContext runContext) throws Exception {
         AtomicInteger count = new AtomicInteger();
         AtomicBoolean snapshot = new AtomicBoolean(false);
         AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>();
@@ -870,7 +876,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     }
 
     private static boolean isMbeanRegistrationInterruption(Throwable error) {
-        for (Throwable current = error; current != null; current = current.getCause()) {
+        for (var current = error; current != null; current = current.getCause()) {
             var msg = current.getMessage();
             if (msg != null && msg.contains("Unable to register the MBean")) {
                 var cause = current.getCause();
@@ -882,7 +888,7 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     }
 
     private static <T extends Throwable> Optional<T> findCause(Throwable error, Class<T> type) {
-        for (Throwable current = error; current != null; current = current.getCause()) {
+        for (var current = error; current != null; current = current.getCause()) {
             if (type.isInstance(current)) {
                 return Optional.of(type.cast(current));
             }

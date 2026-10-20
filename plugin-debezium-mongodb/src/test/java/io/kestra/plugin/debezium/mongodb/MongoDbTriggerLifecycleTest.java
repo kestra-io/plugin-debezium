@@ -9,6 +9,7 @@ import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.bson.Document;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,7 @@ import io.debezium.connector.mongodb.MongoDbConnector;
 import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
@@ -123,8 +125,9 @@ class MongoDbTriggerLifecycleTest {
     @Test
     void triggerReturnsEmptyOnZeroMessages() throws Exception {
         Trigger trigger = Trigger.builder()
-            .id("test_cdc_trigger")
+            .id(IdUtils.create())
             .type(Trigger.class.getName())
+            .stateName(Property.ofValue(IdUtils.create()))
             .snapshotMode(Property.ofValue(MongodbInterface.SnapshotMode.NO_DATA))
             .connectionString(Property.ofValue("mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/admin?replicaSet=rs0"))
             .includedCollections(List.of("test.empty_collection"))
@@ -146,8 +149,9 @@ class MongoDbTriggerLifecycleTest {
         String fullCollectionName = dbName + "." + collName;
 
         Trigger trigger = Trigger.builder()
-            .id("test_cdc_insert_trigger")
+            .id(IdUtils.create())
             .type(Trigger.class.getName())
+            .stateName(Property.ofValue(IdUtils.create()))
             .snapshotMode(Property.ofValue(MongodbInterface.SnapshotMode.NO_DATA))
             .connectionString(Property.ofValue(connectionString))
             .includedCollections(List.of(fullCollectionName))
@@ -159,6 +163,7 @@ class MongoDbTriggerLifecycleTest {
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
         var running = new AtomicBoolean(true);
+        var insertError = new AtomicReference<Throwable>();
         var executor = Executors.newSingleThreadScheduledExecutor();
         try (MongoClient mongoClient = MongoClients.create(connectionString)) {
             mongoClient.getDatabase(dbName).createCollection(collName);
@@ -168,7 +173,10 @@ class MongoDbTriggerLifecycleTest {
                 if (running.get()) {
                     try {
                         collection.insertOne(new Document("msg", "hello"));
-                    } catch (Exception ignored) {
+                    } catch (Throwable t) {
+                        if (running.get()) {
+                            insertError.compareAndSet(null, t);
+                        }
                     }
                 }
             }, 500, 500, TimeUnit.MILLISECONDS);
@@ -177,10 +185,14 @@ class MongoDbTriggerLifecycleTest {
             running.set(false);
             executor.shutdownNow();
 
+            if (result.isEmpty() && insertError.get() != null) {
+                throw new AssertionError("MongoDB insertion failed during test execution", insertError.get());
+            }
+
             assertThat(result.isPresent(), is(true));
             Execution execution = result.get();
             assertThat(execution.getTrigger(), notNullValue());
-            assertThat(execution.getTrigger().getVariables().get("size"), is(1));
+            assertThat((Integer) execution.getTrigger().getVariables().get("size"), greaterThanOrEqualTo(1));
         } finally {
             running.set(false);
             executor.shutdownNow();
