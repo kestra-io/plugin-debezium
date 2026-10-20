@@ -11,7 +11,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.bson.Document;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import com.mongodb.MongoCredential;
@@ -34,7 +33,6 @@ import io.debezium.connector.mongodb.MongoDbConnector;
 import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
@@ -44,16 +42,6 @@ class MongoDbTriggerLifecycleTest {
 
     @Inject
     private RunContextFactory runContextFactory;
-
-    private static boolean isMongoReplicaSetReady() {
-        String connectionString = "mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/admin?replicaSet=rs0&serverSelectionTimeoutMS=2000&connectTimeoutMS=2000";
-        try (MongoClient mongoClient = MongoClients.create(connectionString)) {
-            Document response = mongoClient.getDatabase("admin").runCommand(new Document("ping", 1));
-            return response != null && response.get("ok") instanceof Number n && n.intValue() == 1;
-        } catch (Exception e) {
-            return false;
-        }
-    }
 
     @Test
     void captureConfiguresNoDataSnapshotModeAndConnectorType() throws Exception {
@@ -134,11 +122,6 @@ class MongoDbTriggerLifecycleTest {
 
     @Test
     void triggerReturnsEmptyOnZeroMessages() throws Exception {
-        Assumptions.assumeTrue(
-            isMongoReplicaSetReady(),
-            "Requires running and initialized MongoDB replica set rs0 at 127.0.0.1:27017 (docker-compose-ci.yml)"
-        );
-
         Trigger trigger = Trigger.builder()
             .id("test_cdc_trigger")
             .type(Trigger.class.getName())
@@ -156,20 +139,11 @@ class MongoDbTriggerLifecycleTest {
 
     @Test
     void triggerCapturesInsertedRecordInNoDataMode() throws Exception {
-        Assumptions.assumeTrue(
-            isMongoReplicaSetReady(),
-            "Requires running and initialized MongoDB replica set rs0 at 127.0.0.1:27017 (docker-compose-ci.yml)"
-        );
-
         String connectionString = "mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/admin?replicaSet=rs0";
         String uniqueSuffix = IdUtils.create();
         String dbName = "test";
         String collName = "cdc_events_" + uniqueSuffix;
         String fullCollectionName = dbName + "." + collName;
-
-        try (MongoClient setupClient = MongoClients.create(connectionString)) {
-            setupClient.getDatabase(dbName).createCollection(collName);
-        }
 
         Trigger trigger = Trigger.builder()
             .id("test_cdc_insert_trigger")
@@ -177,17 +151,23 @@ class MongoDbTriggerLifecycleTest {
             .snapshotMode(Property.ofValue(MongodbInterface.SnapshotMode.NO_DATA))
             .connectionString(Property.ofValue(connectionString))
             .includedCollections(List.of(fullCollectionName))
+            .maxRecords(Property.ofValue(1))
+            .maxDuration(Property.ofValue(Duration.ofMinutes(2)))
             .maxWait(Property.ofValue(Duration.ofSeconds(1)))
             .build();
 
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
         var running = new AtomicBoolean(true);
-        try (var executor = Executors.newSingleThreadScheduledExecutor()) {
+        var executor = Executors.newSingleThreadScheduledExecutor();
+        try (MongoClient mongoClient = MongoClients.create(connectionString)) {
+            mongoClient.getDatabase(dbName).createCollection(collName);
+            var collection = mongoClient.getDatabase(dbName).getCollection(collName);
+
             executor.scheduleAtFixedRate(() -> {
                 if (running.get()) {
-                    try (MongoClient mongoClient = MongoClients.create(connectionString)) {
-                        mongoClient.getDatabase(dbName).getCollection(collName).insertOne(new Document("msg", "hello"));
+                    try {
+                        collection.insertOne(new Document("msg", "hello"));
                     } catch (Exception ignored) {
                     }
                 }
@@ -195,10 +175,20 @@ class MongoDbTriggerLifecycleTest {
 
             Optional<Execution> result = trigger.evaluate(context.getKey(), context.getValue());
             running.set(false);
+            executor.shutdownNow();
+
             assertThat(result.isPresent(), is(true));
             Execution execution = result.get();
             assertThat(execution.getTrigger(), notNullValue());
-            assertThat((Integer) execution.getTrigger().getVariables().get("size"), greaterThanOrEqualTo(1));
+            assertThat(execution.getTrigger().getVariables().get("size"), is(1));
+        } finally {
+            running.set(false);
+            executor.shutdownNow();
+            try {
+                executor.awaitTermination(2, TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 

@@ -6,7 +6,6 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -297,8 +296,6 @@ class DebeziumLifecycleTest {
         assertDoesNotThrow(() -> AbstractDebeziumTask.closeBestEffort(ioFailEngine, null));
         assertDoesNotThrow(() -> AbstractDebeziumTask.closeBestEffort(null, null));
     }
-
-
 
     private record TestChangeEvent(SourceRecord value) implements ChangeEvent<SourceRecord, SourceRecord> {
         @Override
