@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.kafka.connect.source.SourceRecord;
 import org.reactivestreams.Publisher;
+import org.slf4j.event.Level;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -101,6 +102,9 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     @Builder.Default
     protected Property<String> stateName = Property.ofValue("debezium-state");
 
+    @Builder.Default
+    protected Property<Level> debeziumLogLevel = Property.ofValue(AbstractDebeziumTask.DEFAULT_LOG_LEVEL);
+
     @Schema(
         title = "When to commit the offsets to the KV Store",
         description = """
@@ -175,7 +179,6 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
     private final AtomicReference<DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>>> engineReference = new AtomicReference<>();
 
     public Publisher<AbstractDebeziumRealtimeTrigger.StreamOutput> publisher(AbstractDebeziumTask task, RunContext runContext) throws IllegalVariableEvaluationException {
-
         var rOffsetsCommitMode = runContext.render(offsetsCommitMode).as(OffsetCommitMode.class).orElse(OffsetCommitMode.ON_STOP);
         var offsetFile = runContext.workingDir().path().resolve(AbstractDebeziumTask.OFFSETS_DATA_FILE);
         var historyFile = runContext.workingDir().path().resolve(AbstractDebeziumTask.DBHISTORY_DATA_FILE);
@@ -186,7 +189,11 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
         return Flux.create(sink ->
         {
             sink.onCancel(this::cancelPublisher);
+            // Polling triggers get this through task.run(); the realtime trigger never calls run(), so it
+            // holds the log level lease for as long as the stream is running.
+            DebeziumLogLevels.Lease logLevelLease = null;
             try {
+                logLevelLease = task.configureLogging(runContext);
                 task.restoreState(runContext, offsetFile, historyFile);
 
                 var identity = task.resolveEffectiveIdentity(runContext);
@@ -206,15 +213,22 @@ public abstract class AbstractDebeziumRealtimeTrigger extends AbstractTrigger im
             } catch (Exception e) {
                 sink.error(e);
             } finally {
-                // The engine flushes its final offsets during shutdown. The file saved
-                // inside an ON_EACH_BATCH callback can still contain the previous batch.
                 try {
-                    task.saveFinalState(runContext, offsetFile, historyFile);
-                } catch (IOException e) {
-                    sink.error(new RuntimeException(e));
-                }
+                    // The engine flushes its final offsets during shutdown. The file saved
+                    // inside an ON_EACH_BATCH callback can still contain the previous batch.
+                    try {
+                        task.saveFinalState(runContext, offsetFile, historyFile);
+                    } catch (IOException e) {
+                        sink.error(new RuntimeException(e));
+                    }
+                } finally {
+                    // released even if saving the state throws, or the level would stay raised for good
+                    if (logLevelLease != null) {
+                        logLevelLease.close();
+                    }
 
-                sink.complete();
+                    sink.complete();
+                }
             }
         });
     }
