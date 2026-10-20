@@ -11,7 +11,12 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
+
+import ch.qos.logback.classic.Logger;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -24,6 +29,7 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.debezium.AbstractDebeziumTask;
 import io.kestra.plugin.debezium.AbstractDebeziumTest;
+import io.kestra.plugin.debezium.LogCapture;
 
 import jakarta.inject.Inject;
 
@@ -162,6 +168,71 @@ class CaptureTest extends AbstractDebeziumTest {
 
         assertThat(events.size(), is(1));
         assertThat(events.getFirst().get("event_title"), is("Iron Maiden"));
+    }
+
+    private static final String SLOT_NAME = "kestra_log_level_test";
+
+    // every way a secret reaches Debezium besides the password: the SSL key password and `properties`
+    enum SecretSource {
+        SSL_KEY_PASSWORD,
+        PROPERTIES
+    }
+
+    @ParameterizedTest
+    @CsvSource({"INFO, SSL_KEY_PASSWORD", "INFO, PROPERTIES", "DEBUG, SSL_KEY_PASSWORD", "DEBUG, PROPERTIES", "TRACE, SSL_KEY_PASSWORD", "TRACE, PROPERTIES"})
+    void appliesDebeziumLogLevel(Level level, SecretSource secretSource) throws Exception {
+        var secret = "leak-check-" + secretSource.name().toLowerCase();
+        executeSqlScript("scripts/postgres.sql");
+
+        var builder = Capture.builder()
+            .id(IdUtils.create())
+            .type(Capture.class.getName())
+            .hostname(Property.ofValue(TestUtils.hostname()))
+            .username(Property.ofValue(TestUtils.username()))
+            .password(Property.ofValue(TestUtils.password()))
+            .port(Property.ofValue("65432"))
+            .database(Property.ofValue("postgres"))
+            .pluginName(Property.ofValue(PostgresInterface.PluginName.PGOUTPUT))
+            .stateName(Property.ofValue("debezium-state-" + IdUtils.create()))
+            .snapshotMode(Property.ofValue(Capture.SnapshotMode.NEVER))
+            .maxWait(Property.ofValue(Duration.ofSeconds(5)))
+            .includedTables(List.of("public.events"))
+            .debeziumLogLevel(Property.ofValue(level))
+            // a fixed slot name, so the cleanup below drops exactly the slot this test created
+            .slotName(Property.ofValue(SLOT_NAME));
+        if (secretSource == SecretSource.SSL_KEY_PASSWORD) {
+            builder.sslKeyPassword(Property.ofValue(secret));
+        } else {
+            // `database.*` entries are passed as-is to the JDBC driver
+            builder.properties(Property.ofValue(Map.of("database.sslpassword", secret)));
+        }
+        var task = builder.build();
+
+        var runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+        PostgresDebeziumTestHelper.dropReplicationArtifacts(
+            this::getConnection,
+            runContext.render(task.getSlotName()).as(String.class).orElse("kestra"),
+            runContext.render(task.getPublicationName()).as(String.class).orElse("kestra_publication")
+        );
+        PostgresDebeziumTestHelper.cleanupTaskState(runContext, task);
+
+        var logs = LogCapture.record();
+        try (logs) {
+            task.run(runContext);
+        } finally {
+            // do not leave the replication slot behind: the test database only allows 10
+            PostgresDebeziumTestHelper.dropReplicationArtifacts(
+                this::getConnection,
+                SLOT_NAME,
+                runContext.render(task.getPublicationName()).as(String.class).orElse("kestra_publication")
+            );
+        }
+
+        assertTrue(logs.hasDebeziumOutputAtOrBelow(level), "expected Debezium " + level + " output while the capture ran");
+
+        assertThat(logs.loggersPrinting(List.of(TestUtils.password(), secret)), is(List.of()));
+
+        assertThat(((Logger) LoggerFactory.getLogger("io.debezium")).getLevel(), is(ch.qos.logback.classic.Level.ERROR));
     }
 
     @SuppressWarnings("unchecked")

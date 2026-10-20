@@ -90,6 +90,7 @@ public class Trigger extends AbstractDebeziumTrigger implements Db2Interface, Ab
             .excludedColumns(this.excludedColumns)
             .properties(this.properties)
             .stateName(this.stateName)
+            .debeziumLogLevel(this.debeziumLogLevel)
             .maxRecords(this.maxRecords)
             .maxDuration(this.maxDuration)
             .maxWait(this.maxWait)
