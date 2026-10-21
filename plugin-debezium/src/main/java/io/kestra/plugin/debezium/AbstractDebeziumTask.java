@@ -723,10 +723,11 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     }
 
     @SuppressWarnings("unchecked")
-    protected static String joinProperties(RunContext runContext, Object raw) {
+    protected static String joinProperties(RunContext runContext, Object raw) throws IllegalVariableEvaluationException {
         List<String> value = raw instanceof Collection ? (List<String>) raw : List.of((String) raw);
 
         return value.stream()
+            .map(throwFunction(runContext::render))
             // debezium needs commas escaped to split properly
             .map(x -> x.replaceAll(",", "\\,"))
             .collect(Collectors.joining(","));
