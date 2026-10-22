@@ -6,7 +6,6 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,7 +19,6 @@ import org.junit.jupiter.api.Test;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 
 import io.debezium.engine.ChangeEvent;
@@ -50,23 +48,23 @@ class DebeziumLifecycleTest {
 
     @Test
     void changeConsumerUpdatesSharedLastRecordAndTaskStarted() {
-        DummyTask task = DummyTask.builder().build();
-        RunContext runContext = runContextFactory.of();
-        AtomicInteger count = new AtomicInteger();
-        AtomicBoolean snapshot = new AtomicBoolean(false);
-        AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>(ZonedDateTime.now().minusMinutes(5));
-        AtomicBoolean taskStarted = new AtomicBoolean(false);
+        var task = DummyTask.builder().build();
+        var runContext = runContextFactory.of();
+        var count = new AtomicInteger();
+        var snapshot = new AtomicBoolean(false);
+        var lastRecord = new AtomicReference<>(ZonedDateTime.now().minusMinutes(5));
+        var taskStarted = new AtomicBoolean(false);
 
-        ChangeConsumer consumer = new ChangeConsumer(
+        var consumer = new ChangeConsumer(
             task, runContext, count, snapshot, lastRecord, taskStarted, Path.of("offsets"), Path.of("history")
         );
 
         assertThat(consumer.getTaskStarted().get(), is(false));
-        ZonedDateTime initialLastRecord = lastRecord.get();
+        var initialLastRecord = lastRecord.get();
 
-        Schema schema = SchemaBuilder.struct().name("test").field("id", Schema.INT32_SCHEMA).build();
-        Struct struct = new Struct(schema).put("id", 1);
-        SourceRecord sourceRecord = new SourceRecord(
+        var schema = SchemaBuilder.struct().name("test").field("id", Schema.INT32_SCHEMA).build();
+        var struct = new Struct(schema).put("id", 1);
+        var sourceRecord = new SourceRecord(
             Map.of("snapshot", false), Map.of(), "topic", null, null, null, schema, struct
         );
 
@@ -79,12 +77,12 @@ class DebeziumLifecycleTest {
 
     @Test
     void changeConsumerRejectsNullLastRecordOrTaskStarted() {
-        DummyTask task = DummyTask.builder().build();
-        RunContext runContext = runContextFactory.of();
-        AtomicInteger count = new AtomicInteger();
-        AtomicBoolean snapshot = new AtomicBoolean(false);
-        AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>(ZonedDateTime.now());
-        AtomicBoolean taskStarted = new AtomicBoolean(false);
+        var task = DummyTask.builder().build();
+        var runContext = runContextFactory.of();
+        var count = new AtomicInteger();
+        var snapshot = new AtomicBoolean(false);
+        var lastRecord = new AtomicReference<>(ZonedDateTime.now());
+        var taskStarted = new AtomicBoolean(false);
 
         assertThrows(NullPointerException.class, () -> new ChangeConsumer(
             task, runContext, count, snapshot, null, taskStarted, Path.of("offsets"), Path.of("history")
@@ -97,20 +95,20 @@ class DebeziumLifecycleTest {
 
     @Test
     void endedDoesNotTimeoutOnMaxWaitBeforeTaskStarted() throws Exception {
-        DummyTask task = DummyTask.builder()
+        var task = DummyTask.builder()
             .maxWait(Property.ofValue(Duration.ofSeconds(10)))
             .build();
-        RunContext runContext = runContextFactory.of();
+        var runContext = runContextFactory.of();
 
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        var executor = Executors.newSingleThreadExecutor();
         try {
-            AtomicInteger count = new AtomicInteger(0);
-            ZonedDateTime start = ZonedDateTime.now().minusSeconds(30);
-            AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>(ZonedDateTime.now().minusSeconds(20));
-            AtomicBoolean taskStarted = new AtomicBoolean(false);
-            AtomicBoolean snapshot = new AtomicBoolean(false);
+            var count = new AtomicInteger(0);
+            var start = ZonedDateTime.now().minusSeconds(30);
+            var lastRecord = new AtomicReference<>(ZonedDateTime.now().minusSeconds(20));
+            var taskStarted = new AtomicBoolean(false);
+            var snapshot = new AtomicBoolean(false);
 
-            boolean ended = task.ended(executor, count, start, lastRecord, taskStarted, snapshot, runContext);
+            var ended = task.ended(executor, count, start, lastRecord, taskStarted, snapshot, runContext);
             assertThat(ended, is(false));
 
             taskStarted.set(true);
@@ -123,20 +121,20 @@ class DebeziumLifecycleTest {
 
     @Test
     void endedExtendsWaitWhenNewRecordsArrive() throws Exception {
-        DummyTask task = DummyTask.builder()
+        var task = DummyTask.builder()
             .maxWait(Property.ofValue(Duration.ofSeconds(10)))
             .build();
-        RunContext runContext = runContextFactory.of();
+        var runContext = runContextFactory.of();
 
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        var executor = Executors.newSingleThreadExecutor();
         try {
-            AtomicInteger count = new AtomicInteger(1);
-            ZonedDateTime start = ZonedDateTime.now().minusSeconds(25);
-            AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>(ZonedDateTime.now());
-            AtomicBoolean taskStarted = new AtomicBoolean(true);
-            AtomicBoolean snapshot = new AtomicBoolean(false);
+            var count = new AtomicInteger(1);
+            var start = ZonedDateTime.now().minusSeconds(25);
+            var lastRecord = new AtomicReference<>(ZonedDateTime.now());
+            var taskStarted = new AtomicBoolean(true);
+            var snapshot = new AtomicBoolean(false);
 
-            boolean ended = task.ended(executor, count, start, lastRecord, taskStarted, snapshot, runContext);
+            var ended = task.ended(executor, count, start, lastRecord, taskStarted, snapshot, runContext);
             assertThat(ended, is(false));
         } finally {
             executor.shutdownNow();
@@ -145,20 +143,20 @@ class DebeziumLifecycleTest {
 
     @Test
     void endedHonorsMaxRecordsAndMaxDuration() throws Exception {
-        DummyTask task = DummyTask.builder()
+        var task = DummyTask.builder()
             .maxRecords(Property.ofValue(5))
             .maxDuration(Property.ofValue(Duration.ofSeconds(30)))
             .maxWait(Property.ofValue(Duration.ofSeconds(10)))
             .build();
-        RunContext runContext = runContextFactory.of();
+        var runContext = runContextFactory.of();
 
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        var executor = Executors.newSingleThreadExecutor();
         try {
-            AtomicInteger count = new AtomicInteger(5);
-            ZonedDateTime start = ZonedDateTime.now().minusSeconds(5);
-            AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>(ZonedDateTime.now());
-            AtomicBoolean taskStarted = new AtomicBoolean(true);
-            AtomicBoolean snapshot = new AtomicBoolean(false);
+            var count = new AtomicInteger(5);
+            var start = ZonedDateTime.now().minusSeconds(5);
+            var lastRecord = new AtomicReference<>(ZonedDateTime.now());
+            var taskStarted = new AtomicBoolean(true);
+            var snapshot = new AtomicBoolean(false);
 
             assertThat(task.ended(executor, count, start, lastRecord, taskStarted, snapshot, runContext), is(true));
 
@@ -167,7 +165,7 @@ class DebeziumLifecycleTest {
             snapshot.set(false);
 
             count.set(2);
-            ZonedDateTime oldStart = ZonedDateTime.now().minusSeconds(35);
+            var oldStart = ZonedDateTime.now().minusSeconds(35);
             assertThat(task.ended(executor, count, oldStart, lastRecord, taskStarted, snapshot, runContext), is(true));
         } finally {
             executor.shutdownNow();
@@ -176,13 +174,13 @@ class DebeziumLifecycleTest {
 
     @Test
     void endedReturnsTrueImmediatelyWhenExecutorShutdown() throws Exception {
-        DummyTask task = new DummyTask();
-        RunContext runContext = runContextFactory.of();
+        var task = new DummyTask();
+        var runContext = runContextFactory.of();
 
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        var executor = Executors.newSingleThreadExecutor();
         executor.shutdown();
 
-        boolean ended = task.ended(
+        var ended = task.ended(
             executor,
             new AtomicInteger(0),
             ZonedDateTime.now(),
@@ -199,10 +197,10 @@ class DebeziumLifecycleTest {
     void isShutdownArtifactIdentifiesExpectedShutdownExceptions() {
         assertThat(AbstractDebeziumTask.isShutdownArtifact(new InterruptedException("sleep interrupted")), is(true));
 
-        Exception mbeanInterruption = new RuntimeException("Unable to register the MBean", new InterruptedException("sleep interrupted"));
+        var mbeanInterruption = new RuntimeException("Unable to register the MBean", new InterruptedException("sleep interrupted"));
         assertThat(AbstractDebeziumTask.isShutdownArtifact(mbeanInterruption), is(true));
 
-        Exception alreadyShutDown = new IllegalStateException("Engine has been already shut down");
+        var alreadyShutDown = new IllegalStateException("Engine has been already shut down");
         assertThat(AbstractDebeziumTask.isShutdownArtifact(alreadyShutDown), is(true));
         assertThat(AbstractDebeziumTask.isShutdownArtifact(new IllegalStateException("Engine is already being shutting down.")), is(true));
 

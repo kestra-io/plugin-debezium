@@ -1,11 +1,8 @@
 package io.kestra.plugin.debezium.mongodb;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -18,13 +15,10 @@ import com.mongodb.MongoCredential;
 import com.mongodb.MongoSecurityException;
 import com.mongodb.MongoSocketOpenException;
 import com.mongodb.ServerAddress;
-import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 
 import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
@@ -47,7 +41,7 @@ class MongoDbTriggerLifecycleTest {
 
     @Test
     void captureConfiguresNoDataSnapshotModeAndConnectorType() throws Exception {
-        Capture capture = Capture.builder()
+        var capture = Capture.builder()
             .id(IdUtils.create())
             .type(Capture.class.getName())
             .snapshotMode(Property.ofValue(MongodbInterface.SnapshotMode.NO_DATA))
@@ -59,11 +53,11 @@ class MongoDbTriggerLifecycleTest {
             .maxDuration(Property.ofValue(Duration.ofMinutes(5)))
             .build();
 
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, capture, Map.of());
-        Path offsetFile = runContext.workingDir().path().resolve("offsets.dat");
-        Path historyFile = runContext.workingDir().path().resolve("history.dat");
+        var runContext = TestsUtils.mockRunContext(runContextFactory, capture, Map.of());
+        var offsetFile = runContext.workingDir().path().resolve("offsets.dat");
+        var historyFile = runContext.workingDir().path().resolve("history.dat");
 
-        Properties properties = capture.properties(runContext, offsetFile, historyFile);
+        var properties = capture.properties(runContext, offsetFile, historyFile);
 
         assertThat(properties.getProperty("connector.class"), is(MongoDbConnector.class.getName()));
         assertThat(properties.getProperty("snapshot.mode"), is("no_data"));
@@ -79,8 +73,8 @@ class MongoDbTriggerLifecycleTest {
 
     @Test
     void triggerMaintainsDeprecatedHostnameAndPortCompatibility() throws Exception {
-        Trigger trigger = Trigger.builder()
-            .id("test_cdc_trigger")
+        var trigger = Trigger.builder()
+            .id(IdUtils.create())
             .type(Trigger.class.getName())
             .snapshotMode(Property.ofValue(MongodbInterface.SnapshotMode.NO_DATA))
             .connectionString(Property.ofValue("mongodb://localhost:27017/?replicaSet=rs0"))
@@ -88,8 +82,8 @@ class MongoDbTriggerLifecycleTest {
             .port(Property.ofValue("27017"))
             .build();
 
-        RealtimeTrigger realtimeTrigger = RealtimeTrigger.builder()
-            .id("test_realtime_trigger")
+        var realtimeTrigger = RealtimeTrigger.builder()
+            .id(IdUtils.create())
             .type(RealtimeTrigger.class.getName())
             .snapshotMode(Property.ofValue(MongodbInterface.SnapshotMode.NO_DATA))
             .connectionString(Property.ofValue("mongodb://localhost:27017/?replicaSet=rs0"))
@@ -97,7 +91,7 @@ class MongoDbTriggerLifecycleTest {
             .port(Property.ofValue("27017"))
             .build();
 
-        RunContext runContext = runContextFactory.of(Map.of());
+        var runContext = runContextFactory.of(Map.of());
         assertThat(runContext.render(trigger.getHostname()).as(String.class).orElse(""), is("legacy-host"));
         assertThat(runContext.render(trigger.getPort()).as(String.class).orElse(""), is("27017"));
         assertThat(trigger.getConnectionString(), notNullValue());
@@ -109,14 +103,14 @@ class MongoDbTriggerLifecycleTest {
 
     @Test
     void triggerDefaultsDeprecatedHostnameAndPortToEmptyForCompatibility() throws Exception {
-        Trigger trigger = Trigger.builder()
-            .id("test_cdc_trigger")
+        var trigger = Trigger.builder()
+            .id(IdUtils.create())
             .type(Trigger.class.getName())
             .snapshotMode(Property.ofValue(MongodbInterface.SnapshotMode.NO_DATA))
             .connectionString(Property.ofValue("mongodb://localhost:27017/?replicaSet=rs0"))
             .build();
 
-        RunContext runContext = runContextFactory.of(Map.of());
+        var runContext = runContextFactory.of(Map.of());
         assertThat(runContext.render(trigger.getHostname()).as(String.class).orElse(""), is(""));
         assertThat(runContext.render(trigger.getPort()).as(String.class).orElse(""), is(""));
         assertThat(trigger.getConnectionString(), notNullValue());
@@ -124,7 +118,7 @@ class MongoDbTriggerLifecycleTest {
 
     @Test
     void triggerReturnsEmptyOnZeroMessages() throws Exception {
-        Trigger trigger = Trigger.builder()
+        var trigger = Trigger.builder()
             .id(IdUtils.create())
             .type(Trigger.class.getName())
             .stateName(Property.ofValue(IdUtils.create()))
@@ -136,19 +130,19 @@ class MongoDbTriggerLifecycleTest {
 
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
-        Optional<Execution> result = trigger.evaluate(context.getKey(), context.getValue());
+        var result = trigger.evaluate(context.getKey(), context.getValue());
         assertThat(result.isEmpty(), is(true));
     }
 
     @Test
     void triggerCapturesInsertedRecordInNoDataMode() throws Exception {
-        String connectionString = "mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/admin?replicaSet=rs0";
-        String uniqueSuffix = IdUtils.create();
-        String dbName = "test";
-        String collName = "cdc_events_" + uniqueSuffix;
-        String fullCollectionName = dbName + "." + collName;
+        var connectionString = "mongodb://mongo_user:mongo_passwd@127.0.0.1:27017/admin?replicaSet=rs0";
+        var uniqueSuffix = IdUtils.create();
+        var dbName = "test";
+        var collName = "cdc_events_" + uniqueSuffix;
+        var fullCollectionName = dbName + "." + collName;
 
-        Trigger trigger = Trigger.builder()
+        var trigger = Trigger.builder()
             .id(IdUtils.create())
             .type(Trigger.class.getName())
             .stateName(Property.ofValue(IdUtils.create()))
@@ -165,7 +159,7 @@ class MongoDbTriggerLifecycleTest {
         var running = new AtomicBoolean(true);
         var insertError = new AtomicReference<Throwable>();
         var executor = Executors.newSingleThreadScheduledExecutor();
-        try (MongoClient mongoClient = MongoClients.create(connectionString)) {
+        try (var mongoClient = MongoClients.create(connectionString)) {
             mongoClient.getDatabase(dbName).createCollection(collName);
             var collection = mongoClient.getDatabase(dbName).getCollection(collName);
 
@@ -181,7 +175,7 @@ class MongoDbTriggerLifecycleTest {
                 }
             }, 500, 500, TimeUnit.MILLISECONDS);
 
-            Optional<Execution> result = trigger.evaluate(context.getKey(), context.getValue());
+            var result = trigger.evaluate(context.getKey(), context.getValue());
             running.set(false);
             executor.shutdownNow();
 
@@ -190,7 +184,7 @@ class MongoDbTriggerLifecycleTest {
             }
 
             assertThat(result.isPresent(), is(true));
-            Execution execution = result.get();
+            var execution = result.get();
             assertThat(execution.getTrigger(), notNullValue());
             assertThat((Integer) execution.getTrigger().getVariables().get("size"), greaterThanOrEqualTo(1));
         } finally {
@@ -206,19 +200,19 @@ class MongoDbTriggerLifecycleTest {
 
     @Test
     void mongoExceptionsNotClassifiedAsShutdownArtifacts() {
-        MongoSecurityException securityException = new MongoSecurityException(
+        var securityException = new MongoSecurityException(
             MongoCredential.createCredential("user", "admin", "pass".toCharArray()),
             "Exception authenticating"
         );
         assertThat(AbstractDebeziumTask.isShutdownArtifact(securityException), is(false));
 
-        MongoSocketOpenException socketException = new MongoSocketOpenException(
+        var socketException = new MongoSocketOpenException(
             "Exception opening socket",
             new ServerAddress("localhost", 27017)
         );
         assertThat(AbstractDebeziumTask.isShutdownArtifact(socketException), is(false));
 
-        RuntimeException connectException = new RuntimeException(
+        var connectException = new RuntimeException(
             "Could not connect to MongoDB replica set", socketException
         );
         assertThat(AbstractDebeziumTask.isShutdownArtifact(connectException), is(false));
