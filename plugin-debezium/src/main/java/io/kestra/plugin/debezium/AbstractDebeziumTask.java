@@ -22,6 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -196,7 +197,8 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     private AbstractDebeziumTask.Output capture(RunContext runContext) throws Exception {
         AtomicInteger count = new AtomicInteger();
         AtomicBoolean snapshot = new AtomicBoolean(false);
-        ZonedDateTime lastRecord = ZonedDateTime.now();
+        AtomicReference<ZonedDateTime> lastRecord = new AtomicReference<>();
+        var taskStarted = new AtomicBoolean(false);
 
         Path offsetFile = runContext.workingDir().path().resolve(OFFSETS_DATA_FILE);
         Path historyFile = runContext.workingDir().path().resolve(DBHISTORY_DATA_FILE);
@@ -214,46 +216,95 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             Thread.ofPlatform().daemon().name("debezium-engine-" + identity.name()).factory()
         );
 
-        CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
-        ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, offsetFile, historyFile);
+        var completionCallback = new CompletionCallback(runContext, executorService);
+        var changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, taskStarted, offsetFile, historyFile);
 
+        var stopRequested = new AtomicBoolean(false);
+        DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = null;
+        Throwable primaryException = null;
+        var thrownFromTry = false;
         try {
-            try (
-                DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
-                    .using(this.getClass().getClassLoader())
-                    .using(props)
-                    .notifying(changeConsumer)
-                    .using(completionCallback)
-                    .build()
-            ) {
-                executorService.execute(engine);
+            engine = DebeziumEngine.create(Connect.class)
+                .using(this.getClass().getClassLoader())
+                .using(props)
+                .notifying(changeConsumer)
+                .using(new DebeziumEngine.ConnectorCallback() {
+                    @Override
+                    public void taskStarted() {
+                        taskStarted.set(true);
+                        lastRecord.compareAndSet(null, ZonedDateTime.now());
+                    }
 
-                ZonedDateTime snapshotStarted = ZonedDateTime.now();
-                boolean consumes;
-                do {
-                    int previousCount = count.get();
-                    ZonedDateTime captureStarted = ZonedDateTime.now();
-                    Await.until(() ->
-                    {
-                        try {
-                            return this.ended(executorService, count, captureStarted, lastRecord, snapshot, runContext);
-                        } catch (IllegalVariableEvaluationException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }, Duration.ofSeconds(1));
-                    consumes = count.get() > previousCount;
-                    // if we are still snapshotting, allow waiting for more time until snapshot wait duration is reached
-                } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(runContext.render(this.maxSnapshotDuration).as(Duration.class).orElseThrow())));
-            }
+                    @Override
+                    public void pollingStarted() {
+                        taskStarted.set(true);
+                        lastRecord.compareAndSet(null, ZonedDateTime.now());
+                    }
+                })
+                .using(completionCallback)
+                .build();
 
-            if (completionCallback.getError() != null) {
-                throw new Exception(completionCallback.getError());
+            executorService.execute(engine);
+
+            ZonedDateTime snapshotStarted = ZonedDateTime.now();
+            boolean consumes;
+            do {
+                int previousCount = count.get();
+                ZonedDateTime captureStarted = ZonedDateTime.now();
+                Await.until(() ->
+                {
+                    try {
+                        return this.ended(executorService, count, captureStarted, lastRecord, taskStarted, snapshot, runContext);
+                    } catch (IllegalVariableEvaluationException e) {
+                        throw new RuntimeException(e);
+                    }
+                }, Duration.ofSeconds(1));
+                consumes = count.get() > previousCount;
+                // if we are still snapshotting, allow waiting for more time until snapshot wait duration is reached
+            } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(runContext.render(this.maxSnapshotDuration).as(Duration.class).orElseThrow())));
+
+            if (completionCallback.getError() == null) {
+                stopRequested.set(true);
             }
+        } catch (Throwable t) {
+            primaryException = t;
+            thrownFromTry = true;
+            throw t;
         } finally {
+            // Apply reviewer feedback: ensure executor shuts down immediately on exception/exit
             executorService.shutdown();
+            
+            if (engine != null) {
+                try {
+                    closeQuietly(engine, runContext.logger());
+                } catch (Throwable t) {
+                    runContext.logger().warn("Failed to close Debezium engine: {}", t.getMessage(), t);
+                    if (primaryException != null) {
+                        primaryException.addSuppressed(t);
+                    } else {
+                        primaryException = t;
+                    }
+                }
+            }
+            try {
+                this.shutdown(runContext.logger(), executorService);
+            } catch (Throwable t) {
+                if (primaryException != null) {
+                    primaryException.addSuppressed(t);
+                } else {
+                    primaryException = t;
+                }
+            }
+            if (!thrownFromTry && primaryException != null) {
+                if (primaryException instanceof Exception e) {
+                    throw e;
+                } else if (primaryException instanceof Error err) {
+                    throw err;
+                } else {
+                    throw new RuntimeException(primaryException);
+                }
+            }
         }
-
-        this.shutdown(runContext.logger(), executorService);
 
         Output.OutputBuilder outputBuilder = Output.builder();
 
@@ -739,8 +790,14 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
     }
 
     @SuppressWarnings("RedundantIfStatement")
-    private boolean ended(ExecutorService executorService, AtomicInteger count, ZonedDateTime start, ZonedDateTime lastRecord, AtomicBoolean snapshot, RunContext runContext)
-        throws IllegalVariableEvaluationException {
+    boolean ended(
+        ExecutorService executorService,
+        AtomicInteger count,
+        ZonedDateTime start,
+        AtomicReference<ZonedDateTime> lastRecord,
+        AtomicBoolean taskStarted,
+        AtomicBoolean snapshot,
+        RunContext runContext) throws IllegalVariableEvaluationException {
         if (executorService.isShutdown()) {
             return true;
         }
@@ -757,7 +814,98 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
         }
 
         var renderedMaxWait = runContext.render(maxWait).as(Duration.class);
-        if (renderedMaxWait.isPresent() && ZonedDateTime.now().isAfter(lastRecord.plus(renderedMaxWait.get()))) {
+        if (renderedMaxWait.isPresent() && taskStarted.get()) {
+            var last = lastRecord.get();
+            if (last != null && ZonedDateTime.now().isAfter(last.plus(renderedMaxWait.get()))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static void closeQuietly(DebeziumEngine<?> engine) {
+        closeQuietly(engine, null);
+    }
+
+    public static void closeQuietly(DebeziumEngine<?> engine, Logger logger) {
+        if (engine == null) {
+            return;
+        }
+        try {
+            engine.close();
+        } catch (IllegalStateException e) {
+            if (isEngineShutdownArtifact(e)) {
+                if (logger != null) {
+                    logger.debug("Debezium engine was already stopped or stopping: {}", e.getMessage());
+                }
+            } else {
+                throw e;
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to close Debezium engine", e);
+        }
+    }
+
+    public static void closeBestEffort(DebeziumEngine<?> engine, Logger logger) {
+        if (engine == null) {
+            return;
+        }
+        try {
+            closeQuietly(engine, logger);
+        } catch (Exception e) {
+            if (logger != null) {
+                logger.warn("Best-effort close of Debezium engine failed: {}", e.getMessage(), e);
+            } else {
+                LoggerFactory.getLogger(AbstractDebeziumTask.class)
+                    .warn("Best-effort close of Debezium engine failed: {}", e.getMessage(), e);
+            }
+        }
+    }
+
+    public static boolean isEngineShutdownArtifact(IllegalStateException e) {
+        if (e == null || e.getMessage() == null) {
+            return false;
+        }
+        var msg = e.getMessage();
+        return msg.contains("already shut down") || msg.contains("already being shutting down");
+    }
+
+    private static boolean isMbeanRegistrationInterruption(Throwable error) {
+        for (var current = error; current != null; current = current.getCause()) {
+            var msg = current.getMessage();
+            if (msg != null && msg.contains("Unable to register the MBean")) {
+                var cause = current.getCause();
+                return cause instanceof InterruptedException ||
+                    (cause != null && cause.getMessage() != null && cause.getMessage().contains("sleep interrupted"));
+            }
+        }
+        return false;
+    }
+
+    private static <T extends Throwable> Optional<T> findCause(Throwable error, Class<T> type) {
+        for (var current = error; current != null; current = current.getCause()) {
+            if (type.isInstance(current)) {
+                return Optional.of(type.cast(current));
+            }
+        }
+        return Optional.empty();
+    }
+
+    public static boolean isShutdownArtifact(Throwable error) {
+        if (error == null) {
+            return false;
+        }
+
+        if (error instanceof InterruptedException) {
+            return error.getCause() == null || error.getCause() instanceof InterruptedException;
+        }
+
+        if (isMbeanRegistrationInterruption(error)) {
+            return true;
+        }
+
+        if (findCause(error, IllegalStateException.class).filter(AbstractDebeziumTask::isEngineShutdownArtifact).isPresent()) {
             return true;
         }
 

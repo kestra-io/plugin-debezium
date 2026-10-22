@@ -121,7 +121,7 @@ subprojects {
         testImplementation "org.hamcrest:hamcrest-library"
         testImplementation "ch.qos.logback:logback-classic"
 
-        testImplementation group: 'com.h2database', name: 'h2', version: '2.5.250'
+        testImplementation group: 'com.h2database', name: 'h2', version: '2.5.252'
     }
 }
 

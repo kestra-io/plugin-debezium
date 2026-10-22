@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
@@ -77,7 +78,7 @@ class ChangeConsumerTest {
         AtomicInteger count = new AtomicInteger();
         ChangeConsumer consumer = new ChangeConsumer(
             task(format, AbstractDebeziumTask.Deleted.DROP), runContextFactory.of(), count,
-            new AtomicBoolean(), ZonedDateTime.now(), Path.of("offsets"), Path.of("history")
+            new AtomicBoolean(), new AtomicReference<>(ZonedDateTime.now()), new AtomicBoolean(false), Path.of("offsets"), Path.of("history")
         );
         SourceRecord record = deleteRecord();
         TrackingCommitter committer = new TrackingCommitter();
@@ -217,7 +218,16 @@ class ChangeConsumerTest {
 
     private List<AbstractDebeziumRealtimeTrigger.StreamOutput> consume(AbstractDebeziumTask task, SourceRecord record, NoopCommitter committer) {
         RunContext runContext = runContextFactory.of();
-        ChangeConsumer consumer = new ChangeConsumer(task, runContext, new AtomicInteger(), new AtomicBoolean(), ZonedDateTime.now(), Path.of("offsets"), Path.of("history"));
+        ChangeConsumer consumer = new ChangeConsumer(
+            task,
+            runContext,
+            new AtomicInteger(),
+            new AtomicBoolean(),
+            new AtomicReference<>(ZonedDateTime.now()),
+            new AtomicBoolean(false),
+            Path.of("offsets"),
+            Path.of("history")
+        );
 
         return Flux.<AbstractDebeziumRealtimeTrigger.StreamOutput> create(sink ->
         {

@@ -31,6 +31,12 @@ public interface Db2Interface {
     @PluginProperty(group = "main")
     Property<SnapshotMode> getSnapshotMode();
 
+    @NotNull
+    Property<String> getHostname();
+
+    @NotNull
+    Property<String> getPort();
+
     public enum SnapshotMode {
         ALWAYS,
         INITIAL,

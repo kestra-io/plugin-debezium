@@ -32,6 +32,12 @@ public interface SqlServerInterface {
     @PluginProperty(group = "main")
     Property<SnapshotMode> getSnapshotMode();
 
+    @NotNull
+    Property<String> getHostname();
+
+    @NotNull
+    Property<String> getPort();
+
     static void handleProperties(Properties properties, RunContext runContext, SqlServerInterface sqlServer) throws IllegalVariableEvaluationException, IOException {
         properties.put("database.names", runContext.render(sqlServer.getDatabase()).as(String.class).orElseThrow());
 

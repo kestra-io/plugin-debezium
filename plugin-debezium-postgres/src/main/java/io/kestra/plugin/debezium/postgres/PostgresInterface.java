@@ -107,6 +107,12 @@ public interface PostgresInterface {
     @PluginProperty(group = "main")
     Property<SnapshotMode> getSnapshotMode();
 
+    @NotNull
+    Property<String> getHostname();
+
+    @NotNull
+    Property<String> getPort();
+
     enum SnapshotMode {
         INITIAL,
         ALWAYS,
