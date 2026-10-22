@@ -271,9 +271,6 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
             thrownFromTry = true;
             throw t;
         } finally {
-            // Apply reviewer feedback: ensure executor shuts down immediately on exception/exit
-            executorService.shutdown();
-            
             if (engine != null) {
                 try {
                     closeQuietly(engine, runContext.logger());
@@ -303,6 +300,15 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
                 } else {
                     throw new RuntimeException(primaryException);
                 }
+            }
+        }
+
+        var error = completionCallback.getError();
+        if (error != null) {
+            if (stopRequested.get() && isShutdownArtifact(error)) {
+                runContext.logger().debug("Ignoring expected Debezium shutdown error: {}", error.getMessage(), error);
+            } else {
+                throw new Exception(error);
             }
         }
 
