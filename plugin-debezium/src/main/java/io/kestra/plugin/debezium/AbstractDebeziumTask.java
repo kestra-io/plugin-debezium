@@ -210,43 +210,47 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         final Properties props = this.properties(runContext, offsetFile, historyFile);
 
-        ExecutorService executorService = Executors.newSingleThreadExecutor(
-            Thread.ofPlatform().daemon().name("debezium-engine-", 0).factory()
+        var executorService = Executors.newSingleThreadExecutor(
+            Thread.ofPlatform().daemon().name("debezium-engine-" + identity.name()).factory()
         );
 
         CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
         ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, offsetFile, historyFile);
 
-        try (
-            DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
-                .using(this.getClass().getClassLoader())
-                .using(props)
-                .notifying(changeConsumer)
-                .using(completionCallback)
-                .build()
-        ) {
-            executorService.execute(engine);
+        try {
+            try (
+                DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine = DebeziumEngine.create(Connect.class)
+                    .using(this.getClass().getClassLoader())
+                    .using(props)
+                    .notifying(changeConsumer)
+                    .using(completionCallback)
+                    .build()
+            ) {
+                executorService.execute(engine);
 
-            ZonedDateTime snapshotStarted = ZonedDateTime.now();
-            boolean consumes;
-            do {
-                int previousCount = count.get();
-                ZonedDateTime captureStarted = ZonedDateTime.now();
-                Await.until(() ->
-                {
-                    try {
-                        return this.ended(executorService, count, captureStarted, lastRecord, snapshot, runContext);
-                    } catch (IllegalVariableEvaluationException e) {
-                        throw new RuntimeException(e);
-                    }
-                }, Duration.ofSeconds(1));
-                consumes = count.get() > previousCount;
-                // if we are still snapshotting, allow waiting for more time until snapshot wait duration is reached
-            } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(runContext.render(this.maxSnapshotDuration).as(Duration.class).orElseThrow())));
-        }
+                ZonedDateTime snapshotStarted = ZonedDateTime.now();
+                boolean consumes;
+                do {
+                    int previousCount = count.get();
+                    ZonedDateTime captureStarted = ZonedDateTime.now();
+                    Await.until(() ->
+                    {
+                        try {
+                            return this.ended(executorService, count, captureStarted, lastRecord, snapshot, runContext);
+                        } catch (IllegalVariableEvaluationException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }, Duration.ofSeconds(1));
+                    consumes = count.get() > previousCount;
+                    // if we are still snapshotting, allow waiting for more time until snapshot wait duration is reached
+                } while (snapshot.get() && consumes && ZonedDateTime.now().isBefore(snapshotStarted.plus(runContext.render(this.maxSnapshotDuration).as(Duration.class).orElseThrow())));
+            }
 
-        if (completionCallback.getError() != null) {
-            throw new Exception(completionCallback.getError());
+            if (completionCallback.getError() != null) {
+                throw new Exception(completionCallback.getError());
+            }
+        } finally {
+            executorService.shutdown();
         }
 
         this.shutdown(runContext.logger(), executorService);
