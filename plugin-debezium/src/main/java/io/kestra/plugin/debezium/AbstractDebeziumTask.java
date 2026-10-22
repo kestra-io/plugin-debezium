@@ -210,7 +210,9 @@ public abstract class AbstractDebeziumTask extends Task implements RunnableTask<
 
         final Properties props = this.properties(runContext, offsetFile, historyFile);
 
-        ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
+        ExecutorService executorService = Executors.newSingleThreadExecutor(
+            Thread.ofPlatform().daemon().name("debezium-engine-", 0).factory()
+        );
 
         CompletionCallback completionCallback = new CompletionCallback(runContext, executorService);
         ChangeConsumer changeConsumer = new ChangeConsumer(this, runContext, count, snapshot, lastRecord, offsetFile, historyFile);
