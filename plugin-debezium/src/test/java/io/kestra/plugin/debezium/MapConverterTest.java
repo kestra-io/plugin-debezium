@@ -3,6 +3,7 @@ package io.kestra.plugin.debezium;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.*;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -52,7 +53,11 @@ class MapConverterTest {
                 Instant.parse("2019-10-06T18:27:49Z").atZone(ZoneId.systemDefault()).toLocalDate()
             ),
             Arguments.of(SchemaBuilder.string().name(Interval.SCHEMA_NAME).build(), "P2Y", Period.parse("P2Y")),
-            Arguments.of(SchemaBuilder.int64().name(MicroDuration.SCHEMA_NAME).build(), Duration.ofSeconds(5).toSeconds(), Duration.ofSeconds(5)),
+            Arguments.of(SchemaBuilder.int64().name(MicroDuration.SCHEMA_NAME).build(), 5_000_000L, Duration.ofSeconds(5)),
+            Arguments.of(SchemaBuilder.int64().name(MicroDuration.SCHEMA_NAME).build(), 1_500_000L, Duration.ofMillis(1500)),
+            Arguments.of(SchemaBuilder.int64().name(MicroDuration.SCHEMA_NAME).build(), 1L, Duration.ofNanos(1000)),
+            Arguments.of(SchemaBuilder.int64().name(MicroDuration.SCHEMA_NAME).build(), -5_000_000L, Duration.ofSeconds(-5)),
+            Arguments.of(SchemaBuilder.int64().name(MicroDuration.SCHEMA_NAME).build(), Long.MAX_VALUE, Duration.of(Long.MAX_VALUE, ChronoUnit.MICROS)),
             Arguments.of(
                 SchemaBuilder.int64().name(MicroTime.SCHEMA_NAME).build(), Instant.parse("2019-10-06T18:27:49Z").atZone(ZoneId.systemDefault()).toLocalTime().toNanoOfDay() / 1000,
                 Instant.parse("2019-10-06T18:27:49Z").atZone(ZoneId.systemDefault()).toLocalTime()
@@ -66,7 +71,7 @@ class MapConverterTest {
             Arguments
                 .of(SchemaBuilder.int64().name(NanoTimestamp.SCHEMA_NAME).build(), Instant.parse("2019-10-06T18:27:49Z").toEpochMilli() * 1000 * 1000, Instant.parse("2019-10-06T18:27:49Z")),
             Arguments.of(
-                SchemaBuilder.int32().name(Time.SCHEMA_NAME).build(), Instant.parse("2019-10-06T18:27:49Z").atZone(ZoneId.systemDefault()).toLocalTime().toNanoOfDay() / 1000 / 1000,
+                SchemaBuilder.int32().name(Time.SCHEMA_NAME).build(), Long.valueOf(Instant.parse("2019-10-06T18:27:49Z").atZone(ZoneId.systemDefault()).toLocalTime().toNanoOfDay() / 1000 / 1000).intValue(),
                 Instant.parse("2019-10-06T18:27:49Z").atZone(ZoneId.systemDefault()).toLocalTime()
             ),
             Arguments.of(SchemaBuilder.int32().name(Timestamp.SCHEMA_NAME).build(), Instant.parse("2019-10-06T18:27:49Z").toEpochMilli(), Instant.parse("2019-10-06T18:27:49Z")),

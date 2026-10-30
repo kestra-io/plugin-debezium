@@ -2,6 +2,8 @@ package io.kestra.plugin.debezium;
 
 import java.util.Map;
 
+import org.slf4j.event.Level;
+
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 
@@ -84,16 +86,18 @@ public interface AbstractDebeziumInterface {
     @Schema(
         title = "Hostname of the remote server"
     )
-    @NotNull
     @PluginProperty(group = "main")
-    Property<String> getHostname();
+    default Property<String> getHostname() {
+        return null;
+    }
 
     @Schema(
         title = "Port of the remote server"
     )
-    @NotNull
     @PluginProperty(group = "main")
-    Property<String> getPort();
+    default Property<String> getPort() {
+        return null;
+    }
 
     @Schema(
         title = "Username on the remote server"
@@ -171,4 +175,25 @@ public interface AbstractDebeziumInterface {
     @NotNull
     @PluginProperty(group = "main")
     Property<String> getStateName();
+
+    @Schema(
+        title = "The log level of Debezium and Kafka Connect in the worker log",
+        description = """
+            Sets the level of the `io.debezium` and `org.apache.kafka.connect` loggers in the worker log while \
+            this task or trigger runs. It defaults to `ERROR`; raise it to `WARN`, `INFO`, `DEBUG` or \
+            `TRACE` to troubleshoot a connector. This controls the worker log only, not the execution logs.
+
+            Loggers that print connection settings, secrets included, are capped: `io.debezium.embedded`, \
+            `io.debezium.jdbc`, `io.debezium.openlineage` and `io.debezium.connector.oracle.jdbc` never go below \
+            `INFO`, `io.debezium.connector.common.BaseSourceTask`, which lists the whole connector configuration \
+            at `INFO`, never goes below `WARN`, and `io.debezium.connector.oracle.OracleConnection`, which logs \
+            the JDBC URL at `TRACE`, never goes below `DEBUG`.
+
+            These loggers are shared by the whole worker JVM. When several Debezium tasks or triggers run on \
+            the same worker, whatever their connector, the most verbose level among them applies, and the \
+            loggers go back to `ERROR` once the last one has finished."""
+    )
+    @NotNull
+    @PluginProperty(group = "advanced")
+    Property<Level> getDebeziumLogLevel();
 }

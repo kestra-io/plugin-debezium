@@ -11,6 +11,8 @@ triggers:
     password: dbz
     sid: XE
     stateName: someStateNameForTrigger
+    maxWait: 30
+    maxRecords: 5
     includedTables: KESTRA.TRIGGER_EVENTS
 
 tasks:

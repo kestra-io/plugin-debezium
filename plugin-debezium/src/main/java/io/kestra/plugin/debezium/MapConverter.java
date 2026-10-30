@@ -3,6 +3,7 @@ package io.kestra.plugin.debezium;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.*;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -75,7 +76,7 @@ public class MapConverter {
                         if (!(value instanceof Long)) {
                             throw new IllegalArgumentException("Invalid type for MicroDuration, expected Long but was " + value.getClass() + " for '" + value + "'");
                         }
-                        return Duration.ofMillis((Long) value * 1000);
+                        return Duration.of((Long) value, ChronoUnit.MICROS);
 
                     case MicroTime.SCHEMA_NAME:
                         if (!(value instanceof Long)) {
@@ -108,10 +109,10 @@ public class MapConverter {
                         return Instant.ofEpochSecond(0L, (Long) value);
 
                     case Time.SCHEMA_NAME:
-                        if (!(value instanceof Long)) {
-                            throw new IllegalArgumentException("Invalid type for Timestamp, expected Long but was " + value.getClass() + " for '" + value + "'");
+                        if (!(value instanceof Integer)) {
+                            throw new IllegalArgumentException("Invalid type for Time, expected Integer but was " + value.getClass() + " for '" + value + "'");
                         }
-                        return LocalTime.ofNanoOfDay((Long) value * 1000 * 1000);
+                        return LocalTime.ofNanoOfDay((Integer) value * 1_000_000L);
 
                     case Timestamp.SCHEMA_NAME:
                         if (!(value instanceof Long)) {

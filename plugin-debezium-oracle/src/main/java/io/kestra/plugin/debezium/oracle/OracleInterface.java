@@ -39,6 +39,12 @@ public interface OracleInterface {
     @NotNull
     Property<SnapshotMode> getSnapshotMode();
 
+    @NotNull
+    Property<String> getHostname();
+
+    @NotNull
+    Property<String> getPort();
+
     public enum SnapshotMode {
         ALWAYS,
         INITIAL,

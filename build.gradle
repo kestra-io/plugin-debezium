@@ -1,15 +1,15 @@
 plugins {
-    id 'io.kestra.gradle.repository-conventions' version '1.2.10'
-    id 'io.kestra.gradle.spotless-conventions' version '1.2.10' apply false
+    id 'io.kestra.gradle.repository-conventions' version '1.2.12'
+    id 'io.kestra.gradle.spotless-conventions' version '1.2.12' apply false
     id 'java-library'
     id "idea"
     id 'jacoco-report-aggregation'
     id "com.gradleup.shadow" version "9.6.1" apply(false)
     id 'signing'
-    id 'net.researchgate.release' version '3.1.0'
+    id 'net.researchgate.release' version '3.2.0'
     id "com.vanniktech.maven.publish" version "0.37.0"
-    id "io.kestra.gradle.inject-bom-versions" version "1.2.10"
-    id "io.kestra.gradle.plugin-doc-lint" version "1.2.10" apply(false)
+    id "io.kestra.gradle.inject-bom-versions" version '1.2.12'
+    id "io.kestra.gradle.plugin-doc-lint" version '1.2.12' apply(false)
 }
 
 def isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
@@ -119,8 +119,9 @@ subprojects {
         testImplementation "org.junit.jupiter:junit-jupiter-params"
         testImplementation "org.hamcrest:hamcrest"
         testImplementation "org.hamcrest:hamcrest-library"
+        testImplementation "ch.qos.logback:logback-classic"
 
-        testImplementation group: 'com.h2database', name: 'h2', version: '2.5.250'
+        testImplementation group: 'com.h2database', name: 'h2', version: '2.5.252'
     }
 }
 

@@ -7,6 +7,10 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.executions.Execution;
@@ -60,8 +64,25 @@ class RealtimeTriggerTest extends AbstractDebeziumTest {
 
     @Test
     void flow() throws Exception {
+        var debeziumLogger = (Logger) LoggerFactory.getLogger("io.debezium");
+        var previousLevel = debeziumLogger.getLevel();
+
+        try {
+            runFlow();
+
+            // realtime.yaml sets `debeziumLogLevel: INFO`; the realtime path never calls task.run(), so this
+            // checks both the builder wiring and the call in AbstractDebeziumRealtimeTrigger#publisher
+            assertThat(debeziumLogger.getLevel(), is(Level.INFO));
+        } finally {
+            // the level is global to the JVM, do not leak it into the other tests
+            debeziumLogger.setLevel(previousLevel);
+        }
+    }
+
+    private void runFlow() throws Exception {
         CountDownLatch queueCount = new CountDownLatch(1);
-        Flux<Execution> receive = TestsUtils.receive(executionQueue, execution -> {
+        Flux<Execution> receive = TestsUtils.receive(executionQueue, execution ->
+        {
             queueCount.countDown();
             assertThat(execution.getLeft().getFlowId(), is("trigger"));
         });

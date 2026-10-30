@@ -63,8 +63,7 @@ public class Trigger extends AbstractDebeziumTrigger implements PostgresInterfac
     @Builder.Default
     protected Property<PluginName> pluginName = Property.ofValue(PluginName.PGOUTPUT);
 
-    @Builder.Default
-    protected Property<String> slotName = Property.ofValue("kestra");
+    protected Property<String> slotName;
 
     @Builder.Default
     protected Property<String> publicationName = Property.ofValue("kestra_publication");
@@ -111,6 +110,7 @@ public class Trigger extends AbstractDebeziumTrigger implements PostgresInterfac
             .excludedColumns(this.excludedColumns)
             .properties(this.properties)
             .stateName(this.stateName)
+            .debeziumLogLevel(this.debeziumLogLevel)
             .maxRecords(this.maxRecords)
             .maxDuration(this.maxDuration)
             .maxWait(this.maxWait)
