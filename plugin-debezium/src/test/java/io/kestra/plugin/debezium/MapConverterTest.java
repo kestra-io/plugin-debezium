@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import org.apache.kafka.connect.data.*;
+import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -88,5 +90,20 @@ class MapConverterTest {
         Object convert = MapConverter.convert(schema, value);
 
         assertThat(convert, is(expected != null ? expected : value));
+    }
+
+    @Test
+    void convertRecordKeepsKeyWhenKeySchemaExists() {
+        var keySchema = SchemaBuilder.struct().field("events_id", Schema.INT32_SCHEMA).build();
+        var key = new Struct(keySchema).put("events_id", 1);
+
+        var record = new SourceRecord(
+            Map.of(), Map.of(), "test.public.events", keySchema, key,
+            null, null
+        );
+
+        var result = MapConverter.convert(record);
+
+        assertThat(result.getLeft().getProperties(), is(Map.of("events_id", 1)));
     }
 }
