@@ -23,7 +23,6 @@ import io.debezium.time.Year;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
 
 class MapConverterTest {
     private final static Schema STRUCT_SCHEMA = SchemaBuilder.struct().field("a", Schema.STRING_SCHEMA).field("b", Schema.INT32_SCHEMA).build();
@@ -95,17 +94,16 @@ class MapConverterTest {
 
     @Test
     void convertRecordKeepsKeyWhenKeySchemaExists() {
-        Schema keySchema = SchemaBuilder.struct().field("events_id", Schema.INT32_SCHEMA).build();
-        Struct key = new Struct(keySchema).put("events_id", 1);
+        var keySchema = SchemaBuilder.struct().field("events_id", Schema.INT32_SCHEMA).build();
+        var key = new Struct(keySchema).put("events_id", 1);
 
-        SourceRecord record = new SourceRecord(
+        var record = new SourceRecord(
             Map.of(), Map.of(), "test.public.events", keySchema, key,
             null, null
         );
 
         var result = MapConverter.convert(record);
 
-        assertThat(result.getLeft(), is(notNullValue()));
         assertThat(result.getLeft().getProperties(), is(Map.of("events_id", 1)));
     }
 }
