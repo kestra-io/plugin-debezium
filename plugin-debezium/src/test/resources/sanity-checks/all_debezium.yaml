@@ -1,0 +1,19 @@
+# The capture flows need their databases already running, so it is on the skip list in kestra-io/sanity-checks.
+id: all_debezium
+namespace: sanitychecks.plugin-debezium
+
+tasks:
+  - id: loop
+    type: io.kestra.plugin.core.flow.Loop
+    values:
+      - postgres-capture
+      - mysql-capture
+      - mongodb-capture
+      - sqlserver-capture
+      - db2-capture
+      - oracle-capture
+    tasks:
+      - id: subflow
+        type: io.kestra.plugin.core.flow.Subflow
+        flowId: "{{ item.value }}"
+        namespace: "{{ flow.namespace }}"
