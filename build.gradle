@@ -49,6 +49,8 @@ subprojects {
         resolutionStrategy {
             // Debezium is using Kafka 4.1.x
             force  group: 'org.apache.kafka', name: 'kafka-clients', version: "4.3.1"
+            // SEC-2095: lz4-java < 1.11.4 is vulnerable (CVE-2026-106451, CVE-2026-106450, CVE-2026-106449), pulled transitively.
+            force group: 'at.yawk.lz4', name: 'lz4-java', version: "1.11.4"
         }
     }
 
