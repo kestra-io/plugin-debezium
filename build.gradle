@@ -49,6 +49,8 @@ subprojects {
         resolutionStrategy {
             // Debezium is using Kafka 4.1.x
             force  group: 'org.apache.kafka', name: 'kafka-clients', version: "4.3.1"
+            // CVE-2025-59250: 13.4.0 rather than 12.10.2.jre11, the scanner ignores the jre11 qualifier and still flags 12.10.2
+            force  group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: "13.4.0.jre11"
         }
     }
 
