@@ -53,6 +53,13 @@ subprojects {
             force  group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: "13.4.0.jre11"
             // SEC-0139: kafka-clients pulls at.yawk.lz4:lz4-java 1.10.2, remove once the platform ships >= 1.11.4.
             force  group: 'at.yawk.lz4', name: 'lz4-java', version: "1.11.4"
+
+            // Platform BOM pins jetty 12.0.31 (CVE-affected); align all jetty 12.0 modules on a fixed version.
+            eachDependency { details ->
+                if (details.requested.group == 'org.eclipse.jetty') {
+                    details.useVersion '12.0.36'
+                }
+            }
         }
     }
 
