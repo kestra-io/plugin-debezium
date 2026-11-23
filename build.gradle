@@ -53,8 +53,6 @@ subprojects {
             force  group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: "13.4.0.jre11"
             // SEC-0139: kafka-clients pulls at.yawk.lz4:lz4-java 1.10.2, remove once the platform ships >= 1.11.4.
             force  group: 'at.yawk.lz4', name: 'lz4-java', version: "1.11.4"
-            // SEC-2109 / CVE-2025-67030: platform BOM pins plexus-utils 3.0.24, remove once the platform ships >= 3.6.1.
-            force  group: 'org.codehaus.plexus', name: 'plexus-utils', version: "3.6.1"
 
             // Platform BOM pins jetty 12.0.31 (CVE-affected); align all jetty 12.0 modules on a fixed version.
             eachDependency { details ->
